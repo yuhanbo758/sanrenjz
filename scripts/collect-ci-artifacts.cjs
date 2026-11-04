@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { auditPackage, loadCatalog } = require('./audit-public-scope');
 const { resolvePackageLayout } = require('./package-local');
+const { parseReleaseVersion } = require('./preview-version.cjs');
 
 const NATIVE_PLATFORMS = { win: 'win32', mac: 'darwin', linux: 'linux' };
 function regularFile(file) {
@@ -60,7 +61,7 @@ function collectArtifacts(root = path.resolve(__dirname, '..'), input = {}) {
     if (packages.length !== 1 || !packages[0].isDirectory() || packages[0].isSymbolicLink()) throw new Error('必须存在且仅存在一个公开构建目录');
     const output = path.join(dist, packages[0].name);
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    if (!/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(pkg.version)) throw new Error('非法版本号');
+    parseReleaseVersion(pkg.version);
     const layout = resolvePackageLayout(output, { platform, arch }, pkg);
     regularFile(path.join(layout.resources, 'app.asar'));
     validateBinary(layout.binary, platform, arch);

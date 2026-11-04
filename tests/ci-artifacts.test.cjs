@@ -24,9 +24,9 @@ function binary(platform, arch = 'x64') {
     else { data.write('\x7fELF', 0, 'binary'); data[4] = 2; data[5] = 1; data.writeUInt16LE(62, 18); }
     return data;
 }
-async function fixture(platform = 'win', arch = 'x64') {
+async function fixture(platform = 'win', arch = 'x64', version = '1.2.3-preview.1') {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-collect-')); roots.push(root);
-    const pkg = { name: 'sanrenjz', version: '1.2.3-preview.1', build: { productName: '三人聚智' } };
+    const pkg = { name: 'sanrenjz', version, build: { productName: '三人聚智' } };
     write(path.join(root, 'package.json'), pkg);
     write(path.join(root, 'config/public-plugins.json'), { tools: ['public-tool'], python: ['public-python'] });
     write(path.join(root, 'config/private-plugins.json'), { tools: ['private-tool'], python: ['private-python'] });
@@ -59,10 +59,11 @@ async function fixture(platform = 'win', arch = 'x64') {
 (async () => {
     const log = console.log; console.log = () => {};
     try {
-        for (const [platform, arch] of [['win', 'x64'], ['mac', 'x64'], ['mac', 'arm64'], ['linux', 'x64']]) {
-            const f = await fixture(platform, arch);
+        for (const version of ['1.2.3-preview.1', '0.1.7']) for (const [platform, arch] of [['win', 'x64'], ['mac', 'x64'], ['mac', 'arm64'], ['linux', 'x64']]) {
+            const f = await fixture(platform, arch, version);
             const result = collectArtifacts(f.root, f.options);
             check(result.platform === f.report.platform && result.arch === arch, '平台和架构必须匹配');
+            check(result.version === version, '正式与预览安装包均使用对应的准确版本号');
             check(result.files.length === (platform === 'win' ? 1 : 2), '必须完整收集平台安装包');
             check(fs.readdirSync(path.join(f.root, 'dist/ci-artifacts')).length === result.files.length + 2, '只收集安装包与两份元数据');
             check(!JSON.stringify(result).includes(f.root) && !JSON.stringify(result).includes('archive-source'), '元数据不得包含本地路径');
@@ -71,6 +72,7 @@ async function fixture(platform = 'win', arch = 'x64') {
             rejects(() => collectArtifacts(f.root, f.options), /EEXIST/);
         }
         let f = await fixture(); fs.mkdirSync(path.join(f.root, 'dist/public-package-2222-3333')); rejects(() => collectArtifacts(f.root), /仅存在一个/);
+        f = await fixture(); write(path.join(f.root, 'package.json'), { ...f.pkg, version: '01.2.3' }); rejects(() => collectArtifacts(f.root), /严格 SemVer/);
         f = await fixture(); fs.mkdirSync(path.join(f.root, 'dist/personal-stage-1234-7777')); rejects(() => collectArtifacts(f.root), /个人包/);
         f = await fixture(); write(path.join(f.output, 'unexpected.exe'), binary('win')); rejects(() => collectArtifacts(f.root), /名称或数量/);
         f = await fixture(); write(path.join(f.output, expectedNames(f.pkg, 'win', 'x64')[0]), Buffer.alloc(0)); rejects(() => collectArtifacts(f.root), /非空/);

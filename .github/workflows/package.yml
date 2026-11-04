@@ -1,4 +1,4 @@
-name: 多平台预览版
+name: 多平台自动打包发布
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: preview-${{ github.ref }}
+  group: package-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -34,7 +34,7 @@ jobs:
           python -X utf8 tests/privacy-scanner.test.py
           python -X utf8 scripts/check-privacy.py --git
           node scripts/audit-public-scope.js
-      - name: 确认预览版本
+      - name: 确认发布版本
         id: version
         run: node scripts/preview-version.cjs
 
@@ -69,7 +69,7 @@ jobs:
     env:
       PYTHONUTF8: '1'
       SANRENJZ_PYTHON_LIVE: '0'
-      SANRENJZ_PREVIEW_BUILD: '1'
+      SANRENJZ_ADHOC_BUILD: '1'
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - name: 检出相同提交
@@ -103,7 +103,7 @@ jobs:
         run: |
           node scripts/prepare-build-assets.cjs --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node --test tests/build-assets.test.cjs tests/ci-artifacts.test.cjs tests/preview-release.test.cjs tests/packaged-runtime-probe.test.cjs
+          node --test tests/build-assets.test.cjs tests/ci-artifacts.test.cjs tests/preview-release.test.cjs tests/packaged-runtime-probe.test.cjs tests/dmg-detach-retry.test.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run audit:public
       - name: Windows 完整功能回归
@@ -151,7 +151,7 @@ jobs:
           retention-days: 30
 
   publish:
-    name: 汇总并发布预览版 Release
+    name: 汇总并发布 Release
     needs: [verify, build]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
@@ -169,7 +169,7 @@ jobs:
         with:
           pattern: public-*
           path: dist/release-input
-      - name: 校验完整资产集合并发布预览版
+      - name: 校验完整资产集合并发布
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/publish-preview.cjs --publish

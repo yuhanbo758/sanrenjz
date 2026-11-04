@@ -5,6 +5,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 const { expectedNames } = require('./collect-ci-artifacts.cjs');
+const { parseReleaseVersion } = require('./preview-version.cjs');
 
 const TARGETS = [
     { directory: 'public-windows-x64', target: 'win-x64', cliPlatform: 'win', platform: 'win32', arch: 'x64', signing: 'unsigned' },
@@ -36,7 +37,8 @@ function checksums(text) {
 }
 function validateInputs(root, { sourceCommit = process.env.GITHUB_SHA || '', input = path.join(root, 'dist/release-input') } = {}) {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    if (pkg.name !== 'sanrenjz' || !/^\d+\.\d+\.\d+-[a-zA-Z0-9.-]+$/.test(pkg.version)) throw new Error('只允许为三人聚智显式预览版本发布');
+    if (pkg.name !== 'sanrenjz') throw new Error('只允许为三人聚智发布安装包');
+    const releaseVersion = parseReleaseVersion(pkg.version);
     if (!/^[a-f0-9]{40}$/i.test(sourceCommit)) throw new Error('发布必须指定完整来源提交');
     directory(input);
     if (!sameNames(fs.readdirSync(input), TARGETS.map(target => target.directory))) throw new Error('四个平台产物必须齐全且不得含额外输入');
@@ -66,14 +68,14 @@ function validateInputs(root, { sourceCommit = process.env.GITHUB_SHA || '', inp
         targets.push({ target: target.target, platform: target.platform, arch: target.arch, signing: target.signing, notarized: false, auditedEntries: info.auditedEntries, runtimeVerified: true, runtimeAssertions: info.runtimeAssertions, files: verified });
     }
     if (allFiles.size !== 7) throw new Error('四个平台必须包含7个安装包');
-    return { version: pkg.version, tag: `v${pkg.version}`, sourceCommit, targets, files: [...allFiles.values()].sort((left, right) => left.filename.localeCompare(right.filename, 'en')) };
+    return { ...releaseVersion, sourceCommit, targets, files: [...allFiles.values()].sort((left, right) => left.filename.localeCompare(right.filename, 'en')) };
 }
 function prepareRelease(root = path.resolve(__dirname, '..'), options = {}) {
     const validated = validateInputs(root, options);
     const output = options.output || path.join(root, 'dist/release-assets');
     const manifest = {
         schemaVersion: 1, version: validated.version, tag: validated.tag, sourceCommit: validated.sourceCommit,
-        preview: true, bundledPython: false, privatePluginsIncluded: false, targets: validated.targets,
+        preview: validated.prerelease, bundledPython: false, privatePluginsIncluded: false, targets: validated.targets,
         files: validated.files.map(({ sourcePath, ...file }) => file),
     };
     const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
@@ -141,7 +143,7 @@ function verifyRemoteAssets(repository, tag, remoteAssets, prepared, { complete 
 function validateReleaseState(release, target, prepared) {
     if (target && target !== prepared.sourceCommit) throw new Error('既有标签指向其他提交，必须使用新版本');
     if (!release) return;
-    if (release.tag_name !== prepared.tag || release.prerelease !== true || (!target && release.target_commitish !== prepared.sourceCommit) || (!release.draft && target !== prepared.sourceCommit)) throw new Error('既有Release的预览状态或来源不符，停止修改');
+    if (release.tag_name !== prepared.tag || release.prerelease !== parseReleaseVersion(prepared.version).prerelease || (!target && release.target_commitish !== prepared.sourceCommit) || (!release.draft && target !== prepared.sourceCommit)) throw new Error('既有Release的发布通道或来源不符，停止修改');
 }
 function findRelease(repository, tag, run = gh) {
     // 按tag接口只保证公开Release；列表对有写权限的任务也返回草稿，按ID继续操作。
@@ -154,7 +156,7 @@ function findRelease(repository, tag, run = gh) {
     return run(['api', '--header', 'Cache-Control: no-cache', `repos/${repository}/releases/${matches[0].id}`], { json: true });
 }
 function validateCreatedRelease(release, prepared) {
-    if (!release || !Number.isSafeInteger(release.id) || release.id <= 0 || release.draft !== true || release.prerelease !== true || release.tag_name !== prepared.tag || release.target_commitish !== prepared.sourceCommit || !Array.isArray(release.assets) || release.assets.length !== 0) throw new Error('创建草稿响应缺少有效标识、来源或预览状态');
+    if (!release || !Number.isSafeInteger(release.id) || release.id <= 0 || release.draft !== true || release.prerelease !== parseReleaseVersion(prepared.version).prerelease || release.tag_name !== prepared.tag || release.target_commitish !== prepared.sourceCommit || !Array.isArray(release.assets) || release.assets.length !== 0) throw new Error('创建草稿响应缺少有效标识、来源或发布通道');
     return release;
 }
 function jsonRequest(root, name, method, endpoint, payload, run) {
@@ -174,6 +176,7 @@ function releaseById(repository, id, run, wait, expectedAssets = 0) {
     throw new Error('Release按标识读取暂不可用或资产未就绪');
 }
 function publishRelease(prepared, root = path.resolve(__dirname, '..'), { run = gh, wait = pause } = {}) {
+    const { prerelease } = parseReleaseVersion(prepared.version);
     const repository = process.env.GITHUB_REPOSITORY || '';
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw new Error('缺少明确的GitHub发布仓库');
     if (!process.env.GH_TOKEN && !process.env.GITHUB_TOKEN) throw new Error('Release发布需要仅用于当前任务的GitHub凭据');
@@ -185,9 +188,10 @@ function publishRelease(prepared, root = path.resolve(__dirname, '..'), { run = 
         return { url: release.html_url, alreadyPublished: true };
     }
     if (!release) {
-        const body = `三人聚智 ${prepared.version} 多平台预览版\n\n来源提交：${prepared.sourceCommit}\n\n- Windows x64：未签名测试安装包。\n- macOS Intel / Apple Silicon：仅 ad-hoc 签名，未使用 Developer ID，未公证；首次打开可能需要系统确认。\n- Linux x64：AppImage 与 tar.gz 测试包。\n- 默认不携带 Python 运行时、私有插件或用户配置。请按 SHA256SUMS.txt 校验下载文件。\n- 各目标已完成原生运行与公开范围检查，不能替代用户设备上的安装、升级与权限验收。\n`;
+        const label = prerelease ? '预览版' : '正式版';
+        const body = `三人聚智 ${prepared.version} 多平台${label}\n\n来源提交：${prepared.sourceCommit}\n\n- Windows x64：未签名安装包。\n- macOS Intel / Apple Silicon：仅 ad-hoc 签名，未使用 Developer ID，未公证；首次打开可能需要系统确认。\n- Linux x64：AppImage 与 tar.gz 安装包。\n- 默认不携带 Python 运行时、私有插件或用户配置。请按 SHA256SUMS.txt 校验下载文件。\n- 各目标已完成原生运行与公开范围检查，不能替代用户设备上的安装、升级与权限验收。\n`;
         // 创建响应的ID是权威结果，不依赖列表或pending-tag索引的即时可见性。
-        release = validateCreatedRelease(jsonRequest(root, 'preview-release-create.json', 'POST', `repos/${repository}/releases`, { tag_name: prepared.tag, target_commitish: prepared.sourceCommit, name: `三人聚智 ${prepared.version} 预览版`, body, draft: true, prerelease: true }, run), prepared);
+        release = validateCreatedRelease(jsonRequest(root, 'preview-release-create.json', 'POST', `repos/${repository}/releases`, { tag_name: prepared.tag, target_commitish: prepared.sourceCommit, name: `三人聚智 ${prepared.version} ${label}`, body, draft: true, prerelease }, run), prepared);
     }
     if (!release) throw new Error('无法读取刚创建的Release草稿');
     const releaseId = release.id;
@@ -204,8 +208,9 @@ function publishRelease(prepared, root = path.resolve(__dirname, '..'), { run = 
     verifyRemoteAssets(repository, prepared.tag, release.assets || [], prepared, { complete: true, run });
     target = tagCommit(repository, prepared.tag, run);
     validateReleaseState(release, target, prepared);
-    release = jsonRequest(root, 'preview-release-publish.json', 'PATCH', endpoint, { draft: false, prerelease: true }, run);
-    if (!release || release.id !== releaseId || release.draft !== false || release.prerelease !== true || release.tag_name !== prepared.tag || !Array.isArray(release.assets)) throw new Error('Release最终状态不符');
+    // GitHub不允许草稿成为latest；正式版仅在完整资产校验后公开时显式设置。
+    release = jsonRequest(root, 'preview-release-publish.json', 'PATCH', endpoint, { draft: false, prerelease, ...(!prerelease ? { make_latest: 'true' } : {}) }, run);
+    if (!release || release.id !== releaseId || release.draft !== false || release.prerelease !== prerelease || release.tag_name !== prepared.tag || !Array.isArray(release.assets)) throw new Error('Release最终状态不符');
     let publishedCommit;
     for (let attempt = 0; attempt < 4; attempt++) {
         if (attempt) wait(200 * attempt);
@@ -221,7 +226,7 @@ function main(argv = process.argv.slice(2)) {
     const root = path.resolve(__dirname, '..');
     const prepared = prepareRelease(root);
     const result = argv.includes('--publish') ? publishRelease(prepared, root) : { preparedOnly: true };
-    console.log(JSON.stringify({ version: prepared.version, tag: prepared.tag, sourceCommit: prepared.sourceCommit, targets: prepared.targets.length, assets: prepared.assets.length, ...result }));
+    console.log(JSON.stringify({ version: prepared.version, tag: prepared.tag, prerelease: prepared.prerelease, channel: prepared.channel, sourceCommit: prepared.sourceCommit, targets: prepared.targets.length, assets: prepared.assets.length, ...result }));
 }
 if (require.main === module) { try { main(); } catch (error) { console.error(error.message); process.exitCode = 1; } }
 module.exports = { TARGETS, checksums, validateInputs, prepareRelease, verifyRemoteAssets, validateReleaseState, findRelease, validateCreatedRelease, releaseById, publishRelease };

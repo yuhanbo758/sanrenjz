@@ -87,9 +87,9 @@ function createStage({ root, stage, personal = [] }) {
     }
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     delete pkg.repository; delete pkg.homepage; delete pkg.bugs; delete pkg.scripts;
-    pkg.build = { ...pkg.build, publish: null, files: ['*.js', '*.html', '*.css', 'LICENSE', '*.json', 'app/**/*', 'assets/**/*', 'config/**/*', 'build/**/*', '!build/preview-sign.cjs', 'node_modules/**/*'], extraResources: [{ from: 'app', to: 'app', filter: ['**/*'] }, { from: 'config', to: 'config', filter: ['python-runtime.json', 'public-plugins.json'] }, { from: 'build', to: 'build', filter: ['*.ico', '*.png', '*.icns'] }] };
-    if (process.env.SANRENJZ_PREVIEW_BUILD === '1') {
-        // 预览包只由显式 afterPack 钩子执行 ad-hoc 签名，不发现或使用个人证书。
+    pkg.build = { ...pkg.build, publish: null, files: ['*.js', '*.html', '*.css', 'LICENSE', '*.json', 'app/**/*', 'assets/**/*', 'config/**/*', 'build/**/*', '!build/preview-sign.cjs', '!build/dmg-detach-retry.cjs', 'node_modules/**/*'], extraResources: [{ from: 'app', to: 'app', filter: ['**/*'] }, { from: 'config', to: 'config', filter: ['python-runtime.json', 'public-plugins.json'] }, { from: 'build', to: 'build', filter: ['*.ico', '*.png', '*.icns'] }] };
+    if (process.env.SANRENJZ_ADHOC_BUILD === '1' || process.env.SANRENJZ_PREVIEW_BUILD === '1') {
+        // 未配置正式证书的构建只由显式 afterPack 钩子执行 ad-hoc 签名，不自动发现个人证书。
         pkg.build.mac = { ...pkg.build.mac, identity: null, forceCodeSigning: false };
     }
     if (personal.length) { pkg.build.productName = `${pkg.build.productName}（个人版）`; pkg.build.artifactName = 'sanrenjz-personal-${version}-${os}-${arch}.${ext}'; }
