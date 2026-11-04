@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execFileSync } = require('child_process');
 
 module.exports = async function signPreview(context) {
@@ -19,8 +20,18 @@ module.exports = async function signPreview(context) {
     findNative(app);
     // .node位于非标准嵌套位置，先逐项签名，再签外层Framework/helper/app。
     for (const file of nativeFiles) execFileSync('codesign', ['--force', '--sign', '-', '--timestamp=none', file], { stdio: 'inherit' });
-    // 仅提供本地完整性用的ad-hoc签名；没有Developer ID身份，也不宣称已公证。
-    execFileSync('codesign', ['--force', '--deep', '--sign', '-', '--options', 'runtime', '--entitlements', entitlements, app], { stdio: 'inherit' });
+    // 由Apple工具规范化XML，避免AMFI对跨平台文本格式的解析差异。
+    const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-preview-sign-'));
+    try {
+        const normalized = path.join(temporary, 'entitlements.plist');
+        execFileSync('plutil', ['-lint', entitlements], { stdio: 'inherit' });
+        execFileSync('plutil', ['-convert', 'xml1', '-o', normalized, entitlements], { stdio: 'inherit' });
+        console.log(JSON.stringify({ originalEntitlementBytes: fs.statSync(entitlements).size, normalizedEntitlementBytes: fs.statSync(normalized).size }));
+        // 仅提供本地完整性用的ad-hoc签名；没有Developer ID身份，也不宣称已公证。
+        execFileSync('codesign', ['--force', '--deep', '--sign', '-', '--options', 'runtime', '--entitlements', normalized, app], { stdio: 'inherit' });
+    } finally {
+        fs.rmSync(temporary, { recursive: true, force: true });
+    }
     execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'inherit' });
     for (const file of nativeFiles) execFileSync('codesign', ['--verify', '--strict', file], { stdio: 'inherit' });
     const result = require('child_process').spawnSync('codesign', ['--display', '--verbose=4', app], { encoding: 'utf8' });

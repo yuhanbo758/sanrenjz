@@ -127,7 +127,10 @@ jobs:
       - name: Linux 图形环境隔离运行验收
         if: runner.os == 'Linux'
         shell: bash
-        run: xvfb-run -a node scripts/test-packaged-runtime.cjs --platform linux --arch x64
+        run: |
+          df -h /dev/shm
+          ulimit -c 0
+          xvfb-run -a node scripts/test-packaged-runtime.cjs --platform linux --arch x64
       - name: 验证运行后 macOS 包签名保持完整
         if: runner.os == 'macOS'
         run: |

@@ -3,12 +3,71 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn, spawnSync } = require('child_process');
+const { StringDecoder } = require('string_decoder');
 const WebSocket = require('ws');
 const { resolvePackageLayout } = require('./package-local');
 
 const TARGETS = { win: 'win32', mac: 'darwin', linux: 'linux' };
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 function failure(code) { return Object.assign(new Error(code), { code }); }
+
+function runtimeArguments(platform) {
+    const args = ['--remote-debugging-port=0', '--disable-gpu'];
+    // 仅CI隔离进程绕过沙盒和有限/dev/shm，产品启动参数不改变。
+    if (platform === 'linux') args.push('--no-sandbox', '--disable-dev-shm-usage');
+    return args;
+}
+
+function sanitizeSystemLine(line, roots = []) {
+    let result = String(line);
+    const field = '[a-z0-9_-]*(?:authorization|api[_-]?key|access[_-]?token|password|passwd|secret|token|cookie)[a-z0-9_-]*';
+    result = result.replace(new RegExp(`(["']?${field}["']?\\s*[:=]\\s*)(?:"[^"\\r\\n]*"|'[^'\\r\\n]*'|[^\\s,;]+)`, 'gi'), '$1[REDACTED]');
+    result = result.replace(/\b(Bearer|Basic)\s+[A-Za-z0-9+/_=.\-]{6,}/gi, '$1 [REDACTED]');
+    result = result.replace(/(["']?authorization["']?\s*[:=]\s*)[^\r\n]+/gi, '$1[REDACTED]');
+    for (const root of roots.filter(Boolean).sort((left, right) => right.length - left.length)) result = result.split(root).join('[PATH]');
+    result = result.replace(/\bfile:\/\/[^\s"'<>|)\]}]+/gi, '[PATH]');
+    result = result.replace(/\/dev\/shm\b/g, '[system-shm]');
+    result = result.replace(/(?:[a-z]:[\\/]|\\\\)[^\s"'<>|)\]}]+/gi, '[PATH]');
+    result = result.replace(/(^|[\s(=:])\/(?!\/)[^\s"'<>|)\]}]+/g, '$1[PATH]');
+    result = result.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[EMAIL]');
+    return result.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, 700);
+}
+
+function createSystemDiagnostics(roots = []) {
+    const decoder = new StringDecoder('utf8');
+    const collected = [];
+    let pending = '', discardUntilNewline = false;
+    const add = line => {
+        if (line.length > 16000 || !/\b(?:FATAL|ERROR|SIGBUS|SIGSEGV|SIGABRT)\b|\/dev\/shm|shared[ _-]?memory|\bmmap\b|bus error|received signal|error while loading shared libraries/i.test(line)) return;
+        const safe = sanitizeSystemLine(line, roots);
+        if (!safe || collected.includes(safe)) return;
+        collected.push(safe);
+        while (collected.length > 8 || collected.join('\n').length > 5000) collected.shift();
+    };
+    const consume = text => {
+        pending += text;
+        const lines = pending.split(/\r?\n/);
+        pending = lines.pop();
+        for (const line of lines) {
+            if (discardUntilNewline) { discardUntilNewline = false; continue; }
+            add(line);
+        }
+        if (pending.length > 16000) { pending = ''; discardUntilNewline = true; }
+    };
+    return {
+        write(chunk) { consume(decoder.write(chunk)); },
+        end() { consume(decoder.end()); if (pending && !discardUntilNewline) add(pending); pending = ''; },
+        lines() { return [...collected]; }
+    };
+}
+
+function linuxCapacity() {
+    const result = { freeMemoryBytes: os.freemem() };
+    for (const [key, directory] of [['sharedMemoryAvailableBytes', '/dev/shm'], ['temporaryStorageAvailableBytes', os.tmpdir()]]) {
+        try { const stat = fs.statfsSync(directory); result[key] = stat.bsize * stat.bavail; } catch {}
+    }
+    return result;
+}
 
 function parseOptions(args = process.argv.slice(2)) {
     const result = {};
@@ -88,7 +147,12 @@ function connectCdp(address) {
         socket.once('open', resolve);
         socket.once('error', () => reject(failure('CDP_CONNECT_FAILED')));
     });
-    socket.on('error', () => {});
+    const rejectPending = code => {
+        for (const request of pending.values()) { clearTimeout(request.timer); request.reject(failure(code)); }
+        pending.clear();
+    };
+    socket.on('error', () => rejectPending('CDP_DISCONNECTED'));
+    socket.once('close', () => rejectPending('CDP_DISCONNECTED'));
     socket.on('message', bytes => {
         let value;
         try { value = JSON.parse(String(bytes)); } catch { return; }
@@ -100,6 +164,7 @@ function connectCdp(address) {
     });
     async function evaluate(expression) {
         await opened;
+        if (socket.readyState !== WebSocket.OPEN) throw failure('CDP_DISCONNECTED');
         const id = ++serial;
         const result = await new Promise((resolve, reject) => {
             const timer = setTimeout(() => { pending.delete(id); reject(failure('CDP_REQUEST_TIMEOUT')); }, 15000);
@@ -110,8 +175,7 @@ function connectCdp(address) {
         return result.result?.value;
     }
     function close() {
-        for (const request of pending.values()) { clearTimeout(request.timer); request.reject(failure('CDP_CLOSED')); }
-        pending.clear();
+        rejectPending('CDP_CLOSED');
         socket.close();
     }
     return { opened, evaluate, close };
@@ -123,7 +187,7 @@ async function runSmoke({ root = path.resolve(__dirname, '..'), platform, arch, 
         version: null, sourceCommit: /^[a-f0-9]{40}$/i.test(process.env.GITHUB_SHA || '') ? process.env.GITHUB_SHA : null,
         isolation: 'temporary-profile-and-plugin-root', assertions: [], errors: [], bundledPython: false, success: false
     };
-    let stage = 'preflight', child, closed = Promise.resolve(), cdp, sandbox, deadline, cancelled = false;
+    let stage = 'preflight', child, closed = Promise.resolve(), cdp, sandbox, deadline, cancelled = false, diagnostics;
     const record = (condition, label) => {
         if (cancelled) throw failure('SMOKE_CANCELLED');
         if (!condition) throw failure('ASSERTION_FAILED');
@@ -141,15 +205,17 @@ async function runSmoke({ root = path.resolve(__dirname, '..'), platform, arch, 
         const pluginRoot = platform === 'win' ? path.join(sandbox, 'portable') : profile;
         fs.mkdirSync(profile); fs.mkdirSync(pluginRoot, { recursive: true });
         const env = isolatedEnvironment(process.env, { platform, profile, pluginRoot });
-        const args = ['--remote-debugging-port=0', '--disable-gpu'];
-        // 仅隔离验收进程使用此参数；产品启动选项不改变。
-        if (platform === 'linux') args.push('--no-sandbox');
+        const args = runtimeArguments(platform);
+        if (platform === 'linux') env.ELECTRON_ENABLE_STACK_DUMPING = '1';
         child = spawn(layout.binary, args, { env, cwd: sandbox, windowsHide: true, detached: platform !== 'win', stdio: ['ignore', 'pipe', 'pipe'] });
         let spawnFailed = false, exited = false;
         child.once('error', () => { spawnFailed = true; });
         closed = new Promise(resolve => child.once('close', (code, signal) => { exited = true; report.exitCode = code; report.signal = signal || null; resolve(); }));
-        // 不把宿主或插件原始输出写入产物，报告只保存受控断言和错误代码。
-        child.stdout.on('data', () => {}); child.stderr.on('data', () => {});
+        diagnostics = createSystemDiagnostics([sandbox, root, layout.binary, layout.resources, os.homedir(), os.tmpdir()]);
+        // 原始输出不落盘、不进产物；失败时仅向CI控制台输出脱敏且限长的系统诊断。
+        child.stdout.on('data', () => {});
+        child.stderr.on('data', chunk => diagnostics.write(chunk));
+        child.stderr.once('end', () => diagnostics.end());
         const validation = async () => {
             stage = 'startup';
             let page;
@@ -220,6 +286,11 @@ async function runSmoke({ root = path.resolve(__dirname, '..'), platform, arch, 
         clearTimeout(deadline);
         cdp?.close();
         await stopOwnedProcess(child, closed);
+        if (!report.success && diagnostics) {
+            const lines = diagnostics.lines();
+            if (lines.length) console.error(`PACKAGED_RUNTIME_SYSTEM_DIAGNOSTICS ${JSON.stringify(lines)}`);
+            if (platform === 'linux') console.error(`PACKAGED_RUNTIME_SYSTEM_CAPACITY ${JSON.stringify(linuxCapacity())}`);
+        }
         if (sandbox) try { fs.rmSync(sandbox, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { report.cleanupPending = true; }
         const output = path.join(root, 'dist', `packaged-runtime-${platform}-${arch}.json`);
         fs.mkdirSync(path.dirname(output), { recursive: true });
@@ -233,4 +304,4 @@ if (require.main === module) {
     try { options = parseOptions(); } catch (error) { console.error(error.code || 'INVALID_ARGUMENTS'); process.exitCode = 1; }
     if (options) runSmoke(options).then(report => { console.log(JSON.stringify(report)); process.exitCode = report.success ? 0 : 1; }).catch(() => { console.error('SMOKE_REPORT_FAILED'); process.exitCode = 1; });
 }
-module.exports = { parseOptions, locatePackage, isolatedEnvironment, inside, stopOwnedProcess, runSmoke };
+module.exports = { parseOptions, locatePackage, isolatedEnvironment, inside, stopOwnedProcess, runSmoke, runtimeArguments, sanitizeSystemLine, createSystemDiagnostics, connectCdp };

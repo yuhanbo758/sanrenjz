@@ -13,6 +13,13 @@ test('实际跨平台图标和DMG背景包含要求的尺寸', () => {
     assert.deepEqual(Object.entries(assets.icns), ICNS_SIZES);
 });
 
+test('签名权限XML采用无BOM的LF格式，避免AMFI拒绝CRLF', () => {
+    const bytes = fs.readFileSync(path.join(build, 'entitlements.mac.plist'));
+    assert.equal(bytes.includes(13), false);
+    assert.equal(bytes.subarray(0, 3).equals(Buffer.from([239, 187, 191])), false);
+    assert.equal(bytes.at(-1), 10);
+});
+
 test('PNG校验拒绝不完整图片头', () => {
     assert.throws(() => pngSize(Buffer.alloc(32)), /PNG/);
 });

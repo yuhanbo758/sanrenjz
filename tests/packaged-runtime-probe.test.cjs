@@ -5,7 +5,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
-const { parseOptions, locatePackage, isolatedEnvironment, inside, stopOwnedProcess, runSmoke } = require('../scripts/test-packaged-runtime.cjs');
+const WebSocket = require('ws');
+const { parseOptions, locatePackage, isolatedEnvironment, inside, stopOwnedProcess, runSmoke, runtimeArguments, sanitizeSystemLine, createSystemDiagnostics, connectCdp } = require('../scripts/test-packaged-runtime.cjs');
 
 function fixture(t) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-smoke-test-'));
@@ -74,4 +75,65 @@ test('失败报告不包含本地路径或原始程序输出，平台不符时�
     const serialized = fs.readFileSync(path.join(root, 'dist', `packaged-runtime-${platform}-x64.json`), 'utf8');
     assert.equal(serialized.includes(root), false);
     assert.equal(serialized.includes(os.homedir()), false);
+});
+
+test('只有Linux隔离验收使用共享内存规避和无沙盒参数', () => {
+    assert.ok(runtimeArguments('linux').includes('--disable-dev-shm-usage'));
+    assert.ok(runtimeArguments('linux').includes('--no-sandbox'));
+    for (const platform of ['win', 'mac']) {
+        assert.equal(runtimeArguments(platform).includes('--disable-dev-shm-usage'), false);
+        assert.equal(runtimeArguments(platform).includes('--no-sandbox'), false);
+    }
+});
+
+test('系统诊断逐行解码、过滤和限长，凭据与本机路径不输出', () => {
+    const directory = path.join(os.tmpdir(), 'private-diagnostic-location');
+    const value = ['fixture', 'credential', 'content'].join('-');
+    const collector = createSystemDiagnostics([directory]);
+    const line = `[FATAL] 共享内存 ${directory}/config error api_` + `key=${value} from person@example.invalid\n`;
+    const bytes = Buffer.from(line);
+    for (let offset = 0; offset < bytes.length; offset += 7) collector.write(bytes.subarray(offset, offset + 7));
+    collector.write(Buffer.from('routine user configuration is omitted\n'));
+    collector.end();
+    const result = collector.lines().join('\n');
+    assert.ok(result.includes('共享内存') && result.includes('[REDACTED]'));
+    assert.equal(result.includes(value), false);
+    assert.equal(result.includes(directory), false);
+    assert.equal(result.includes('person@example.invalid'), false);
+    assert.equal(result.includes('\uFFFD'), false);
+    assert.equal(collector.lines().length, 1);
+    const authorization = sanitizeSystemLine('[ERROR] Authorization: Bearer ' + value);
+    assert.equal(authorization.includes(value), false);
+    const memory = sanitizeSystemLine('[ERROR] shared memory mmap /dev/shm/fixture failed');
+    assert.ok(memory.includes('[system-shm]'));
+    assert.equal(sanitizeSystemLine('[ERROR] file:///home/private-user/config.json').includes('private-user'), false);
+});
+
+test('系统诊断容量有界，超长未完成行整行丢弃', () => {
+    const collector = createSystemDiagnostics();
+    collector.write(Buffer.from('[ERROR] ' + 'x'.repeat(17000)));
+    collector.write(Buffer.from(' [ERROR] must-not-be-a-separate-line\n'));
+    for (let index = 0; index < 30; index++) collector.write(Buffer.from(`[ERROR] system line ${index} ${'x'.repeat(900)}\n`));
+    collector.end();
+    assert.equal(collector.lines().some(line => line.includes('must-not-be')), false);
+    assert.ok(collector.lines().length <= 8);
+    assert.ok(collector.lines().join('\n').length <= 5000);
+    assert.ok(collector.lines().every(line => line.length <= 700));
+});
+
+test('CDP进程断连立即拒绝待处理请求，不能被误报为15秒超时', { timeout: 4000 }, async () => {
+    const server = new WebSocket.Server({ host: '127.0.0.1', port: 0 });
+    await new Promise(resolve => server.once('listening', resolve));
+    server.on('connection', socket => socket.once('message', () => socket.close()));
+    const cdp = connectCdp(`ws://127.0.0.1:${server.address().port}`);
+    try {
+        await cdp.opened;
+        const started = Date.now();
+        await assert.rejects(cdp.evaluate('true'), { code: 'CDP_DISCONNECTED' });
+        assert.ok(Date.now() - started < 1500);
+    } finally {
+        cdp.close();
+        for (const client of server.clients) client.terminate();
+        await new Promise(resolve => server.close(resolve));
+    }
 });

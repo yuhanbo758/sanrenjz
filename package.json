@@ -288,7 +288,7 @@
       ],
       "category": "Utility",
       "icon": "build/icon.png",
-      "artifactName": "sanrenjz-${version}-linux-${arch}.${ext}",
+      "artifactName": "sanrenjz-${version}-linux-x64.${ext}",
       "desktop": {
         "Name": "三人聚智",
         "Comment": "效率工具与 Python 程序管理",

@@ -30,4 +30,4 @@
 - 统一日志入口在两类页面常显，按稳定条目 ID 采集和筛选；导出必须使用同一筛选条件。默认采用有界会话缓存，不扫描或安装 Python，不把插件配置或宿主存储调试值写入日志。
 - 隐私检查必须覆盖 Git 公开候选、实际索引及公开构建暂存内容，包含 HTML/CJS、JSON 引号字段和 UTF-16 文本；公开 Python 配置只允许空模板。误报仅按文件、规则和行校验值逐项复核，不得整目录放行；原始扫描报告只在本地保留。
 - Python插件目录复制保留明确的filter回调，避免Windows下Node22的cpSync原生快路径在中文目录上异常退出；不得用跳过导入测试代替兼容修复。
-- Windows安装态插件仍在安装目录；macOS/Linux安装态插件与公共插件运行时放入独立userData目录，不能写入签名.app或AppImage只读挂载目录。macOS预览版仅作ad-hoc签名并明确未公证，不能冒充Developer ID正式签名。
+- Windows安装态插件仍在安装目录；macOS/Linux安装态插件与公共插件运行时放入独立userData目录，不能写入签名.app或AppImage只读挂载目录。macOS预览版仅作ad-hoc签名并明确未公证，不能冒充Developer ID正式签名；签名权限plist保持无BOM的LF文本，签名前由Apple工具校验和规范化。
