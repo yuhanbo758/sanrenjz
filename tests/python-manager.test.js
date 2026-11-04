@@ -139,7 +139,7 @@ test('迁移后公开升级入口保留自定义 VBS/helper，拒绝新插件根
     fs.writeFileSync(path.join(source, 'VBS运行.vbs'), customVbs);
     fs.writeFileSync(path.join(source, 'standalone_launcher.py'), customHelper);
     const installed = path.join(plugins, 'custom-helper');
-    fs.cpSync(source, installed, { recursive: true });
+    fs.cpSync(source, installed, { recursive: true, filter: () => true });
     const result = await manager.upgradeStandardHelpers(installed);
     assert.equal(result.updated, false);
     assert.equal(result.reason, 'custom-helper');
@@ -184,7 +184,7 @@ End If
 `;
     fs.writeFileSync(path.join(source, 'VBS运行.vbs'), oldVbs);
     const installed = path.join(plugins, 'old-standard');
-    fs.cpSync(source, installed, { recursive: true });
+    fs.cpSync(source, installed, { recursive: true, filter: () => true });
     const result = await manager.upgradeStandardHelpers(installed);
     assert.equal(result.updated, true);
     assert.equal(result.files.length, 3);

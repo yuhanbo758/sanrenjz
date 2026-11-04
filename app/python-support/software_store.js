@@ -25,7 +25,9 @@ function copyMissingEntries(sourceDir, targetDir) {
         fs.cpSync(sourcePath, targetPath, {
             recursive: entry.isDirectory(),
             force: false,
-            errorOnExist: true
+            errorOnExist: true,
+            // 与导入共用逐项复制路径，兼容Windows中文目录和Node22。
+            filter: () => true
         });
         result.copied.push(entry.name);
     }
@@ -91,7 +93,7 @@ function importLocalSoftware(sourcePath, softwareDir, runningScriptPaths = [], c
     const backup = path.join(workspace, 'old');
     try {
         // 完整准备新版本后才切换目录，确保旧文件被移除且复制失败不损坏旧插件。
-        fs.cpSync(source, staged, { recursive: stats.isDirectory(), force: false, errorOnExist: true });
+        fs.cpSync(source, staged, { recursive: stats.isDirectory(), force: false, errorOnExist: true, filter: () => true });
         // 更新程序不能改变配置内容；兼容旧插件旁路配置及新版本配置文件改名。
         if (replaced && stats.isDirectory()) {
             const settingsFile = path.join(target, 'settings.json');

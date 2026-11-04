@@ -229,7 +229,8 @@ class PythonManager {
             if (stat.isDirectory() && path.resolve(source) !== path.resolve(destination)) {
                 workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-import-'));
                 prepared = path.join(workspace, path.basename(source));
-                fs.cpSync(source, prepared, { recursive: true });
+                // Node22在Windows复制中文目录的原生快路径可能崩溃；保留过滤回调以逐项复制。
+                fs.cpSync(source, prepared, { recursive: true, filter: () => true });
                 const candidate = this._entries(prepared, { strict: true })[0];
                 if (!fs.existsSync(path.join(prepared, 'settings.json'))) {
                     fs.writeFileSync(path.join(prepared, 'settings.json'), JSON.stringify({ name: path.basename(source), main_file: path.relative(prepared, candidate.entry) }, null, 2), 'utf8');
