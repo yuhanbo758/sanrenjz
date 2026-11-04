@@ -118,6 +118,10 @@ function resolvePackageLayout(output, { platform = 'win', arch = 'x64' } = {}, p
     }
     return { unpacked, appRoot, binary, executable: binary, resources };
 }
+function builderEnvironment(environment = process.env) {
+    // 暂存依赖链接可能让同源模块出现两次；隔离复制也防止Mac签名回写源依赖。
+    return { ...environment, USE_HARD_LINKS: 'false' };
+}
 function main(argv = process.argv.slice(2)) {
     const root = path.resolve(__dirname, '..');
     const { platform, architecture } = parseBuildOptions(argv);
@@ -136,7 +140,7 @@ function main(argv = process.argv.slice(2)) {
     const output = path.join(root, 'dist', `${kind}-package-${stamp}`);
     const args = [cli, '--projectDir', stage, '--publish', 'never', `--${platform}`, `--${architecture}`, `--config.directories.output=${output}`];
     if (argv.includes('--dir')) args.push('--dir');
-    const child = spawnSync(process.execPath, args, { cwd: root, stdio: 'inherit', windowsHide: true });
+    const child = spawnSync(process.execPath, args, { cwd: root, stdio: 'inherit', windowsHide: true, env: builderEnvironment() });
     if (child.status !== 0) throw new Error('本地打包失败，暂存目录已保留');
     const { unpacked } = resolvePackageLayout(output, { platform, arch: architecture }, JSON.parse(fs.readFileSync(path.join(stage, 'package.json'), 'utf8')));
     const audited = auditPackage(unpacked, { publicCatalog: loadCatalog(root, 'public'), privateCatalog, personal });
@@ -144,4 +148,4 @@ function main(argv = process.argv.slice(2)) {
     console.log(JSON.stringify({ output, files: audited.files, published: false, personal }));
 }
 if (require.main === module) { try { main(); } catch (error) { console.error(error.message); process.exitCode = 1; } }
-module.exports = { ROOT_FILES, copyRuntime, parseSelections, parseBuildOptions, createStage, resolvePackageLayout };
+module.exports = { ROOT_FILES, copyRuntime, parseSelections, parseBuildOptions, createStage, resolvePackageLayout, builderEnvironment };
