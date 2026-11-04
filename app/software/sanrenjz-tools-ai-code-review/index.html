@@ -1,0 +1,155 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-layout="review-terminal">
+<head data-business>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 代码审查</title>
+<style>
+:root{--a:#dc2626;--a2:#ef4444;--as:rgba(220,38,38,.1);--al:rgba(220,38,38,.3);--bg:#fdf5f5;--sf:#fff;--s2:#fce8e8;--bd:#f0d4d4;--ink:#2d1010;--mt:#7a5656;--ft:#a89090;--ok:#16a34a;--err:#dc2626;--warn:#d97706;--crit:#991b1b;--info:#2563eb;--mono:'JetBrains Mono','Fira Code',Consolas,monospace;--sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif}
+*{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.head{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none}
+.icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--a),var(--a2));display:flex;align-items:center;justify-content:center;flex:none}.icon svg{width:18px;height:18px;color:#fff}
+.head h1{margin:0;font-size:17px;font-weight:700}.head p{margin:0;color:var(--mt);font-size:12px}
+.spacer{flex:1}.gear{border:1px solid var(--bd);background:var(--sf);color:var(--a);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}.gear svg{width:14px;height:14px}
+.modes{display:flex;gap:6px;padding:10px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none}
+.mode{border:1px solid var(--bd);background:var(--sf);color:var(--mt);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:.12s}.mode:hover{border-color:var(--al);color:var(--a)}.mode.active{background:var(--a);color:#fff;border-color:transparent}
+.modes{overflow-x:auto}.mode{white-space:nowrap}.mode:disabled{opacity:.5;cursor:default}
+.body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:0;overflow:hidden}
+.code-side{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--bd);background:var(--sf)}
+.code-h{padding:10px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex:none}
+.code-h .title{font-weight:700;font-size:13px;flex:1}.code-h .cnt{font:11px var(--mono);color:var(--ft)}
+.code-area{flex:1;min-height:0;border:0;outline:0;resize:none;padding:16px;font:13px/1.6 var(--mono);background:#1a1010;color:#f0d4d4;min-height:0}
+.code-area::placeholder{color:#6a5050}
+.issues-side{display:flex;flex-direction:column;min-height:0;overflow:hidden;background:var(--sf)}
+.issues-h{padding:10px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex:none}
+.issues-h .title{font-weight:700;font-size:13px}.issues-h .stat{font:11px var(--mono);color:var(--ft)}
+.sev-badge{font:600 10px var(--mono);padding:3px 10px;border-radius:999px}
+.sev-crit{background:rgba(153,27,27,.15);color:var(--crit)}.sev-high{background:rgba(220,38,38,.12);color:var(--err)}.sev-med{background:rgba(217,119,6,.12);color:var(--warn)}.sev-low{background:var(--s2);color:var(--mt)}
+.issues-list{flex:1;min-height:0;overflow:auto;padding:12px}
+.issue{background:var(--s2);border:1px solid var(--bd);border-left:4px solid var(--err);border-radius:8px;padding:12px 14px;margin-bottom:10px}
+.issue.crit{border-left-color:var(--crit)}.issue.high{border-left-color:var(--err)}.issue.med{border-left-color:var(--warn)}.issue.low{border-left-color:var(--ft)}
+.issue .ih{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.issue .id{font:600 13px var(--sans);flex:1}
+.issue .idesc{font-size:13px;line-height:1.6;color:var(--ink)}
+.issue .iloc{font:11px var(--mono);color:var(--ft);margin-top:6px}
+.report{font-size:13px;line-height:1.65;overflow-wrap:anywhere}.report h1,.report h2,.report h3,.report h4{line-height:1.4;margin:16px 0 8px}.report h1{font-size:18px}.report h2{font-size:16px}.report h3{font-size:14px}.report h4{font-size:13px}.report p{margin:0 0 10px}.report ul,.report ol{margin:0 0 12px;padding-left:22px}.report li{margin:3px 0}.report strong{font-weight:700}.report code{font:12px/1.5 var(--mono);background:#f6dede;padding:1px 4px;border-radius:3px}.report pre{overflow:auto;background:#211717;color:#f5e7e7;border-radius:6px;padding:10px;margin:8px 0 12px}.report pre code{background:transparent;color:inherit;padding:0;white-space:pre}.report> :first-child{margin-top:0}
+.hint{padding:8px 16px;color:var(--mt);font-size:12px;border-bottom:1px solid var(--bd);background:var(--bg)}
+.drop-zone{margin:10px 12px;padding:9px 12px;border:1px dashed var(--al);border-radius:8px;background:var(--bg);color:var(--mt);text-align:center;cursor:pointer;font:12px/1.5 var(--sans);flex:none}.drop-zone strong{color:var(--a)}.drop-zone small{display:block;color:var(--ft);font-size:11px}.drop-zone:hover,.drop-zone.drag-over{border-color:var(--a);background:var(--as);color:var(--a)}.drop-zone:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.issues-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ft);gap:10px}.issues-empty svg{width:48px;height:48px;opacity:.3}
+.act-bar{padding:12px 24px;border-top:1px solid var(--bd);background:var(--sf);display:flex;gap:10px;align-items:center;flex:none}
+.btn{border:1px solid var(--bd);background:var(--sf);color:var(--ink);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;transition:.12s;display:inline-flex;align-items:center;gap:6px}.btn:hover{border-color:var(--al)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border-color:transparent}.btn.primary:hover{filter:brightness(1.08)}.btn:disabled{opacity:.5}
+.drawer{position:fixed;top:32px;right:0;bottom:0;width:min(420px,92vw);background:var(--sf);box-shadow:-12px 0 40px rgba(0,0,0,.1);z-index:50;transform:translateX(100%);transition:.25s;overflow:auto;padding:24px}.drawer.open{transform:translateX(0)}.drawer h2{margin:0 0 16px;font-size:16px}.drawer .close{position:absolute;top:16px;right:16px;border:0;background:transparent;font-size:20px;color:var(--ft);cursor:pointer}
+.field{margin-bottom:16px}.field label{display:block;font-size:12px;color:var(--mt);font-weight:600;margin-bottom:6px}.field input{width:100%;border:1px solid var(--bd);border-radius:8px;padding:9px 12px;font:14px var(--sans);outline:none;background:var(--s2);color:var(--ink)}.field input:focus{border-color:var(--al)}
+.overlay{position:fixed;inset:32px 0 0 0;background:rgba(0,0,0,.3);z-index:40;display:none}.overlay.show{display:block}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2d1010;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#e0bcbc;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="head">
+    <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+    <div><h1>AI 代码审查</h1><p>审查代码与 Git Diff，检查安全风险，并给出测试与优化建议</p></div>
+    <div class="spacer"></div>
+    <button class="gear" onclick="toggleDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 1-.1 1.2l2 1.5-2 3.4-2.3-1a7 7 0 0 1-2 1.2l-.4 2.5H9l-.4-2.5a7 7 0 0 1-2-1.2l-2.3 1-2-3.4 2-1.5A7 7 0 0 1 4 12a7 7 0 0 1 .1-1.2l-2-1.5 2-3.4 2.3 1a7 7 0 0 1 2-1.2L9 1h4l.4 2.5a7 7 0 0 1 2 1.2l2.3-1 2 3.4-2 1.5A7 7 0 0 1 19 12z"/></svg>供应商设置</button>
+  </div>
+  <div class="modes">
+    <button class="mode active" data-mode="review">审查代码</button>
+    <button class="mode" data-mode="diff">审查 Diff</button>
+    <button class="mode" data-mode="security">安全检查</button>
+    <button class="mode" data-mode="explain">解释代码</button>
+    <button class="mode" data-mode="tests">测试建议</button>
+    <button class="mode" data-mode="improve">优化建议</button>
+  </div>
+  <div class="body">
+    <div class="code-side">
+      <div class="code-h"><span class="title">代码输入</span><span class="cnt" id="codeCnt">0 行</span></div>
+      <div class="hint" id="inputHint">粘贴代码，或从本地打开代码文件</div>
+      <button class="drop-zone" id="dropZone" type="button"><strong>拖拽代码文件到这里</strong>，或点击选择<small>单个文本文件 · 不超过 200 KB · .diff/.patch 自动切换审查模式</small></button>
+      <textarea class="code-area" id="codeInput" spellcheck="false" placeholder="粘贴需要审查的代码或 Git Diff…"></textarea>
+    </div>
+    <div class="issues-side">
+      <div class="issues-h"><span class="title">审查结果</span><span class="stat" id="issueStat">等待审查</span></div>
+      <div class="issues-list" id="issuesList"><div class="issues-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6z"/></svg><span>粘贴代码后点击审查</span></div></div>
+    </div>
+  </div>
+  <div class="act-bar">
+    <button class="btn primary" id="reviewBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span id="reviewLabel">开始审查</span></button>
+    <button class="btn" id="stopBtn" disabled>取消</button>
+    <button class="btn" id="openFileBtn">打开文件</button>
+    <button class="btn" id="openDiffBtn">读取 Git Diff</button>
+    <button class="btn" id="copyBtn">复制报告</button>
+    <button class="btn" id="clearBtn">清空</button>
+  </div>
+</main>
+<div class="overlay" id="overlay" onclick="toggleDrawer()"></div>
+<aside class="drawer" id="drawer"><button class="close" onclick="toggleDrawer()">×</button><h2>统一供应商配置</h2>
+  <div class="field"><label>服务名称</label><input id="pName" value="OpenAI 兼容服务"></div>
+  <div class="field"><label>Base URL</label><input id="pUrl" value="https://api.openai.com/v1"></div>
+  <div class="field"><label>模型 ID</label><input id="pModel" value="gpt-4o-mini"></div>
+  <div class="field"><label>API Key</label><input id="pKey" type="password" placeholder="仅保存到系统安全存储"></div>
+  <button class="btn primary" style="width:100%;justify-content:center" onclick="saveProvider()">保存并共享</button>
+</aside>
+<div class="toast" id="toast"></div>
+<script src="../../plugin_runtime/ai-provider-manager.js"></script>
+<script src="report-renderer.js"></script>
+<script>
+const api=window.aiAPI;const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
+let mode='review';let requestId='';let lastReport='';let running=false;
+const providerManager=AIProviderManager.create(api,{capability:'text',notify:toast});
+const esc=ReviewReportRenderer.escapeHtml;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1600);}
+function toggleDrawer(){$('#drawer').classList.toggle('open');$('#overlay').classList.toggle('show');}
+const modes={
+  review:{label:'开始审查',hint:'粘贴代码，或从本地打开代码文件',prompt:'请审查以下代码的正确性、边界条件、错误处理和回归风险。按严重程度列出可验证的问题，每项包括标题、证据、位置和建议。无法确认的风险请明确写成待核实。不要修改代码。'},
+  diff:{label:'审查 Diff',hint:'粘贴 Git Diff，或点击“读取 Git Diff”选择仓库目录（相对 HEAD，含暂存和未暂存的已跟踪文件）',prompt:'以下内容是 Git Diff。只审查改动引入的问题，结合上下文说明具体文件和行号、触发条件、影响及修复建议；不要把未改动代码当成新问题。若上下文不足，请注明。'},
+  security:{label:'安全检查',hint:'粘贴代码或打开文件；请先移除密钥和敏感配置，再发送给模型',prompt:'请检查以下代码中的真实安全风险，重点关注不可信输入、注入、XSS、权限边界、敏感信息和路径处理。每项说明攻击前提、证据、影响、位置与修复建议；不要凭关键词推断漏洞。'},
+  explain:{label:'解释代码',hint:'粘贴代码或打开文件，解释执行流程与关键约束',prompt:'请解释以下代码的用途、主要执行流程、输入输出、重要依赖和边界条件。对无法从代码确认的行为明确标注不确定。'},
+  tests:{label:'生成测试建议',hint:'粘贴代码或打开文件，获得可执行的测试场景',prompt:'请为以下代码设计测试场景：正常路径、边界输入、错误路径和可能的回归。每项给出输入、预期结果和测试价值；不要声称已运行测试。'},
+  improve:{label:'生成优化建议',hint:'粘贴代码或打开文件，获得可衡量的优化建议',prompt:'请分析以下代码的性能、可读性和可维护性。只给出有具体依据的优化建议，说明收益、代价和如何验证；不要直接改写文件。'}
+};
+function setMode(value){mode=value;$$('.modes .mode').forEach(x=>x.classList.toggle('active',x.dataset.mode===value));$('#reviewLabel').textContent=modes[value].label;$('#inputHint').textContent=modes[value].hint;$('#codeInput').placeholder=value==='diff'?'粘贴 git diff --git 格式的差异…':'粘贴需要处理的代码…';}
+$$('.modes .mode').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+function updateCount(){const value=$('#codeInput').value;$('#codeCnt').textContent=(value?value.split('\n').length:0)+' 行';}
+$('#codeInput').addEventListener('input',updateCount);
+api.onChunk(chunk=>{if(running&&chunk.requestId===requestId){lastReport=chunk.text;renderReport(chunk.text);}});
+function setBusy(value){running=value;$('#reviewBtn').disabled=value;$('#stopBtn').disabled=!value;$$('.modes .mode').forEach(x=>x.disabled=value);}
+$('#reviewBtn').onclick=async()=>{
+  const code=$('#codeInput').value.trim();if(!code){toast('请输入代码');return;}
+  if(mode==='diff'&&!/^diff --git |^@@ |^--- /m.test(code)){toast('请输入 Git Diff');return;}
+  requestId=crypto.randomUUID();const currentId=requestId;lastReport='';setBusy(true);$('#issueStat').textContent='处理中…';
+  $('#issuesList').innerHTML='<div style="padding:30px;text-align:center;color:var(--ft)">审查中…</div>';
+  try{const selection=await providerManager.getSelection();if(currentId!==requestId)return;const r=await api.complete({requestId:currentId,capability:'text',selection,stream:true,messages:[{role:'user',content:modes[mode].prompt+'\n\n请使用 Markdown 排版，段落之间空一行；代码放入代码块。\n\n'+code}]});if(currentId!==requestId)return;lastReport=r.text||lastReport;renderReport(lastReport);$('#issueStat').textContent='已完成';}
+  catch(e){if(currentId!==requestId)return;$('#issuesList').innerHTML=`<div style="padding:20px;color:var(--err)">${esc(e.message)}</div>`;$('#issueStat').textContent='失败';}
+  finally{if(currentId===requestId)setBusy(false);}
+};
+$('#stopBtn').onclick=()=>{if(running){api.cancel(requestId);requestId='';setBusy(false);$('#issueStat').textContent='已取消';}};
+function renderReport(text){$('#issuesList').innerHTML='<article class="report">'+ReviewReportRenderer.render(text)+'</article>';}
+async function importInput(loader,nextMode){
+  try{const result=await loader();if(!result)return;if(/\u0000/.test(result.text)){toast('文件不是可读取的文本');return;}if(!result.text.trim()){toast('没有可读取的内容');return;}if(nextMode||/\.(diff|patch)$/i.test(result.name)||/^diff --git /m.test(result.text))setMode(nextMode||'diff');$('#codeInput').value=result.text;updateCount();$('#inputHint').textContent='已读取 '+result.name+' · '+modes[mode].hint;toast('已读取 '+result.name);}
+  catch(e){toast('读取失败：'+e.message);}
+}
+$('#openFileBtn').onclick=()=>importInput(()=>api.openTextFile());
+$('#openDiffBtn').onclick=()=>importInput(()=>api.openGitDiff(),'diff');
+$('#dropZone').onclick=()=>$('#openFileBtn').click();
+const dropSide=$('.code-side'),dropZone=$('#dropZone');
+for(const eventName of ['dragenter','dragover'])dropSide.addEventListener(eventName,event=>{if(!event.dataTransfer?.types?.includes('Files'))return;event.preventDefault();event.dataTransfer.dropEffect='copy';dropZone.classList.add('drag-over');});
+dropSide.addEventListener('dragleave',event=>{if(!dropSide.contains(event.relatedTarget))dropZone.classList.remove('drag-over');});
+dropSide.addEventListener('drop',event=>{
+  event.preventDefault();dropZone.classList.remove('drag-over');
+  const files=Array.from(event.dataTransfer?.files||[]);
+  if(files.length!==1){toast('请一次拖入一个代码文件');return;}
+  const file=files[0];
+  if(file.size>200000){toast('文件超过 200 KB，请选取较小文件或粘贴片段');return;}
+  importInput(async()=>({name:file.name,text:await file.text()}));
+});
+// 阻止将文件拖到窗口其他位置时 Chromium 导航离开当前审查页面。
+for(const eventName of ['dragover','drop'])window.addEventListener(eventName,event=>{if(event.dataTransfer?.types?.includes('Files'))event.preventDefault();});
+$('#copyBtn').onclick=()=>{if(lastReport){navigator.clipboard.writeText(lastReport);toast('已复制报告');}else toast('暂无报告');};
+$('#clearBtn').onclick=()=>{if(running)$('#stopBtn').click();$('#codeInput').value='';updateCount();$('#issuesList').innerHTML='<div class="issues-empty"><span>粘贴代码后点击审查</span></div>';$('#issueStat').textContent='等待审查';lastReport='';$('#inputHint').textContent=modes[mode].hint;};
+window.addEventListener('plugin-enter',e=>{const action=e.detail||{};const text=action.payload||action.clipboardText||'';if(!text)return;$('#codeInput').value=text;updateCount();if(/^diff --git /m.test(text))setMode('diff');if(action.featureArgs?.autoRun)setTimeout(()=>{if(!running)$('#reviewBtn').click();},150);});
+</script>
+</body></html>

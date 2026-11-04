@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN" data-layout="scan-frame">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>二维码与条码工具</title>
+<style>
+:root{--accent:#087f5b;--bg:#f3f8f6;--surface:#fff;--line:#d9e8e1;--ink:#17372b;--muted:#668176;--soft:#e9f5ef;--danger:#b93838}
+*{box-sizing:border-box}html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+.app{height:calc(100vh - 32px);display:grid;grid-template-columns:minmax(300px,360px) minmax(260px,1fr) 250px;min-height:0}
+.panel{min-height:0;overflow:auto;background:var(--surface);padding:18px;border-right:1px solid var(--line)}
+.tabs{display:flex;gap:6px;margin-bottom:18px}.tab{flex:1;padding:9px;border:1px solid var(--line);border-radius:9px;background:white;color:var(--muted);font-weight:600}
+.tab.active{background:var(--accent);border-color:var(--accent);color:white}
+.field{margin-bottom:14px}.field label{display:block;font-weight:600;margin-bottom:6px}.field small{display:block;color:var(--muted);margin-top:5px}
+.input,select,textarea{width:100%;border:1px solid var(--line);border-radius:8px;background:white;color:var(--ink);padding:9px 10px;outline:0}
+.input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px #087f5b20}
+textarea{resize:vertical;min-height:80px}.row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}.settings .field{margin-bottom:12px}
+.color-row{display:flex;align-items:center;gap:8px}.color-row input{width:45px;height:36px;padding:2px;border:1px solid var(--line);border-radius:7px;background:white}
+.check{display:flex;align-items:center;gap:8px;margin:2px 0 14px}.check input{accent-color:var(--accent)}
+.btn{border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:white;color:var(--ink);white-space:nowrap}
+.btn:hover{border-color:var(--accent)}.btn.primary{border-color:var(--accent);background:var(--accent);color:white}
+.btn:disabled{opacity:.48;cursor:not-allowed}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.actions .btn{flex:1}
+.preview{min-width:0;min-height:0;padding:20px;display:flex;flex-direction:column;gap:12px}
+.preview-card{flex:1;min-height:180px;border:1px solid var(--line);border-radius:14px;background:white;display:flex;align-items:center;justify-content:center;padding:22px;overflow:auto}
+.preview-card img{max-width:100%;max-height:100%;object-fit:contain;image-rendering:auto}
+.empty{text-align:center;color:#9bad9f}.empty b{display:block;font-size:40px;font-weight:400;line-height:1.3;color:#d0ded6}.summary{color:var(--muted);min-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.history{min-height:0;background:#fcfefd;display:flex;flex-direction:column}.history-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:18px 14px}.history-head strong{font-size:15px}
+.text-btn{background:none;border:0;color:var(--accent);padding:4px}.hist-list{padding:8px;overflow:auto;flex:1}
+.hist-item{padding:9px;border:1px solid transparent;border-radius:9px;margin-bottom:5px;display:flex;gap:4px;align-items:start}.hist-item:hover{background:var(--soft);border-color:var(--line)}
+.hist-main{min-width:0;flex:1;border:0;background:none;text-align:left;cursor:pointer;color:var(--ink);padding:0}
+.hist-main b,.hist-main span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hist-main b{font-size:12px}.hist-main span{font-size:11px;color:var(--muted);margin-top:3px}.hist-del{border:0;background:none;color:var(--muted);padding:0 4px}
+.hist-del:hover{color:var(--danger)}.drop{min-height:145px;border:2px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:15px;cursor:pointer}
+.drop.over{border-color:var(--accent);background:var(--soft)}.drop img{max-width:100%;max-height:180px;object-fit:contain}
+.result{min-height:70px;padding:11px;background:var(--bg);border:1px solid var(--line);border-radius:8px;word-break:break-all;white-space:pre-wrap;user-select:text}
+.notice{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:8px 14px;border-radius:8px;background:#17372b;color:white;display:none;z-index:10}
+.notice.show{display:block}[hidden]{display:none!important}
+@media(max-width:1050px){.app{grid-template-columns:minmax(280px,330px) minmax(250px,1fr) 205px}.panel{padding:14px}.preview{padding:14px}}
+@media(max-width:780px){.app{grid-template-columns:minmax(260px,1fr) minmax(240px,1fr)}.history{display:none}}
+</style>
+</head>
+<body>
+<main class="app">
+  <section class="panel">
+    <nav class="tabs" aria-label="工作模式"><button class="tab active" data-mode="generate">生成</button><button class="tab" data-mode="scan">识别</button></nav>
+    <div id="generate">
+      <div class="field"><label for="kind">类型</label><select id="kind"><option value="QR">二维码</option><option value="CODE128">Code 128 条码</option><option value="EAN13">EAN-13 条码</option><option value="EAN8">EAN-8 条码</option><option value="UPC">UPC-A 条码</option><option value="CODE39">Code 39 条码</option><option value="ITF">ITF 条码</option></select></div>
+      <div class="field"><label for="content">内容</label><textarea id="content" placeholder="输入文本、网址或商品编码">https://sanrenjz.com</textarea><small id="formatTip">二维码支持文本、网址等内容</small></div>
+      <div id="qrOptions" class="settings">
+        <div class="field"><label for="size">图片尺寸</label><select id="size"><option value="240">240 px</option><option value="360" selected>360 px</option><option value="480">480 px</option><option value="720">720 px</option><option value="1000">1000 px</option></select></div>
+        <div class="field"><label for="level">纠错级别</label><select id="level"><option value="L">低 L</option><option value="M" selected>中 M</option><option value="Q">较高 Q</option><option value="H">高 H</option></select></div>
+        <div class="field"><label for="margin">留白模块</label><select id="margin"><option value="1">1</option><option value="2" selected>2</option><option value="4">4</option><option value="6">6</option></select></div>
+        <div class="field"><label>颜色</label><div class="color-row"><input id="dark" type="color" value="#17372b" aria-label="前景色"><input id="light" type="color" value="#ffffff" aria-label="背景色"></div></div>
+      </div>
+      <div id="barcodeOptions" hidden>
+        <div class="settings"><div class="field"><label for="barWidth">条宽</label><select id="barWidth"><option value="2" selected>标准</option><option value="3">较宽</option><option value="4">加宽</option></select></div><div class="field"><label for="barHeight">条高</label><select id="barHeight"><option value="80">80 px</option><option value="120" selected>120 px</option><option value="160">160 px</option></select></div></div>
+        <label class="check"><input id="showValue" type="checkbox" checked>显示条码下方文本</label>
+      </div>
+      <button id="generateBtn" class="btn primary" style="width:100%">生成图码</button>
+      <div class="actions"><button id="copyImage" class="btn" disabled>复制图片</button><button id="savePng" class="btn" disabled>保存 PNG</button><button id="saveSvg" class="btn" disabled>保存 SVG</button></div>
+    </div>
+    <div id="scan" hidden>
+      <div class="field"><label>识别图片</label><div class="drop" id="drop" tabindex="0" role="button">点击选图，或将图片拖入这里<br>支持 PNG、JPEG、WebP、BMP</div><small>也可粘贴截图或读取剪贴板图片</small></div>
+      <div class="row"><button id="pasteImage" class="btn">剪贴板图片</button><button id="recognize" class="btn primary" disabled>开始识别</button></div>
+      <div class="field" style="margin-top:18px"><label>识别结果</label><div class="result" id="result">尚未识别</div></div>
+      <div class="row"><button id="copyResult" class="btn" disabled>复制结果</button><button id="useResult" class="btn" disabled>转为生成内容</button></div>
+    </div>
+  </section>
+  <section class="preview"><div class="preview-card" id="preview"><div class="empty"><b>▦</b>生成结果将在这里显示</div></div><div class="summary" id="summary">选择类型并输入内容</div></section>
+  <aside class="history"><div class="history-head"><strong>最近记录</strong><button id="clearHistory" class="text-btn">清空</button></div><div id="historyList" class="hist-list"><div class="empty">暂无记录</div></div></aside>
+</main>
+<div class="notice" id="notice" role="status"></div>
+<script src="./vendor/jsbarcode.min.js"></script>
+<script>
+const api=window.pluginAPI,$=id=>document.getElementById(id);
+let current=null,scanDataUrl='',recognized='',history=[];
+const formats={QR:'二维码',CODE128:'Code 128',EAN13:'EAN-13',EAN8:'EAN-8',UPC:'UPC-A',CODE39:'Code 39',ITF:'ITF'};
+function notice(message){const el=$('notice');el.textContent=message;el.classList.add('show');clearTimeout(el.timer);el.timer=setTimeout(()=>el.classList.remove('show'),2300)}
+function setMode(mode){document.querySelectorAll('.tab').forEach(tab=>tab.classList.toggle('active',tab.dataset.mode===mode));$('generate').hidden=mode!=='generate';$('scan').hidden=mode!=='scan'}
+document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>setMode(tab.dataset.mode));
+function updateKind(){const qr=$('kind').value==='QR';$('qrOptions').hidden=!qr;$('barcodeOptions').hidden=qr;$('content').style.minHeight=qr?'80px':'48px';$('formatTip').textContent=qr?'二维码支持文本、网址等内容':'EAN/UPC 支持不含校验位的数字，工具会自动计算；ITF 需要偶数位数字';}
+$('kind').onchange=updateKind;
+function setCurrent(value){current=value;const stage=$('preview');stage.replaceChildren();const image=new Image();image.src=value.dataUrl;image.alt=value.kind==='QR'?'生成的二维码':'生成的条码';stage.appendChild(image);$('summary').textContent=formats[value.kind]+' · '+value.text;$('copyImage').disabled=$('savePng').disabled=$('saveSvg').disabled=false}
+async function generate(){const kind=$('kind').value,text=$('content').value.trim();if(!text){notice('请输入内容');return}if(text.length>3000){notice('内容最多 3000 字符');return}
+  $('generateBtn').disabled=true;
+  try{
+    let dataUrl,svg;
+    if(kind==='QR'){
+      const result=await api.generateQrAdvanced(text,{size:$('size').value,level:$('level').value,margin:$('margin').value,dark:$('dark').value,light:$('light').value});
+      if(!result.ok)throw new Error(result.error);({dataUrl,svg}=result);
+    }else{
+      const canvas=document.createElement('canvas'),svgNode=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      const options={format:kind,width:Number($('barWidth').value),height:Number($('barHeight').value),displayValue:$('showValue').checked,margin:18,background:'#ffffff',lineColor:'#17372b',fontSize:18};
+      JsBarcode(canvas,text,options);JsBarcode(svgNode,text,options);
+      dataUrl=canvas.toDataURL('image/png');svg=new XMLSerializer().serializeToString(svgNode);
+    }
+    setCurrent({kind,text,dataUrl,svg});await addHistory({kind,text,action:'生成'});notice('生成成功');
+  }catch(error){notice('生成失败：'+error.message)}finally{$('generateBtn').disabled=false}
+}
+$('generateBtn').onclick=generate;$('content').addEventListener('keydown',event=>{if(event.ctrlKey&&event.key==='Enter')generate()});
+function save(format){if(!current)return;const name=current.kind==='QR'?'qrcode':'barcode';
+  const result=format==='svg'?api.saveResult({title:'保存 SVG',defaultPath:name+'.svg',filters:[{name:'SVG',extensions:['svg']}],text:current.svg}):api.saveResult({title:'保存 PNG',defaultPath:name+'.png',filters:[{name:'PNG',extensions:['png']}],dataUrl:current.dataUrl});
+  if(!result.cancelled)notice('已保存 '+format.toUpperCase());
+}
+$('savePng').onclick=()=>save('png');$('saveSvg').onclick=()=>save('svg');
+$('copyImage').onclick=()=>{try{api.copyImage(current.dataUrl);notice('已复制图片')}catch(error){notice(error.message)}};
+async function addHistory(item){history=[{...item,time:new Date().toISOString()},...history].slice(0,30);await api.storage.set('qr-history-v2',history);renderHistory()}
+function renderHistory(){const list=$('historyList');list.replaceChildren();if(!history.length){const el=document.createElement('div');el.className='empty';el.textContent='暂无记录';list.appendChild(el);return}
+  history.forEach((item,index)=>{const row=document.createElement('div');row.className='hist-item';const main=document.createElement('button');main.className='hist-main';const name=document.createElement('b');name.textContent=item.action+' · '+(formats[item.kind]||item.kind);const detail=document.createElement('span');detail.textContent=item.text;main.append(name,detail);main.onclick=()=>{$('kind').value=item.kind in formats?item.kind:'QR';updateKind();$('content').value=item.text;setMode('generate');notice('已填入内容，点击生成')};const del=document.createElement('button');del.className='hist-del';del.textContent='×';del.title='删除记录';del.onclick=async()=>{history.splice(index,1);await api.storage.set('qr-history-v2',history);renderHistory()};row.append(main,del);list.appendChild(row)})}
+$('clearHistory').onclick=async()=>{if(!history.length)return;if(!confirm('清空全部最近记录？'))return;history=[];await api.storage.set('qr-history-v2',history);renderHistory();notice('已清空')};
+async function loadHistory(){const saved=await api.storage.get('qr-history-v2');if(Array.isArray(saved)){history=saved}else{const old=await api.storage.get('qr-history');history=Array.isArray(old)?old.map(item=>({kind:'QR',text:String(item.text||'').replace(/^识别: /,''),action:String(item.text||'').startsWith('识别:')?'识别':'生成',time:''})):[]}renderHistory()}
+function readFile(file){if(!file||!file.type.startsWith('image/')){notice('请选择图片文件');return}if(file.size>20*1024*1024){notice('图片不能超过 20 MB');return}const reader=new FileReader();reader.onload=()=>loadScanImage(reader.result);reader.onerror=()=>notice('读取图片失败');reader.readAsDataURL(file)}
+function loadScanImage(url){scanDataUrl=url;const drop=$('drop');drop.replaceChildren();const img=new Image();img.src=url;img.alt='待识别图片';drop.appendChild(img);$('recognize').disabled=false;$('result').textContent='图片已载入，点击开始识别';recognized='';$('copyResult').disabled=$('useResult').disabled=true}
+$('drop').onclick=()=>{const selection=api.selectFiles({multiple:false,filters:[{name:'图片',extensions:['png','jpg','jpeg','webp','bmp']}]});const path=Array.isArray(selection)?selection[0]:selection;if(path){try{loadScanImage(api.readImageFile(path))}catch(error){notice(error.message)}}};
+$('drop').onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();$('drop').click()}};
+document.addEventListener('dragover',event=>{if(event.dataTransfer?.types?.includes('Files'))event.preventDefault()});
+document.addEventListener('drop',event=>{if(!event.dataTransfer?.files?.length)return;event.preventDefault();$('drop').classList.remove('over');setMode('scan');readFile(event.dataTransfer.files[0])});
+$('drop').ondragenter=()=>$('drop').classList.add('over');$('drop').ondragleave=()=>$('drop').classList.remove('over');
+$('pasteImage').onclick=()=>{const url=api.readClipboardImage();if(url)loadScanImage(url);else notice('剪贴板中没有图片')};
+document.addEventListener('paste',event=>{const file=[...(event.clipboardData?.files||[])].find(item=>item.type.startsWith('image/'));if(file){setMode('scan');readFile(file)}});
+async function recognize(){if(!scanDataUrl)return;$('recognize').disabled=true;$('result').textContent='正在识别…';
+  try{const result=await api.decodeBarcode(scanDataUrl);recognized=result.text;const kind=({CODE_128:'CODE128',EAN_13:'EAN13',EAN_8:'EAN8',UPC_A:'UPC',CODE_39:'CODE39',ITF:'ITF'})[result.format]||'QR';$('result').textContent=recognized;$('copyResult').disabled=$('useResult').disabled=false;await addHistory({kind,text:recognized,action:'识别'});notice('识别成功')}
+  catch(error){const qr=await api.decodeQr(scanDataUrl);if(qr.ok&&qr.text){recognized=qr.text;$('result').textContent=recognized;$('copyResult').disabled=$('useResult').disabled=false;await addHistory({kind:'QR',text:recognized,action:'识别'});notice('识别成功')}else{$('result').textContent='未识别到支持的二维码或条码';notice('未识别到图码')}}
+  finally{$('recognize').disabled=false}
+}
+$('recognize').onclick=recognize;$('copyResult').onclick=()=>{api.copyText(recognized);notice('已复制识别结果')};$('useResult').onclick=()=>{$('content').value=recognized;setMode('generate')};
+window.addEventListener('plugin-enter',event=>{const action=event.detail?.action||{};const text=action.payload||action.clipboardText||'';if(text){$('content').value=String(text);setMode('generate')}});
+updateKind();loadHistory().catch(error=>notice('历史记录读取失败：'+error.message));
+</script>
+</body></html>

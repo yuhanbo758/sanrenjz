@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>超级文本片段</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+            background: #fff;
+            overflow: hidden; /* 防止出现双滚动条 */
+        }
+
+        .header {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            flex-shrink: 0; /* 防止头部被压缩 */
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-button {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .header-button:hover {
+            background: #f5f5f5;
+            border-color: #ccc;
+        }
+
+        .main-container {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            height: calc(100vh - 60px); /* 确保有足够的高度 */
+            min-height: 0; /* 确保Firefox中的flex布局正常工作 */
+        }
+
+        .search-container {
+            margin-bottom: 20px;
+            flex-shrink: 0; /* 防止搜索框被压缩 */
+        }
+
+        .snippets-list {
+            margin-top: 20px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            overflow: auto;
+            flex: 1; /* 让列表占据所有剩余空间 */
+            min-height: 100px; /* 设置最小高度 */
+        }
+
+        .snippet-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .snippet-item:last-child {
+            border-bottom: none;
+        }
+
+        .snippet-item:hover {
+            background: #f5f5f5;
+        }
+
+        .snippet-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        .snippet-preview {
+            color: #666;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .empty-state {
+            margin-top: 50px;
+            text-align: center;
+            color: #666;
+        }
+
+        .empty-state p {
+            margin-bottom: 20px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: white;
+            width: 600px;
+            max-width: 90%;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            font-size: 18px;
+            color: #333;
+            font-weight: normal;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            min-height: 200px;
+            resize: vertical;
+        }
+
+        .form-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #007AFF;
+            color: white;
+            border-color: #007AFF;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+            border-color: #0056b3;
+        }
+
+        .btn-danger {
+            background: #ff3b30;
+            color: white;
+            border-color: #ff3b30;
+        }
+
+        .btn-danger:hover {
+            background: #d60000;
+            border-color: #d60000;
+        }
+
+        .settings-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .settings-title {
+            font-size: 18px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        #noSnippetsMessage {
+            text-align: center;
+            margin-top: 50px;
+            color: #666;
+        }
+
+        /* 新增样式 */
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            white-space: nowrap;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            margin: 0;
+            order: 2;
+            flex-shrink: 0;
+        }
+
+        .checkbox-wrapper label {
+            margin: 0;
+            flex: 1;
+            order: 1;
+            white-space: normal;
+            min-width: 300px;
+        }
+
+        /* 设置选项容器 */
+        .setting-option {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 8px 0;
+        }
+
+        .setting-option-label {
+            flex: 1;
+            white-space: nowrap;
+            text-align: left;
+            overflow: visible;
+            max-width: 80%;
+            font-size: 14px;
+        }
+
+        .checkbox-container {
+            margin-left: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+        }
+
+        /* 长文本容器适配 */
+        .setting-option.long-text .setting-option-label {
+            white-space: normal;
+            line-height: 1.5;
+        }
+
+        /* 媒体查询 - 小屏幕适配 */
+        @media (max-width: 576px) {
+            .setting-option {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .setting-option-label {
+                white-space: normal;
+                margin-bottom: 5px;
+                max-width: 100%;
+            }
+            
+            .checkbox-container {
+                align-self: flex-end;
+            }
+        }
+
+        /* 文件夹路径项样式 */
+        .folder-path-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .folder-path-item input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* 文件夹路径操作容器 */
+        .folder-path-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            min-width: 180px;
+            justify-content: flex-end;
+        }
+        
+        /* 默认选项容器 */
+        .default-radio-container {
+            display: flex;
+            align-items: center;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 2px 5px;
+            background-color: #f9f9f9;
+        }
+        
+        /* 默认路径选择器样式 */
+        .default-folder-radio {
+            margin-left: 3px;
+            width: 16px;
+            height: 16px;
+        }
+        
+        .default-radio-label {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .default-path-indicator {
+            color: #007AFF;
+            font-size: 12px;
+            margin-left: 10px;
+            display: none;
+        }
+        
+        .btn-browse {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .btn-remove {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            color: #ff3b30;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .add-folder-btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+        }
+
+        /* 响应式布局调整 */
+        @media (max-height: 500px) {
+            .main-container {
+                padding: 10px;
+            }
+            
+            .search-container {
+                margin-bottom: 10px;
+            }
+            
+            .search-input {
+                padding: 6px;
+            }
+            
+            .snippets-list {
+                margin-top: 10px;
+            }
+            
+            .snippet-item {
+            padding: 10px;
+            }
+        }
+
+        /* 处理移动设备上的滚动问题 */
+        @media (max-width: 768px) {
+            body {
+                position: fixed;
+                width: 100%;
+                height: 100%;
+            }
+            
+            .main-container {
+                -webkit-overflow-scrolling: touch; /* 增强iOS的滚动体验 */
+            }
+            
+            .snippets-list {
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+        body { color: #172235; background: #f7f9fc; }
+        .header { padding: 10px 18px; background: #fff; }
+        .header-button { border-radius: 8px; font-weight: 600; }
+        .header-button:first-child { background: #1769e0; border-color: #1769e0; color: #fff; }
+        .main-container { height: auto; padding: 18px; overflow: hidden; }
+        .search-container { display: flex; gap: 10px; margin: 0; }
+        .search-input { flex: 1; min-width: 0; border-radius: 9px; background: #fff; }
+        .sort-select { padding: 0 10px; border: 1px solid #dbe2eb; border-radius: 9px; background: #fff; }
+        .list-meta { padding: 12px 2px 8px; color: #66758a; font-size: 13px; }
+        .snippets-list { margin-top: 0; min-height: 0; border-color: #dbe2eb; border-radius: 10px; background: #fff; }
+        .snippet-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+        .snippet-item:focus-visible { outline: 2px solid #1769e0; outline-offset: -2px; }
+        .snippet-main { min-width: 0; flex: 1; }
+        .snippet-title { margin-bottom: 3px; }
+        .snippet-folder { color: #8995a6; font-size: 12px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .snippet-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .snippet-actions button { padding: 6px 9px; border: 1px solid #dbe2eb; border-radius: 7px; background: #fff; cursor: pointer; }
+        .snippet-actions button:hover { background: #edf4ff; }
+        .snippet-item:focus-within { background: #f0f6ff; }
+        .snippet-actions button[aria-pressed="true"] { color: #b06a00; background: #fff5d9; border-color: #f2d389; }
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 10px; }
+        .filter-bar button, .filter-bar select { padding: 6px 10px; border: 1px solid #dbe2eb; border-radius: 7px; background: #fff; color: #34445b; cursor: pointer; }
+        .filter-bar button[aria-pressed="true"] { color: #145ac3; background: #eaf2ff; border-color: #8bb7f7; }
+        .filter-bar select { max-width: 230px; }
+        .empty-state { margin-top: 20px; padding: 24px; border: 1px dashed #c8d5e5; border-radius: 10px; background: #fff; }
+        .empty-state p { margin-bottom: 8px; }
+        .modal-content { max-height: calc(100vh - 42px); overflow: auto; }
+        .preview-content { white-space: pre-wrap; overflow: auto; max-height: 48vh; padding: 12px; border: 1px solid #e1e7ef; border-radius: 8px; background: #f7f9fc; font: 13px/1.6 Consolas, monospace; }
+        @media (max-width: 620px) { .snippet-item { align-items: flex-start; flex-wrap: wrap; } .snippet-actions { width: 100%; } .header-buttons { gap: 5px; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-buttons">
+            <button onclick="showNewSnippetModal()" class="header-button">新建片段</button>
+            <button onclick="createFromClipboard()" class="header-button" title="读取当前剪贴板文字并打开新建窗口">从剪贴板新建</button>
+            <button onclick="showSettingsModal()" class="header-button">设置</button>
+            <button onclick="refreshSnippets()" class="header-button" title="重新读取磁盘片段">刷新</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="search-container">
+            <input type="search" id="searchInput" class="search-input" placeholder="搜索标题或内容，多个词需全部匹配  /" oninput="searchSnippets()" aria-label="搜索片段">
+            <select id="sortSelect" class="sort-select" onchange="searchSnippets()" aria-label="片段排序"><option value="name">名称排序</option><option value="modified">最近修改</option></select>
+    </div>
+        <div class="filter-bar" aria-label="片段筛选">
+            <button id="allFilter" type="button" aria-pressed="true" onclick="setListFilter('all')">全部</button>
+            <button id="favoriteFilter" type="button" aria-pressed="false" onclick="setListFilter('favorite')">★ 收藏</button>
+            <button id="recentFilter" type="button" aria-pressed="false" onclick="setListFilter('recent')">最近使用</button>
+            <select id="folderFilter" onchange="searchSnippets()" aria-label="按文件夹筛选"><option value="">全部文件夹</option></select>
+        </div>
+        <div id="listMeta" class="list-meta" aria-live="polite"></div>
+        <div id="snippetsList" class="snippets-list"></div>
+        
+        <div id="noSnippetsMessage" class="empty-state" style="display: none;">
+            <p>还没有文本片段</p>
+            <p>点击"新建片段"或在设置中指定文件夹路径</p>
+        </div>
+        </div>
+
+    <!-- 新建/编辑片段模态框 -->
+    <div id="snippetModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">新建文本片段</h2>
+                <button class="modal-close" onclick="closeModal('snippetModal')">&times;</button>
+        </div>
+            <div class="form-group">
+                <label for="snippetTitle">标题</label>
+                <input type="text" id="snippetTitle" placeholder="输入标题（将作为搜索关键词）">
+            </div>
+            <div class="form-group">
+                <label for="snippetContent">内容</label>
+                <textarea id="snippetContent" placeholder="输入文本片段内容..."></textarea>
+        </div>
+            <div id="savePath" class="form-group" style="font-size: 12px; color: #666;">
+                <!-- 这里将显示保存路径信息 -->
+            </div>
+            <input type="hidden" id="editingFileName">
+            <div class="form-buttons">
+                <button class="btn" onclick="closeModal('snippetModal')">取消</button>
+                <button id="deleteSnippetBtn" class="btn btn-danger" onclick="deleteSnippet()" style="display: none;">删除</button>
+                <button class="btn btn-primary" onclick="saveSnippet()">保存</button>
+        </div>
+            </div>
+        </div>
+
+    <!-- 设置模态框 -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>设置</h2>
+                <button class="modal-close" onclick="closeModal('settingsModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>文本片段文件夹路径</label>
+                <div id="folderPathsContainer">
+                    <!-- 路径列表将动态生成 -->
+            </div>
+                <div style="display: flex; justify-content: flex-end;">
+                    <button class="add-folder-btn" onclick="addFolderPath()">添加文件夹</button>
+            </div>
+            </div>
+            <div class="setting-option long-text">
+                <div class="setting-option-label">自动插入内容（选择后直接插入到活动窗口）</div>
+                <div class="checkbox-container">
+                    <input type="checkbox" id="autoInsert">
+        </div>
+    </div>
+
+            <div class="setting-option">
+                <div class="setting-option-label">搜索子文件夹</div>
+                <div class="checkbox-container">
+                    <input type="checkbox" id="searchSubfolders">
+            </div>
+            </div>
+            <div class="form-buttons">
+                <button class="btn" onclick="closeModal('settingsModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="previewModal" class="modal" role="dialog" aria-modal="true" aria-label="片段预览">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="previewTitle"></h2><button class="modal-close" onclick="closeModal('previewModal')" aria-label="关闭预览">&times;</button></div>
+            <div id="previewPath" class="snippet-folder" style="margin-bottom: 12px;"></div>
+            <pre id="previewContent" class="preview-content"></pre>
+            <div class="form-buttons"><button class="btn" onclick="closeModal('previewModal')">关闭</button><button class="btn" onclick="duplicatePreviewSnippet()">创建副本</button><button class="btn" onclick="editPreviewSnippet()">编辑</button><button class="btn btn-primary" onclick="copyPreviewSnippet()">复制内容</button></div>
+        </div>
+    </div>
+
+    <script>
+        // 监听DOM加载完成
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载设置
+            // 加载片段列表
+            loadSnippets();
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') document.querySelectorAll('.modal').forEach(modal => modal.style.display = 'none');
+                if (event.key === 'ArrowDown' && document.activeElement.id === 'searchInput') {
+                    const first = document.querySelector('.snippet-item');
+                    if (first) { event.preventDefault(); first.focus(); }
+                } else if (['ArrowDown', 'ArrowUp'].includes(event.key) && document.activeElement.classList.contains('snippet-item')) {
+                    const rows = [...document.querySelectorAll('.snippet-item')];
+                    const index = rows.indexOf(document.activeElement);
+                    const next = rows[index + (event.key === 'ArrowDown' ? 1 : -1)];
+                    if (next) { event.preventDefault(); next.focus(); }
+                }
+                if (event.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && !document.querySelector('.modal[style*="flex"]')) {
+                    event.preventDefault(); document.getElementById('searchInput').focus();
+                }
+                if (event.ctrlKey && event.key.toLowerCase() === 'k') {
+                    event.preventDefault();
+                    document.getElementById('searchInput').focus();
+                }
+                if (event.ctrlKey && event.key.toLowerCase() === 'n') {
+                    event.preventDefault();
+                    showNewSnippetModal();
+                }
+            });
+        });
+
+        // 加载片段列表
+        function loadSnippets() {
+            refreshFolderFilter();
+            searchSnippets();
+        }
+
+        let listFilter = 'all';
+        function setListFilter(value) {
+            listFilter = value;
+            for (const [id, name] of [['allFilter', 'all'], ['favoriteFilter', 'favorite'], ['recentFilter', 'recent']]) {
+                document.getElementById(id).setAttribute('aria-pressed', String(name === value));
+            }
+            searchSnippets();
+        }
+
+        function refreshFolderFilter() {
+            const select = document.getElementById('folderFilter');
+            const selected = select.value;
+            const folders = [...new Set(window.services.getSnippets().map(item => item.folder))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+            select.replaceChildren(new Option('全部文件夹', ''));
+            for (const folder of folders) select.add(new Option(folder, folder));
+            select.value = folders.includes(selected) ? selected : '';
+        }
+
+        // 更新片段列表
+        function updateSnippetsList(snippets) {
+            const listContainer = document.getElementById('snippetsList');
+            const noSnippetsMessage = document.getElementById('noSnippetsMessage');
+            
+            listContainer.replaceChildren();
+            document.getElementById('listMeta').textContent = `${snippets.length} 个片段`;
+            
+            if (!snippets || snippets.length === 0) {
+                listContainer.style.display = 'none';
+                noSnippetsMessage.style.display = 'block';
+                noSnippetsMessage.querySelector('p').textContent = window.services.getSnippets().length ?
+                    (listFilter === 'favorite' ? '还没有收藏的片段' : listFilter === 'recent' ? '还没有最近使用的片段' : '没有匹配的片段') : '还没有文本片段';
+                return;
+            }
+            
+            listContainer.style.display = 'block';
+            noSnippetsMessage.style.display = 'none';
+            
+            // 创建文档片段提高性能
+            const fragment = document.createDocumentFragment();
+            
+            const favorites = new Set(window.services.getActivity().favorites);
+            snippets.forEach(snippet => {
+                const item = document.createElement('div');
+                item.className = 'snippet-item';
+                item.tabIndex = 0;
+                const main = document.createElement('div');
+                main.className = 'snippet-main';
+                for (const [className, value] of [['snippet-title', snippet.title], ['snippet-preview', snippet.preview], ['snippet-folder', snippet.folder]]) {
+                    const line = document.createElement('div');
+                    line.className = className;
+                    line.textContent = value || '';
+                    main.appendChild(line);
+                }
+                const actions = document.createElement('div');
+                actions.className = 'snippet-actions';
+                const favorite = favorites.has(snippet.path);
+                for (const [label, handler] of [[favorite ? '★' : '☆', () => toggleFavorite(snippet)], ['复制', () => copySnippet(snippet)], ['编辑', () => showEditSnippetModal(snippet)]]) {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.textContent = label;
+                    if (label === '★' || label === '☆') {
+                        button.setAttribute('aria-label', favorite ? '取消收藏' : '收藏片段');
+                        button.setAttribute('aria-pressed', String(favorite));
+                    }
+                    button.onclick = event => { event.stopPropagation(); handler(); };
+                    actions.appendChild(button);
+                }
+                item.append(main, actions);
+                item.onclick = () => showPreviewSnippet(snippet);
+                item.onkeydown = event => { if (event.target === item && event.key === 'Enter') showPreviewSnippet(snippet); };
+                fragment.appendChild(item);
+            });
+            
+            // 一次性添加所有元素
+            listContainer.appendChild(fragment);
+            
+        }
+
+        let previewSnippet = null;
+        function showPreviewSnippet(snippet) {
+            previewSnippet = snippet;
+            document.getElementById('previewTitle').textContent = snippet.title;
+            document.getElementById('previewPath').textContent = snippet.path;
+            document.getElementById('previewContent').textContent = snippet.content;
+            document.getElementById('previewModal').style.display = 'flex';
+        }
+        function copySnippet(snippet) {
+            window.services.copySnippet(snippet);
+            searchSnippets();
+            showToast('已复制到剪贴板');
+        }
+        function toggleFavorite(snippet) {
+            window.services.toggleFavorite(snippet.path);
+            searchSnippets();
+        }
+        function createFromClipboard() {
+            const content = window.services.getClipboardText();
+            if (!content.trim()) { showToast('剪贴板没有文字'); return; }
+            showNewSnippetModal();
+            document.getElementById('snippetContent').value = content;
+            document.getElementById('snippetTitle').focus();
+        }
+        function duplicatePreviewSnippet() {
+            if (!previewSnippet) return;
+            try {
+                window.services.duplicateSnippet(previewSnippet.path);
+                closeModal('previewModal');
+                loadSnippets();
+                showToast('已创建副本');
+            } catch (error) { alert('复制片段失败: ' + error.message); }
+        }
+        function copyPreviewSnippet() { if (previewSnippet) copySnippet(previewSnippet); }
+        function editPreviewSnippet() { if (previewSnippet) { closeModal('previewModal'); showEditSnippetModal(previewSnippet); } }
+        function showToast(message) {
+            let toast = document.getElementById('snippetToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'snippetToast';
+                toast.style.cssText = 'position:fixed;bottom:18px;right:18px;padding:9px 14px;border-radius:8px;background:#172235;color:white;z-index:200';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.hidden = false;
+            clearTimeout(showToast.timer);
+            showToast.timer = setTimeout(() => { toast.hidden = true; }, 2200);
+        }
+
+        // 搜索片段（带权重排序，支持多关键词）
+        function searchSnippets() {
+            const searchText = document.getElementById('searchInput').value.trim();
+            const activity = window.services.getActivity();
+            const folder = document.getElementById('folderFilter').value;
+            const snippets = window.services.getSnippets().filter(item =>
+                (!folder || item.folder === folder) &&
+                (listFilter === 'all' || (listFilter === 'favorite' ? activity.favorites : activity.recent).includes(item.path))
+            );
+            
+            if (!searchText) {
+                updateSnippetsList(sortSnippets(snippets));
+                return;
+            }
+            
+            // 将搜索文本按空格分割成多个关键词
+            const keywords = searchText.toLowerCase().split(/\s+/).filter(keyword => keyword.length > 0);
+            
+            // 计算每个片段的权重分数
+            const scoredSnippets = snippets.map(snippet => {
+                let score = 0;
+                const title = snippet.title.toLowerCase();
+                const content = snippet.content.toLowerCase();
+                
+                // 对每个关键词进行匹配计算
+                const matchesAll = keywords.every(keyword => title.includes(keyword) || content.includes(keyword));
+                keywords.forEach(keyword => {
+                    // 文件名匹配权重为10
+                    if (title.includes(keyword)) {
+                        score += 10;
+                    }
+                    
+                    // 内容匹配权重为1
+                    if (content.includes(keyword)) {
+                        score += 1;
+                    }
+                });
+                
+                return {
+                    ...snippet,
+                    score: matchesAll ? score : 0
+                };
+            })
+            .filter(snippet => snippet.score > 0) // 只保留有匹配的片段
+            .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, 'zh-CN'));
+            
+            updateSnippetsList(scoredSnippets);
+        }
+
+        function sortSnippets(snippets) {
+            const ordered = [...snippets];
+            if (listFilter === 'recent') {
+                const recent = window.services.getActivity().recent;
+                return ordered.sort((a, b) => recent.indexOf(a.path) - recent.indexOf(b.path));
+            }
+            if (listFilter === 'favorite') {
+                return ordered.sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'));
+            }
+            if (document.getElementById('sortSelect').value === 'modified') return ordered.sort((a, b) => b.modifiedAt - a.modifiedAt);
+            return ordered.sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'));
+        }
+
+        // 显示新建片段模态框
+        function showNewSnippetModal() {
+            document.getElementById('modalTitle').textContent = '新建文本片段';
+            document.getElementById('snippetTitle').value = '';
+            document.getElementById('snippetContent').value = '';
+            document.getElementById('editingFileName').value = '';
+            document.getElementById('deleteSnippetBtn').style.display = 'none';
+            
+            // 显示默认存储路径
+            const settings = window.services.getSettings();
+            const defaultPath = settings.defaultSnippetsPath || 
+                               (Array.isArray(settings.snippetsPaths) && settings.snippetsPaths.length > 0 ? 
+                                settings.snippetsPaths[0] : settings.snippetsPath);
+                                
+            const savePathElement = document.getElementById('savePath');
+            if (defaultPath) {
+                savePathElement.textContent = `将保存到: ${defaultPath}`;
+                savePathElement.style.display = 'block';
+            } else {
+                savePathElement.style.display = 'none';
+            }
+            
+            document.getElementById('snippetModal').style.display = 'flex';
+        }
+
+        // 显示编辑片段模态框
+        function showEditSnippetModal(snippet) {
+            document.getElementById('modalTitle').textContent = '编辑文本片段';
+            document.getElementById('snippetTitle').value = snippet.title;
+            document.getElementById('snippetContent').value = snippet.content;
+            document.getElementById('editingFileName').value = snippet.path;
+            document.getElementById('deleteSnippetBtn').style.display = 'inline-block';
+            
+            // 显示当前文件路径
+            const savePathElement = document.getElementById('savePath');
+            savePathElement.textContent = `文件位置: ${snippet.path}`;
+            savePathElement.style.display = 'block';
+            
+            document.getElementById('snippetModal').style.display = 'flex';
+        }
+
+        // 显示设置模态框
+        function showSettingsModal() {
+                const settings = window.services.getSettings();
+            
+            // 清空并重新生成文件夹路径列表
+            const container = document.getElementById('folderPathsContainer');
+            container.innerHTML = '';
+            
+            // 兼容原来的单一路径设置
+            const paths = Array.isArray(settings.snippetsPaths) ? settings.snippetsPaths : 
+                          (settings.snippetsPath ? [settings.snippetsPath] : []);
+            
+            // 获取默认路径
+            const defaultPath = settings.defaultSnippetsPath || (paths.length > 0 ? paths[0] : '');
+            
+            if (paths.length === 0) {
+                // 如果没有路径，添加一个空的
+                addFolderPathItem('', container, true);
+            } else {
+                // 添加每个路径，并标记默认路径
+                paths.forEach(path => {
+                    addFolderPathItem(path, container, path === defaultPath);
+                });
+            }
+            
+            document.getElementById('autoInsert').checked = settings.autoInsert !== false;
+            document.getElementById('searchSubfolders').checked = settings.searchSubfolders !== false;
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        // 添加新的文件夹路径项
+        function addFolderPathItem(value, container, isDefault = false) {
+            const item = document.createElement('div');
+            item.className = 'folder-path-item';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'folder-path-input';
+            input.value = value || '';
+            input.readOnly = true;
+            
+            const browseBtn = document.createElement('button');
+            browseBtn.textContent = '浏览';
+            browseBtn.className = 'btn-browse';
+            browseBtn.onclick = function() {
+                selectFolderForInput(input);
+            };
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '删除';
+            removeBtn.className = 'btn-remove';
+            removeBtn.onclick = function() {
+                item.remove();
+                // 如果删除的是默认路径，且还有其他路径，则设置第一个为默认
+                if (radioBtn.checked) {
+                    const firstRadio = document.querySelector('.default-folder-radio');
+                    if (firstRadio) firstRadio.checked = true;
+                }
+            };
+            
+            // 默认路径单选按钮
+            const radioContainer = document.createElement('div');
+            radioContainer.className = 'default-radio-container';
+            
+            const radioLabel = document.createElement('label');
+            radioLabel.textContent = '默认';
+            radioLabel.className = 'default-radio-label';
+            
+            const radioBtn = document.createElement('input');
+            radioBtn.type = 'radio';
+            radioBtn.name = 'defaultPath';
+            radioBtn.className = 'default-folder-radio';
+            radioBtn.checked = isDefault;
+            
+            radioContainer.appendChild(radioLabel);
+            radioContainer.appendChild(radioBtn);
+            
+            const defaultLabel = document.createElement('span');
+            defaultLabel.className = 'default-path-indicator';
+            defaultLabel.textContent = isDefault ? '(默认)' : '';
+            
+            radioBtn.onchange = function() {
+                // 更新所有指示器文本
+                document.querySelectorAll('.default-path-indicator').forEach(indicator => {
+                    indicator.textContent = '';
+                });
+                // 设置当前选中项为默认
+                if (radioBtn.checked) {
+                    defaultLabel.textContent = '(默认)';
+                }
+            };
+            
+            const actions = document.createElement('div');
+            actions.className = 'folder-path-actions';
+            actions.appendChild(browseBtn);
+            actions.appendChild(removeBtn);
+            actions.appendChild(radioContainer);
+            
+            item.appendChild(input);
+            item.appendChild(defaultLabel);
+            item.appendChild(actions);
+            
+            container = container || document.getElementById('folderPathsContainer');
+            container.appendChild(item);
+        }
+
+        // 为指定的输入框选择文件夹
+        async function selectFolderForInput(inputElement) {
+            const folderPath = await window.services.selectFolder();
+            if (folderPath) {
+                inputElement.value = folderPath;
+            }
+        }
+
+        // 添加新的文件夹路径
+        function addFolderPath() {
+            addFolderPathItem('');
+        }
+
+        // 关闭模态框
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // 保存片段
+        function saveSnippet() {
+            const title = document.getElementById('snippetTitle').value.trim();
+            const content = document.getElementById('snippetContent').value;
+            const editingPath = document.getElementById('editingFileName').value;
+
+            if (!title) {
+                alert('请输入标题');
+                return;
+            }
+
+            if (!content.trim()) {
+                alert('请输入内容');
+                return;
+            }
+
+            try {
+                if (editingPath) {
+                    window.services.editSnippet(editingPath, title, content);
+                } else {
+                    // 创建新片段
+                    window.services.createSnippet(title, content);
+        }
+
+                // 刷新列表并关闭模态框
+                loadSnippets();
+                closeModal('snippetModal');
+                showToast('片段已保存');
+            } catch (error) {
+                alert('保存失败: ' + error.message);
+            }
+        }
+
+        // 删除片段
+        function deleteSnippet() {
+            const filePath = document.getElementById('editingFileName').value;
+            if (!filePath) return;
+            
+            if (confirm('确定要删除这个片段吗？此操作不可撤销。')) {
+                try {
+                    window.services.deleteSnippet(filePath);
+                    loadSnippets();
+                    closeModal('snippetModal');
+                    showToast('片段已删除');
+            } catch (error) {
+                    alert('删除失败: ' + error.message);
+                }
+            }
+        }
+
+        // 保存设置
+        function saveSettings() {
+            // 收集所有路径
+            const pathItems = document.querySelectorAll('.folder-path-item');
+            const paths = [];
+            let defaultPath = '';
+            
+            pathItems.forEach(item => {
+                const input = item.querySelector('.folder-path-input');
+                const radio = item.querySelector('.default-folder-radio');
+                const path = input.value.trim();
+                
+            if (path) {
+                    paths.push(path);
+                    if (radio.checked) {
+                        defaultPath = path;
+                    }
+                }
+            });
+            
+            // 如果没有选择默认路径，但有路径，则将第一个设为默认
+            if (!defaultPath && paths.length > 0) {
+                defaultPath = paths[0];
+            }
+            
+            const settings = {
+                snippetsPaths: paths, // 新的多路径设置
+                snippetsPath: paths.length > 0 ? paths[0] : '', // 保持向后兼容
+                defaultSnippetsPath: defaultPath, // 新增：默认保存路径
+                autoInsert: document.getElementById('autoInsert').checked,
+                searchSubfolders: document.getElementById('searchSubfolders').checked
+            };
+            
+            try {
+                if (!window.services.saveSettings(settings)) throw new Error('写入设置失败');
+                closeModal('settingsModal');
+                loadSnippets();
+            } catch (error) {
+                alert('保存设置失败: ' + error.message);
+            }
+        }
+
+        // 刷新片段列表
+        function refreshSnippets() {
+            const snippets = window.services.refreshSnippets();
+            searchSnippets();
+            showToast(`已刷新 ${snippets.length} 个片段`);
+        }
+    </script>
+</body>
+</html>

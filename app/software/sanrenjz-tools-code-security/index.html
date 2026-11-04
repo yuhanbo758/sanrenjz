@@ -1,0 +1,249 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-layout="vault-cards">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>编码与安全工具箱</title>
+<style>
+:root{
+  --accent:#e15b3d;--accent-2:#f97316;--accent-soft:rgba(225,91,61,.12);--accent-line:rgba(225,91,61,.32);
+  --bg:#fbf7f5;--surface:#fff;--surface-2:#f5ede9;--border:#e8dcd5;
+  --ink:#2d1f1a;--muted:#7a6b62;--faint:#a89a90;
+  --ok:#16a34a;--err:#dc2626;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.head{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex:none}
+.shield{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;flex:none}
+.shield svg{width:18px;height:18px;color:#fff}
+.head h1{margin:0;font-size:17px;font-weight:700}
+.head p{margin:0;color:var(--muted);font-size:12px}
+.head .spacer{flex:1}
+.tabs{display:flex;gap:6px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex:none;overflow-x:auto}
+.tab{border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:.15s;display:flex;align-items:center;gap:7px}
+.tab svg{width:15px;height:15px}
+.tab:hover{background:var(--surface-2)}
+.tab.active{background:var(--accent);color:#fff}
+.content{flex:1;min-height:0;overflow:auto;padding:16px 24px}
+.panel{height:100%;min-height:0;display:none;flex-direction:column;gap:14px}
+.panel.active{display:flex}
+.action-row{display:flex;gap:8px;flex-wrap:wrap;flex:none}
+.act{border:1px solid var(--border);background:var(--surface);color:var(--ink);padding:7px 14px;border-radius:8px;font-size:12px;cursor:pointer;transition:.15s;font-weight:500}
+.act:hover{border-color:var(--accent-line);color:var(--accent)}
+.act.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:700}
+.io{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.card-h{padding:9px 14px;border-bottom:1px solid var(--border);font:600 11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;align-items:center;flex:none}
+.card-h .cnt{font-size:10px;color:var(--faint)}
+.card textarea{flex:1;border:0;outline:0;resize:none;padding:14px;font:13px/1.6 var(--mono);background:var(--surface);color:var(--ink);min-height:0}
+.card textarea::placeholder{color:var(--faint)}
+.card pre{flex:1;overflow:auto;margin:0;padding:14px;font:13px/1.6 var(--mono);color:var(--ink);white-space:pre-wrap;word-break:break-all}
+.opts{display:flex;gap:14px;align-items:center;flex-wrap:wrap;flex:none}
+.opt{display:flex;align-items:center;gap:6px}
+.opt label{font-size:12px;color:var(--muted);font-weight:500}
+.sel{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;outline:none}
+.sel:focus{border-color:var(--accent-line)}
+.txt{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;font-family:var(--mono);outline:none;min-width:90px}
+.txt:focus{border-color:var(--accent-line)}
+.run{border:0;border-radius:8px;padding:8px 22px;font-weight:600;font-size:13px;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;transition:.15s}
+.run:hover{filter:brightness(1.08)}
+.run:disabled{opacity:.5}
+.bar{flex:none;padding:6px 0;font:12px var(--mono);color:var(--muted);display:flex;align-items:center;gap:8px}
+.bar .d{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.bar.ok .d{background:var(--ok)}.bar.err .d{background:var(--err)}
+.bar.err{color:var(--err)}
+.source-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none}
+.source-note{color:var(--muted);font-size:12px}
+.source-note strong{color:var(--ink)}
+.drop-zone{border:1px dashed var(--accent-line);background:var(--accent-soft);border-radius:10px;padding:11px 14px;color:var(--muted);font-size:12px;flex:1;min-width:220px;text-align:center;cursor:pointer}
+.drop-zone.dragover{border-color:var(--accent);background:rgba(225,91,61,.2);color:var(--ink)}
+.drop-zone:focus-visible,.act:focus-visible,.run:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.file-result{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:none;gap:8px;flex-direction:column;word-break:break-all;font:12px/1.5 var(--mono)}
+.file-result.show{display:flex}
+.file-result .digest{font-size:13px;color:var(--ink)}
+.file-result .match{color:var(--ok)}.file-result .mismatch{color:var(--err)}
+.section-label{font-size:12px;color:var(--muted);font-weight:600}
+@media(max-width:1050px){.head,.tabs{padding-left:16px;padding-right:16px}.content{padding:14px 16px}.io{gap:10px}.action-row{max-height:92px;overflow:auto}}
+.id-grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-content:start;padding:4px}
+.id-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:.15s;position:relative}
+.id-card:hover{border-color:var(--accent);box-shadow:0 4px 12px rgba(225,91,61,.1)}
+.id-card .id-val{font:12px/1.5 var(--mono);word-break:break-all;color:var(--ink)}
+.id-card .id-copy{position:absolute;top:8px;right:8px;opacity:0;transition:.15s;font-size:11px;color:var(--accent)}
+.id-card:hover .id-copy{opacity:1}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2d1f1a;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#d4c4b8;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="head">
+    <div class="shield"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/></svg></div>
+    <div><h1>编码与安全工具箱</h1><p>编码、摘要、令牌与安全随机 ID 的组合工作区</p></div>
+    <div class="spacer"></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-tool="codec-assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h10M4 7l3-3M4 7l3 3M20 17H10M20 17l-3-3M20 17l-3 3"/></svg>编解码</button>
+    <button class="tab" data-tool="hash-hmac"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>哈希/HMAC</button>
+    <button class="tab" data-tool="jwt-inspector"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6M12 17v6M4.2 4.2l4.3 4.3M15.5 15.5l4.3 4.3M1 12h6M17 12h6M4.2 19.8l4.3-4.3M15.5 8.5l4.3-4.3"/></svg>JWT 解析</button>
+    <button class="tab" data-tool="id-generator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>ID 生成</button>
+  </div>
+  <div class="content">
+    <!-- Codec -->
+    <div class="panel active" data-panel="codec-assistant">
+      <div class="source-row"><button class="act" id="codecOpen">选择文件</button><div class="drop-zone" id="codecDrop" role="button" tabindex="0">拖入文件或点击选择 · 文本加载为输入，二进制转 Base64 · 最大 8 MB</div><span class="source-note" id="codecFileNote">也可直接输入文本</span></div>
+      <div class="action-row" id="codecActions"></div>
+      <div class="io">
+        <div class="card"><div class="card-h">输入 <span class="cnt" id="codecCnt">0</span></div><textarea id="codecInput" spellcheck="false" placeholder="输入需要编码或解码的文本"></textarea></div>
+        <div class="card"><div class="card-h">结果 <span class="cnt" id="codecCopy">复制</span></div><pre id="codecOutput"></pre></div>
+      </div>
+      <button class="run" data-run style="align-self:flex-start">执行编解码</button>
+      <div class="bar" id="codecBar"><span class="d"></span><span>等待输入</span></div>
+    </div>
+    <!-- Hash -->
+    <div class="panel" data-panel="hash-hmac">
+      <div class="source-row"><button class="act" id="hashOpen">选择文件</button><div class="drop-zone" id="hashDrop" role="button" tabindex="0">将任意文件拖到这里，计算文件摘要</div><span class="source-note" id="hashFileNote">未选择文件时计算下方文本</span></div>
+      <div class="opts">
+        <div class="opt"><label>算法</label><select class="sel" id="hashAlgo"><option>md5</option><option>sha1</option><option selected>sha256</option><option>sha384</option><option>sha512</option></select></div>
+        <div class="opt"><label>输出</label><select class="sel" id="hashEnc"><option value="hex">hex</option><option value="base64">base64</option></select></div>
+        <div class="opt"><label>HMAC 密钥（可选）</label><input class="txt" id="hashKey" placeholder="留空则纯哈希" style="min-width:160px"></div>
+        <div class="opt"><label>预期摘要</label><input class="txt" id="hashExpected" placeholder="粘贴摘要以比对" style="min-width:200px"></div>
+      </div>
+      <div class="io">
+        <div class="card"><div class="card-h">待哈希内容</div><textarea id="hashInput" spellcheck="false" placeholder="输入需要计算摘要的文本"></textarea></div>
+        <div class="card"><div class="card-h">摘要结果 <span class="cnt" id="hashCopy">复制</span></div><pre id="hashOutput"></pre></div>
+      </div>
+      <button class="run" data-run style="align-self:flex-start">计算摘要</button>
+      <div class="file-result" id="hashFileResult"></div>
+      <div class="bar" id="hashBar"><span class="d"></span><span>等待输入</span></div>
+    </div>
+    <!-- JWT -->
+    <div class="panel" data-panel="jwt-inspector">
+      <div class="opts">
+        <div class="opt"><label>验证密钥（可选，HS256/384/512）</label><input class="txt" id="jwtSecret" placeholder="留空则仅解析不验证" style="min-width:200px"></div>
+      </div>
+      <div class="io" style="grid-template-columns:1fr">
+        <div class="card"><div class="card-h">JWT 令牌</div><textarea id="jwtInput" spellcheck="false" placeholder="粘贴 eyJhbGciOi... 格式的 JWT" style="height:90px"></textarea></div>
+      </div>
+      <button class="run" data-run style="align-self:flex-start">解析令牌</button>
+      <div class="card" style="flex:1;min-height:0"><div class="card-h">解析结果</div><pre id="jwtOutput" style="flex:1;overflow:auto"></pre></div>
+      <div class="bar" id="jwtBar"><span class="d"></span><span>等待输入</span></div>
+    </div>
+    <!-- ID -->
+    <div class="panel" data-panel="id-generator">
+      <div class="opts">
+        <div class="opt"><label>类型</label><select class="sel" id="idType"><option value="uuid">UUID v4</option><option value="nanoid">NanoID</option><option value="password">强随机密码</option><option value="hex">随机 HEX</option></select></div>
+        <div class="opt" id="lenWrap"><label>长度</label><input class="txt" id="idLen" type="number" value="21" min="4" max="128" style="width:70px"></div>
+        <div class="opt"><label>数量</label><input class="txt" id="idCount" type="number" value="8" min="1" max="200" style="width:70px"></div>
+        <button class="run" data-run>生成</button>
+      </div>
+      <div class="section-label">仅在本机生成；请妥善保存，关闭窗口后不会保留</div>
+      <div class="id-grid" id="idGrid">
+        <div style="grid-column:1/-1;color:var(--faint);text-align:center;padding:40px">点击「生成」创建安全随机 ID</div>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const api=window.pluginAPI;const $=s=>document.querySelector(s);const $$=(s,r=document)=>r.querySelectorAll(s);
+let current='codec-assistant';
+const codecActs=[['base64-encode','Base64 编码'],['base64-decode','Base64 解码'],['base64url-encode','Base64URL 编码'],['base64url-decode','Base64URL 解码'],['url-encode','URL 编码'],['url-decode','URL 解码'],['hex-encode','HEX 编码'],['hex-decode','HEX 解码'],['unicode-encode','Unicode 编码'],['unicode-decode','Unicode 解码'],['html-encode','HTML 编码'],['html-decode','HTML 解码'],['json-format','JSON 美化'],['json-minify','JSON 压缩']];
+let codecAction='base64-encode';
+(function buildCodecActions(){const c=$('#codecActions');codecActs.forEach(([v,l])=>{const b=document.createElement('button');b.className='act'+(v===codecAction?' active':'');b.textContent=l;b.dataset.v=v;b.onclick=()=>{codecAction=v;$$('#codecActions .act').forEach(x=>x.classList.toggle('active',x.dataset.v===v));};c.appendChild(b);});})();
+$$('.tab').forEach(t=>t.onclick=()=>{current=t.dataset.tool;$$('.tab').forEach(x=>x.classList.toggle('active',x===t));$$('.panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===current));});
+$('#codecInput').addEventListener('input',()=>$('#codecCnt').textContent=$('#codecInput').value.length);
+['#codecCopy','#hashCopy'].forEach(s=>{$(s).style.cursor='pointer';$(s).onclick=()=>{const el=$(s);const out=el.id==='codecCopy'?$('#codecOutput'):$('#hashOutput');if(out.textContent){api.copyText(out.textContent);toast('已复制');}}});
+$('#idType').onchange=()=>{$('#lenWrap').style.display=$('#idType').value==='uuid'?'none':'flex';};
+$('#idType').onchange();
+let hashFilePath='';
+async function chooseFile(kind,path){
+  try{
+    if(!path){const picked=api.selectFile();path=Array.isArray(picked)?picked[0]:picked;}
+    if(!path)return;
+    if(kind==='codec'){
+      try{
+        const file=await api.loadTextFile(path);
+        $('#codecInput').value=file.text;$('#codecCnt').textContent=file.text.length;$('#codecOutput').textContent='';
+        $('#codecFileNote').textContent=`${file.name} · ${file.size.toLocaleString()} 字节 · 文本`;
+        setBar('#codecBar','文本文件已加载，选择操作后执行','ok');
+      }catch(error){
+        if(!/二进制|UTF-8/.test(error.message))throw error;
+        const file=await api.encodeFileBase64(path);
+        $('#codecInput').value='';$('#codecCnt').textContent='0';$('#codecOutput').textContent=file.base64;
+        $('#codecFileNote').textContent=`${file.name} · ${file.size.toLocaleString()} 字节 · 二进制 Base64`;
+        setBar('#codecBar','二进制文件已转为 Base64，点击结果右上角复制','ok');
+      }
+    }else{
+      hashFilePath=path;
+      $('#hashFileNote').textContent=path.split(/[\\/]/).pop()+' · 文件模式';
+      $('#hashKey').disabled=true;$('#hashEnc').value='hex';$('#hashEnc').disabled=true;
+      $('#hashFileResult').classList.remove('show');
+      setBar('#hashBar','文件已选择，点击计算摘要','ok');
+    }
+  }catch(error){setBar(kind==='codec'?'#codecBar':'#hashBar',error.message,'err');}
+}
+function setupDrop(kind){
+  const zone=$('#'+kind+'Drop');
+  $('#'+kind+'Open').onclick=()=>chooseFile(kind);
+  zone.onclick=()=>chooseFile(kind);
+  zone.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();chooseFile(kind);}};
+  zone.ondragover=e=>{e.preventDefault();zone.classList.add('dragover');};
+  zone.ondragleave=()=>zone.classList.remove('dragover');
+  zone.ondrop=e=>{e.preventDefault();zone.classList.remove('dragover');const files=e.dataTransfer.files;if(files.length!==1){setBar(kind==='codec'?'#codecBar':'#hashBar','一次请选择一个文件','err');return;}const path=files[0].path;if(!path){setBar(kind==='codec'?'#codecBar':'#hashBar','无法获取文件路径，请点击选择文件','err');return;}chooseFile(kind,path);};
+}
+setupDrop('codec');setupDrop('hash');
+$('#hashInput').addEventListener('input',()=>{if(hashFilePath){hashFilePath='';$('#hashFileNote').textContent='已切回文本模式';$('#hashKey').disabled=false;$('#hashEnc').disabled=false;$('#hashFileResult').classList.remove('show');}});
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1600);}
+function setBar(sel,msg,st){const b=$(sel);b.className='bar'+(st==='ok'?' ok':st==='err'?' err':'');b.querySelector('span:last-child').textContent=msg;}
+function digestMatches(expected,actual,encoding){return encoding==='hex'?expected.toLowerCase()===actual.toLowerCase():expected===actual;}
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+$$('[data-run]').forEach(b=>b.onclick=run);
+async function run(){
+  if(current==='codec-assistant'){
+    const input=$('#codecInput').value;if(!input){setBar('#codecBar','请输入内容','err');return;}
+    try{$('#codecOutput').textContent=api.transformText(input,codecAction);setBar('#codecBar','已完成','ok');}catch(error){$('#codecOutput').textContent='';setBar('#codecBar',error.message,'err');}
+  }else if(current==='hash-hmac'){
+    const input=$('#hashInput').value;if(!hashFilePath&&!input){setBar('#hashBar','请输入内容或选择文件','err');return;}
+    const button=$('[data-panel="hash-hmac"] [data-run]');button.disabled=true;setBar('#hashBar','正在计算…');
+    try{
+      let digest,meta=null;
+      if(hashFilePath){meta=await api.hashFile(hashFilePath,$('#hashAlgo').value);digest=meta.hex;}
+      else digest=api.hashText(input,{algorithm:$('#hashAlgo').value,encoding:$('#hashEnc').value,key:$('#hashKey').value});
+      $('#hashOutput').textContent=digest;
+      const expected=$('#hashExpected').value.trim();const box=$('#hashFileResult');box.replaceChildren();
+      if(meta){const line=document.createElement('div');line.textContent=`${meta.name} · ${meta.size.toLocaleString()} 字节 · ${meta.algorithm}`;box.appendChild(line);}
+      if(expected){const line=document.createElement('div');const matched=digestMatches(expected,digest,$('#hashEnc').value);line.className=matched?'match':'mismatch';line.textContent=matched?'摘要一致':'摘要不一致';box.appendChild(line);}
+      box.classList.toggle('show',!!meta||!!expected);
+      const matched=digestMatches(expected,digest,$('#hashEnc').value);
+      setBar('#hashBar',expected?(matched?'摘要一致':'摘要不一致'):'摘要计算完成',expected&&!matched?'err':'ok');
+    }catch(error){$('#hashOutput').textContent='';$('#hashFileResult').classList.remove('show');setBar('#hashBar',error.message,'err');}finally{button.disabled=false;}
+  }else if(current==='jwt-inspector'){
+    const input=$('#jwtInput').value.trim();if(!input){setBar('#jwtBar','请输入 JWT','err');return;}
+    const res=await api.runTask({toolId:'jwt-inspector',input,options:{secret:$('#jwtSecret').value},execute:false});
+    if(res.ok){const r=typeof res.result==='string'?JSON.parse(res.result):res.result;let html='';const cv=r.verified===true?'<span style="color:var(--ok)">签名验证通过</span>':r.verified===false?'<span style="color:var(--err)">签名验证失败</span>':'<span style="color:var(--faint)">未提供密钥，跳过验证</span>';
+      html+=`<div style="margin-bottom:10px"><strong>Header</strong><pre>${escapeHtml(JSON.stringify(r.header,null,2))}</pre></div>`;
+      html+=`<div style="margin-bottom:10px"><strong>Payload</strong><pre>${escapeHtml(JSON.stringify(r.payload,null,2))}</pre></div>`;
+      html+=`<div><strong>过期</strong>: ${r.expired===null?'无 exp 字段':r.expired?'<span style="color:var(--err)">已过期</span>':'<span style="color:var(--ok)">未过期</span>'}</div>`;
+      html+=`<div><strong>签名</strong>: ${cv}</div>`;
+      $('#jwtOutput').innerHTML=html;setBar('#jwtBar','解析完成','ok');}else setBar('#jwtBar',res.error,'err');
+  }else if(current==='id-generator'){
+    const type=$('#idType').value,count=Math.min(200,Math.max(1,+$('#idCount').value||1)),length=Math.min(128,Math.max(4,+$('#idLen').value||21));
+    try{const ids=api.generateIds({type,count,length});const g=$('#idGrid');g.innerHTML='';
+      ids.forEach(id=>{const c=document.createElement('div');c.className='id-card';c.innerHTML=`<div class="id-val">${escapeHtml(id)}</div><div class="id-copy">复制</div>`;c.onclick=()=>{api.copyText(id);toast('已复制');};g.appendChild(c);});
+    }catch(error){toast(error.message);}
+  }
+}
+window.addEventListener('plugin-enter',e=>{
+  const id=e.detail?.toolId;if(id){$$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tool===id));$$('.panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===id));current=id;}
+  const text=e.detail?.action?.payload||e.detail?.action?.clipboardText||e.detail?.payload||e.detail?.clipboardText||'';
+  if(text){const map={'codec-assistant':'#codecInput','hash-hmac':'#hashInput','jwt-inspector':'#jwtInput'};const el=$(map[current]);if(el)el.value=text;}
+});
+</script>
+</body></html>

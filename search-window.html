@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三人聚智-效率工具 - 快速搜索</title>
+    <style>
+        :root {
+            --primary-color: #1890ff;
+            --primary-hover: #40a9ff;
+            --bg-color: rgba(255, 255, 255, 0.95);
+            --card-bg: #ffffff;
+            --text-color: #262626;
+            --text-secondary: #595959;
+            --border-color: #d9d9d9;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: var(--bg-color);
+            backdrop-filter: blur(20px);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .search-header {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #10239e 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 16px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--text-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            background: #ffffff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .search-input::placeholder {
+            color: #999;
+        }
+
+        .results-container {
+            max-height: 340px;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+            margin: 0 4px;
+            border-radius: 4px;
+        }
+
+        .result-item:hover,
+        .result-item.selected {
+            background: rgba(24, 144, 255, 0.08);
+            border-left-color: var(--primary-color);
+            transform: translateX(2px);
+        }
+
+        .result-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, var(--primary-color) 0%, #40a9ff 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            margin-right: 16px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 6px rgba(24, 144, 255, 0.2);
+        }
+
+        .result-logo img {
+            width: 100%;
+            height: 100%;
+            border-radius: var(--radius-md);
+            object-fit: cover;
+        }
+
+        .result-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .result-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .result-description {
+            font-size: 12px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .result-category {
+            font-size: 11px;
+            color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 12px;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+
+        .no-results {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .search-footer {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .shortcut-hint {
+            display: flex;
+            gap: 12px;
+        }
+
+        .shortcut-key {
+            background: #fff;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-weight: 600;
+            color: #666;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* 滚动条样式 */
+        .results-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .results-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .results-container::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.1);
+            border-radius: 3px;
+        }
+
+        .results-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(0,0,0,0.2);
+        }
+
+        /* 通知样式 */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #fff;
+            border-radius: var(--radius-md);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+            max-width: 400px;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(120%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(120%);
+                opacity: 0;
+            }
+        }
+
+        .notification.success {
+            border-left: 4px solid #52c41a;
+        }
+
+        .notification.error {
+            border-left: 4px solid #ff4d4f;
+        }
+
+        .notification.info {
+            border-left: 4px solid #1890ff;
+        }
+
+        .notification-icon {
+            font-size: 20px;
+        }
+
+        .notification.success .notification-icon {
+            color: #52c41a;
+        }
+
+        .notification.error .notification-icon {
+            color: #ff4d4f;
+        }
+
+        .notification.info .notification-icon {
+            color: #1890ff;
+        }
+
+        .notification-message {
+            flex: 1;
+            font-size: 14px;
+            color: #262626;
+        }
+
+        .match-indicator {
+            font-size: 11px;
+            color: #fff;
+            background-color: var(--primary-color);
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .search-tip {
+            font-size: 12px;
+            color: var(--primary-color);
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="search-header">
+        <input type="text" class="search-input" placeholder="搜索插件..." id="search-input" autofocus>
+    </div>
+    
+    <div class="results-container" id="results-container">
+        <div class="no-results" id="no-results">开始输入以搜索插件...</div>
+    </div>
+    
+    <div class="search-footer">
+        <div class="shortcut-hint">
+            <span><span class="shortcut-key">↑</span><span class="shortcut-key">↓</span> 选择</span>
+            <span><span class="shortcut-key">Enter</span> 打开</span>
+            <span><span class="shortcut-key">Ctrl+D</span> 钉住</span>
+            <span><span class="shortcut-key">Esc</span> 关闭</span>
+        </div>
+        <div id="pin-status">三人聚智-效率工具</div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const fs = require('fs');
+        const path = require('path');
+        const packagedSearchUtils = path.join(process.resourcesPath || '', 'app', 'search_utils.js');
+        const { searchCatalog } = require(fs.existsSync(packagedSearchUtils) ? packagedSearchUtils : './app/search_utils');
+
+        let plugins = [];
+        let pluginContents = []; // 存储插件的内容（如文本片段）
+        let filteredResults = []; // 合并的搜索结果
+        let selectedIndex = 0;
+        let pluginSearchSettings = {}; // 用户自定义的搜索设置
+        let isPinned = false; // 钉住状态
+        let catalogVersion = -1;
+        let catalogLoading = null;
+        let searchFrame = 0;
+        let isComposing = false;
+
+        const searchInput = document.getElementById('search-input');
+        const resultsContainer = document.getElementById('results-container');
+        const noResults = document.getElementById('no-results');
+        const pinStatus = document.getElementById('pin-status');
+
+        // 结果项类型
+        const RESULT_TYPES = {
+            PLUGIN: 'plugin',
+            CONTENT: 'content'
+        };
+
+        // 初始化并读取主进程统一搜索目录。目录在内存中缓存，不再逐插件同步扫描磁盘。
+        async function init(force = false) {
+            if (catalogLoading) return catalogLoading;
+            catalogLoading = (async () => {
+            try {
+                const catalog = await ipcRenderer.invoke('search-catalog-get', { force });
+                plugins = Array.isArray(catalog?.plugins) ? catalog.plugins : [];
+                pluginContents = Array.isArray(catalog?.contents) ? catalog.contents : [];
+                catalogVersion = Number(catalog?.version ?? catalogVersion);
+                updateSearchPlaceholder();
+            } catch (error) {
+                console.error('初始化失败:', error);
+                showNotification('搜索目录加载失败，请重新打开快捷搜索后重试。', 'error');
+            }
+            })().finally(() => { catalogLoading = null; });
+            return catalogLoading;
+        }
+
+        // 更新搜索提示
+        function updateSearchPlaceholder() {
+            const totalItems = plugins.length + pluginContents.length;
+            searchInput.placeholder = `搜索 ${plugins.length} 个插件和 ${pluginContents.length} 个内容项...可用空格分隔多个关键词`;
+        }
+
+        // 与输入事件共用同一评分规则，避免直接搜索和逐字输入的排序不一致。
+        function search(query) {
+            filteredResults = searchCatalog(query, plugins, pluginContents, 50);
+            selectedIndex = 0;
+            renderResults();
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // 渲染搜索结果
+        function renderResults() {
+            if (filteredResults.length === 0) {
+                // 检查是否是空输入
+                if (!searchInput.value.trim()) {
+                    resultsContainer.innerHTML = '<div class="no-results">开始输入以搜索插件和内容...</div>';
+                } else {
+                    resultsContainer.innerHTML = `
+                        <div class="no-results">
+                            <p>没有找到匹配的结果</p>
+                            <p class="search-tip">提示：可以使用空格分隔多个关键词进行精确搜索</p>
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            const html = filteredResults.map((result, index) => {
+                const isSelected = index === selectedIndex;
+                const selectedClass = isSelected ? 'selected' : '';
+                
+                if (result.type === RESULT_TYPES.PLUGIN) {
+                    const safeName = escapeHtml(result.name);
+                    return `
+                        <div class="result-item ${selectedClass}" data-index="${index}" data-type="plugin">
+                            <div class="result-logo">
+                                ${result.logoUrl ?
+                                    `<img src="${escapeHtml(result.logoUrl)}" alt="${safeName}">` :
+                                    `<span>${safeName.charAt(0).toUpperCase()}</span>`
+                                }
+                            </div>
+                            <div class="result-content">
+                                <div class="result-title">${safeName} <small>${result.engine === 'python' ? 'py程序' : '效率工具'}</small></div>
+                                <div class="result-description">${escapeHtml(result.description)}</div>
+                            </div>
+                            <div class="result-category">插件</div>
+                            ${result.totalKeywords > 1 ? 
+                            `<div class="match-indicator" title="匹配 ${result.matchedKeywordsCount}/${result.totalKeywords} 个关键词">
+                                ${result.matchedKeywordsCount}/${result.totalKeywords}
+                            </div>` : ''}
+                        </div>
+                    `;
+                } else {
+                    // 内容结果
+                    const isCommand = result.contentType === 'command';
+                    const isTextSnippet = result.contentType === 'text-snippet';
+                    
+                    return `
+                        <div class="result-item ${selectedClass}" data-index="${index}" data-type="content">
+                            <div class="result-logo">
+                                ${isCommand ? '<span>⚡</span>' : 
+                                  isTextSnippet ? '<span>📄</span>' : 
+                                  '<span>📋</span>'}
+                            </div>
+                            <div class="result-content">
+                                <div class="result-title">${escapeHtml(result.title)}</div>
+                                <div class="result-description">${escapeHtml(result.preview)}</div>
+                            </div>
+                            <div class="result-category">${escapeHtml(result.pluginName)}</div>
+                            ${result.totalKeywords > 1 ? 
+                            `<div class="match-indicator" title="匹配 ${result.matchedKeywordsCount}/${result.totalKeywords} 个关键词">
+                                ${result.matchedKeywordsCount}/${result.totalKeywords}
+                            </div>` : ''}
+                        </div>
+                    `;
+                }
+            }).join('');
+
+            resultsContainer.innerHTML = html;
+
+        }
+
+        // 使用事件委托，结果刷新时不再为每一项重复创建监听器。
+        resultsContainer.addEventListener('click', event => {
+            const item = event.target.closest('.result-item');
+            if (!item || isComposing) return;
+            // 输入后尚未重绘的旧结果不能被误执行；先展示当前查询，再由用户选择。
+            if (searchFrame) { flushSearch(); return; }
+            selectedIndex = Number(item.dataset.index) || 0;
+            selectResult();
+        });
+
+        // 键盘导航
+        function handleKeyNavigation(direction) {
+            if (filteredResults.length === 0) return;
+
+            if (direction === 'down') {
+                selectedIndex = (selectedIndex + 1) % filteredResults.length;
+            } else if (direction === 'up') {
+                selectedIndex = selectedIndex === 0 ? filteredResults.length - 1 : selectedIndex - 1;
+            }
+
+            renderResults();
+            
+            // 滚动到选中项
+            const selectedElement = document.querySelector('.result-item.selected');
+            if (selectedElement) {
+                selectedElement.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest' 
+                });
+            }
+        }
+
+        // 防重复执行标志
+        let isExecuting = false;
+        function ensureActionSucceeded(result) {
+            if (result?.success === false) throw new Error(result.error || result.message || '操作失败');
+        }
+
+        /**
+         * 选择并执行当前高亮结果
+         * 函数级注释：
+         * - 插件项：调用主进程 run-plugin，并在未钉住时隐藏搜索窗口（不恢复焦点）
+         * - 内容项：
+         *   - 文本片段 text-snippet：回车后直接插入到原输入框光标处
+         *   - 其他内容：打开对应插件窗口
+         */
+        async function selectResult() {
+            if (filteredResults.length === 0 || isExecuting || isComposing) return;
+            
+            // 设置执行标志，防止重复执行
+            isExecuting = true;
+            
+            const selectedResult = filteredResults[selectedIndex];
+            
+            try {
+                if (selectedResult.type === RESULT_TYPES.PLUGIN) {
+                    // 打开插件
+                    console.log('正在打开插件:', selectedResult.name);
+                    // 只传递可序列化的features数据
+                    const serializableFeatures = selectedResult.features ? selectedResult.features.map(f => ({
+                        code: f.code,
+                        explain: f.explain,
+                        cmds: f.cmds || []
+                    })) : [];
+                    if (selectedResult.engine === 'python') {
+                        let result = await ipcRenderer.invoke('unified:run', selectedResult.id);
+                        if (result?.requiresDependencies) {
+                            const answer = await ipcRenderer.invoke('show-message-box', { type: 'question', message: '运行前需要安装依赖', detail: (result.packages || []).join('\n'), buttons: ['取消', '安装并运行'], defaultId: 0, cancelId: 0 });
+                            if (answer.response !== 1) return;
+                            result = await ipcRenderer.invoke('unified:run', selectedResult.id, { installDependencies: true });
+                        }
+                        if (result?.success === false) { await ipcRenderer.invoke('show-message-box', { type: 'info', message: result.error || '请在主程序设置中配置 Python 环境', buttons: ['确定'] }); return; }
+                    } else ensureActionSucceeded(await ipcRenderer.invoke('run-plugin', selectedResult.path, serializableFeatures));
+                    // 打开插件后总是关闭搜索面板
+                    await ipcRenderer.invoke('hide-search-window', { restoreFocus: false });
+                } else if (selectedResult.type === RESULT_TYPES.CONTENT) {
+                    // 处理不同类型的内容
+                    if (selectedResult.contentType === 'text-snippet') {
+                        console.log('正在处理文本片段(直接插入):', selectedResult.title);
+                        ensureActionSucceeded(await ipcRenderer.invoke('insert-content', {
+                            ...selectedResult,
+                            directInsert: true
+                        }));
+                    } else {
+                        // 其他类型内容（包括命令）：直接打开对应的插件窗口
+                        console.log('正在打开插件:', selectedResult.pluginName || '未知插件');
+                        // 如果是具体的功能命令，传递功能代码
+                        const features = selectedResult.featureCode ? [{
+                            code: selectedResult.featureCode,
+                            cmd: selectedResult.command
+                        }] : [];
+                        ensureActionSucceeded(await ipcRenderer.invoke('run-plugin', selectedResult.pluginPath, features));
+                        // 打开插件后总是关闭搜索面板
+                        await ipcRenderer.invoke('hide-search-window', { restoreFocus: false });
+                    }
+                }
+            } catch (error) {
+                console.warn('操作失败:', error);
+                showNotification(error.message || '操作失败，请重试。', 'error');
+            } finally {
+                // 重置执行标志，允许下次操作
+                setTimeout(() => {
+                    isExecuting = false;
+                }, 100); // 100ms后重置，快速允许下次操作
+            }
+        }
+
+        // 合并同一帧内的连续输入，避免中文输入法组合输入期间反复全量计算。
+        function flushSearch() {
+            if (searchFrame) cancelAnimationFrame(searchFrame);
+            searchFrame = 0;
+            search(searchInput.value);
+        }
+        function scheduleSearch() {
+            if (isComposing) return;
+            if (searchFrame) cancelAnimationFrame(searchFrame);
+            searchFrame = requestAnimationFrame(() => {
+                searchFrame = 0;
+                search(searchInput.value);
+            });
+        }
+        searchInput.addEventListener('compositionstart', () => {
+            isComposing = true;
+            if (searchFrame) cancelAnimationFrame(searchFrame);
+            searchFrame = 0;
+        });
+        searchInput.addEventListener('compositionend', () => { isComposing = false; scheduleSearch(); });
+        searchInput.addEventListener('input', scheduleSearch);
+
+        // 键盘事件
+        document.addEventListener('keydown', (e) => {
+            // 输入法确认候选的回车和方向键只交给输入法，不能启动上一次搜索的插件。
+            if (isComposing || e.isComposing || e.keyCode === 229) return;
+            switch (e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (searchFrame) flushSearch();
+                    handleKeyNavigation('up');
+                    break;
+                    
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (searchFrame) flushSearch();
+                    handleKeyNavigation('down');
+                    break;
+                    
+                case 'Enter':
+                    e.preventDefault();
+                    if (e.repeat) return;
+                    if (searchFrame) flushSearch();
+                    selectResult();
+                    break;
+                    
+                case 'Escape':
+                    e.preventDefault();
+                    hideWindow(true);
+                    break;
+                    
+                case 'd':
+                case 'D':
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        togglePin();
+                    }
+                    break;
+            }
+        });
+
+        // 窗口显示时重置状态
+        window.addEventListener('focus', async () => {
+            searchInput.value = '';
+            searchInput.focus();
+            filteredResults = [];
+            selectedIndex = 0;
+            renderResults();
+            await updatePinStatus(); // 更新钉住状态
+            await init();
+        });
+
+        ipcRenderer.on('search-catalog-invalidated', async (event, payload) => {
+            if (Number(payload?.version) <= catalogVersion) return;
+            await init();
+            if (searchInput.value.trim()) scheduleSearch();
+        });
+
+        // 窗口失去焦点时隐藏（除非被钉住）
+        window.addEventListener('blur', () => {
+            // 延迟隐藏，防止点击结果时立即隐藏
+            setTimeout(() => {
+                if (!isPinned) {
+                    hideWindow();
+                }
+            }, 200);
+        });
+
+        // 监听主进程发送的钉住状态变化
+        ipcRenderer.on('pin-status-changed', (event, newPinStatus) => {
+            isPinned = newPinStatus;
+            updatePinStatusDisplay();
+        });
+
+        // 更新钉住状态显示
+        async function updatePinStatus() {
+            try {
+                isPinned = await ipcRenderer.invoke('get-pin-status');
+                updatePinStatusDisplay();
+            } catch (error) {
+                console.error('获取钉住状态失败:', error);
+            }
+        }
+
+        // 更新钉住状态显示（内部函数）
+        function updatePinStatusDisplay() {
+            pinStatus.textContent = isPinned ? '📌 已钉住' : '三人聚智-效率工具';
+            pinStatus.style.color = isPinned ? '#1890ff' : '#8c8c8c';
+        }
+
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            // 移除现有通知
+            const existingNotification = document.querySelector('.notification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+
+            // 创建通知元素
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            const iconMap = {
+                success: '✓',
+                error: '✕',
+                info: 'ℹ'
+            };
+            
+            notification.innerHTML = `
+                <span class="notification-icon">${iconMap[type] || iconMap.info}</span>
+                <span class="notification-message"></span>
+            `;
+            notification.querySelector('.notification-message').textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // 自动移除通知
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 3000);
+        }
+
+        // 切换钉住状态
+        async function togglePin() {
+            try {
+                isPinned = await ipcRenderer.invoke('toggle-pin');
+                await updatePinStatus();
+                console.log('钉住状态已切换:', isPinned);
+            } catch (error) {
+                console.error('切换钉住状态失败:', error);
+            }
+        }
+
+        // 隐藏窗口（考虑钉住状态）
+        async function hideWindow(force = false) {
+            try {
+                if (force || !isPinned) {
+                    await ipcRenderer.invoke('hide-search-window');
+                }
+            } catch (error) {
+                console.error('隐藏窗口失败:', error);
+            }
+        }
+
+        // 接收通知
+        ipcRenderer.on('hotkey-fallback', (event, data) => {
+            showNotification(`快捷键 ${data.original} 无法使用，已改为 ${data.fallback}`, 'info');
+        });
+
+        // 初始化
+        init();
+        renderResults();
+        updatePinStatus(); // 初始化时更新钉住状态
+    </script>
+</body>
+</html>

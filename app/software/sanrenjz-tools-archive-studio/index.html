@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="archive-box">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>压缩包工作台</title>
+<style>
+:root{
+  --accent:#9a6700;--accent-2:#b8860b;--accent-soft:rgba(154,103,0,.1);--accent-line:rgba(154,103,0,.32);
+  --bg:#fdfaf3;--surface:#fff;--surface-2:#f6efdf;--border:#ece0c6;
+  --ink:#2d2200;--muted:#7a6840;--faint:#a89880;
+  --ok:#16a34a;--err:#dc2626;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.head{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex:none}
+.icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:18px;height:18px;color:#fff}
+.head h1{margin:0;font-size:17px;font-weight:700}
+.head p{margin:0;color:var(--muted);font-size:12px}
+.spacer{flex:1}
+.mode-tabs{display:flex;gap:6px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex:none}
+.mtab{border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:.15s;display:flex;align-items:center;gap:7px}
+.mtab svg{width:15px;height:15px}
+.mtab:hover{background:var(--surface-2)}
+.mtab.active{background:var(--accent);color:#fff}
+.content{flex:1;min-height:0;overflow:hidden;padding:16px 24px;display:flex;flex-direction:column;gap:14px}
+.panel{flex:1;min-height:0;display:none;flex-direction:column;gap:14px}
+.panel.active{display:flex}
+.drop{flex:none;border:2px dashed var(--border);border-radius:14px;padding:24px;text-align:center;cursor:pointer;transition:.15s;color:var(--faint)}
+.drop:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.drop.dragging{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.drop svg{width:36px;height:36px;margin-bottom:6px}
+.ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
+.ctrl label{font-size:12px;color:var(--muted);font-weight:500}
+.sel{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:13px;cursor:pointer;outline:none}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent-line)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.5}
+.entry-list{flex:1;min-height:0;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+.entry{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--surface-2);font:12px var(--mono)}
+.entry:hover{background:var(--accent-soft)}
+.entry .nm{flex:1;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entry .sz{color:var(--faint);font-size:11px}
+.entry .dir{color:var(--accent);font-weight:700}
+.entry input{accent-color:var(--accent)}
+.entry .remove{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:16px}
+.entry .remove:hover{color:var(--err)}
+.bar{flex:none;padding:6px 0;font:12px var(--mono);color:var(--muted);display:flex;align-items:center;gap:8px}
+.bar .d{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.bar.ok .d{background:var(--ok)}.bar.err .d{background:var(--err)}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--faint);gap:10px}
+.empty svg{width:48px;height:48px;opacity:.4}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2d2200;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#dacba8;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="head">
+    <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg></div>
+    <div><h1>压缩包工作台</h1><p>创建、预览并安全解压 ZIP，拦截越界路径</p></div>
+    <div class="spacer"></div>
+  </div>
+  <div class="mode-tabs">
+    <button class="mtab active" data-mode="extract"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>预览 / 解压</button>
+    <button class="mtab" data-mode="create"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 3h16"/></svg>创建压缩包</button>
+  </div>
+  <div class="content">
+    <!-- Extract -->
+    <div class="panel active" data-panel="extract">
+      <div class="drop" id="exDrop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
+        <div style="font-weight:600;color:var(--ink)">点击添加 ZIP，或拖入多个 ZIP</div>
+        <div style="font-size:12px">批量预览、筛选条目并安全解压</div>
+      </div>
+      <div class="ctrl"><button class="btn" id="exAdd">添加 ZIP</button><button class="btn" id="exRemove">移除当前</button><button class="btn" id="exClear">清空队列</button><select class="sel" id="exArchive" aria-label="选择压缩包"></select><input class="sel" id="exSearch" placeholder="筛选包内文件" aria-label="筛选包内文件"><button class="btn" id="exAll">全选</button><button class="btn" id="exNone">全不选</button><span id="exSummary" style="font-size:12px;color:var(--muted)"></span></div>
+      <div class="ctrl">
+        <button class="btn" id="exPickDir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V5"/></svg>解压目录</button>
+        <button class="btn" id="exOpenDir">打开目录</button>
+        <span style="flex:1;font:12px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="exDir">未选择解压目录</span>
+        <label><input type="checkbox" id="exSeparate" checked>每个 ZIP 使用独立子目录</label>
+        <label><input type="checkbox" id="exSkip" checked>跳过已有文件</label>
+        <button class="btn primary" id="exPreview">预览内容</button>
+        <button class="btn" id="exExtract" disabled>解压所选文件</button>
+        <button class="btn" id="exBatch" disabled>批量解压全部</button>
+      </div>
+      <div class="entry-list" id="exList"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 8v13H3V8M1 3h22v5H1z"/></svg><span>选择 ZIP 后预览文件清单</span></div></div>
+      <div id="exResults" style="max-height:70px;overflow:auto;font-size:12px;color:var(--muted)" aria-live="polite"></div>
+      <div class="bar" id="exBar"><span class="d"></span><span>等待选择文件</span></div>
+    </div>
+    <!-- Create -->
+    <div class="panel" data-panel="create">
+      <div class="drop" id="crDrop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 3h16"/></svg>
+        <div style="font-weight:600;color:var(--ink)">点击添加文件，或拖入文件与文件夹</div>
+        <div style="font-size:12px">保留文件夹结构，支持多次添加</div>
+      </div>
+      <div class="ctrl">
+        <button class="btn" id="crAddFiles">添加文件</button><button class="btn" id="crAddFolder">添加文件夹</button><button class="btn" id="crClear">清空队列</button>
+        <label>压缩级别</label><select class="sel" id="crLevel"><option value="0">0 (仅存储)</option><option value="3">3</option><option value="6" selected>6 (默认)</option><option value="9">9 (最大)</option></select>
+        <div class="spacer"></div>
+        <button class="btn primary" id="crCreate">创建压缩包</button>
+      </div>
+      <div class="entry-list" id="crList"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/></svg><span>选择文件后显示清单</span></div></div>
+      <div class="bar" id="crBar"><span class="d"></span><span>等待选择文件</span></div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="renderer.js"></script>
+</body></html>

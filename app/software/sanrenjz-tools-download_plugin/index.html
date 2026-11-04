@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>腾讯云对象存储下载器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow: hidden;
+        }
+
+
+
+        /* 主容器 */
+        .container {
+            height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 主卡片 */
+        .main-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            height: calc(100vh - 40px);
+        }
+
+        /* 标题区域 */
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        /* 选项卡样式 */
+        .tab-container {
+            margin-bottom: 15px;
+        }
+
+        .tab-nav {
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 3px;
+            gap: 3px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: #7f8c8d;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #2c3e50;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+            color: #5a6c7d;
+        }
+
+        /* 选项卡内容 */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 选项组样式 */
+        .option-group {
+            margin-top: 10px;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #2c3e50;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #667eea;
+            cursor: pointer;
+        }
+
+        .checkbox-text {
+            user-select: none;
+        }
+
+        .main-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        /* 输入区域 */
+        .input-section {
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .input-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #34495e;
+            min-width: 80px;
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 2px solid #e0e6ed;
+            border-radius: 8px;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .download-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 90px;
+        }
+
+        .download-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .download-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .browse-btn {
+            padding: 10px 15px;
+            background: #34495e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 60px;
+        }
+
+        .browse-btn:hover {
+            background: #2c3e50;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 73, 94, 0.3);
+        }
+
+        /* 进度区域 */
+        .progress-section {
+            margin-bottom: 15px;
+        }
+
+        .status-text {
+            font-size: 13px;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            min-height: 18px;
+        }
+
+        .progress-container {
+            background: #ecf0f1;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 6px;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            font-size: 11px;
+            color: #7f8c8d;
+            text-align: right;
+        }
+
+        /* 文件管理区域 */
+        .file-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-list {
+            flex: 1;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            overflow-y: auto;
+            border: 2px solid #e0e6ed;
+            min-height: 200px;
+        }
+
+        /* 美化滚动条 */
+        .file-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .file-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .file-list::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 10px;
+            transition: background 0.3s ease;
+        }
+
+        .file-list::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            min-height: 45px;
+        }
+
+        .file-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .file-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-icon {
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .file-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 13px;
+        }
+
+        .file-size {
+            font-size: 11px;
+            color: #7f8c8d;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .action-btn {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .open-btn {
+            background: #3498db;
+            color: white;
+        }
+
+        .delete-btn {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .action-btn:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 14px;
+            padding: 40px 20px;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .main-card {
+                padding: 20px;
+            }
+
+            .input-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .input-label {
+                min-width: auto;
+                margin-bottom: 5px;
+            }
+        }
+
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        /* 加载动画 */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+
+    <!-- 主容器 -->
+    <div class="container">
+        <div class="main-card fade-in">
+            <!-- 标题区域 -->
+            <div class="header">
+                <h1 class="main-title">插件下载</h1>
+                <p class="subtitle">多功能下载工具，支持腾讯云对象存储和GitHub仓库下载</p>
+            </div>
+
+            <!-- 选项卡导航 -->
+            <div class="tab-container">
+                <div class="tab-nav">
+                    <button class="tab-btn active" onclick="switchTab('cos')">腾讯云存储</button>
+                    <button class="tab-btn" onclick="switchTab('github')">GitHub仓库</button>
+                </div>
+            </div>
+
+            <!-- 腾讯云存储下载区域 -->
+            <div id="cosTab" class="tab-content active">
+                <div class="input-section">
+                    <div class="input-group">
+                        <label class="input-label">下载地址:</label>
+                        <input type="text" id="cosUrlInput" class="url-input" placeholder="请输入腾讯云对象存储文件地址...">
+                        <button id="cosDownloadBtn" class="download-btn" onclick="startCosDownload()">
+                            <span id="cosBtnText">开始下载</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GitHub仓库下载区域 -->
+            <div id="githubTab" class="tab-content">
+                <div class="input-section">
+                    <div class="input-group">
+                        <label class="input-label">仓库地址:</label>
+                        <input type="text" id="githubUrlInput" class="url-input" placeholder="支持多种格式：user/repo 或 https://github.com/user/repo">
+                        <button id="githubDownloadBtn" class="download-btn" onclick="startGithubDownload()">
+                            <span id="githubBtnText">克隆仓库</span>
+                        </button>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">保存位置:</label>
+                        <input type="text" id="githubPathInput" class="url-input" placeholder="选择保存位置...">
+                        <button class="browse-btn" onclick="browseSaveDirectory()">浏览</button>
+                    </div>
+                    <div class="option-group">
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" id="autoExtract" checked>
+                            <span class="checkmark"></span>
+                            <span class="checkbox-text">下载后自动解压</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 进度区域 -->
+            <div class="progress-section">
+                <div id="statusText" class="status-text">请输入腾讯云对象存储文件地址</div>
+                <div class="progress-container">
+                    <div id="progressBar" class="progress-bar"></div>
+                </div>
+                <div id="progressText" class="progress-text">0%</div>
+            </div>
+
+            <!-- 文件管理区域 -->
+            <div class="file-section">
+                <div class="section-title">
+                    📁 已下载文件 <span style="font-size: 12px; color: #7f8c8d;">(腾讯云存储目录)</span>
+                    <span id="scrollHint" style="margin-left: auto; font-size: 12px; color: #7f8c8d; display: none;">👆 滚动查看更多</span>
+                    <button onclick="refreshFileList()" style="margin-left: 10px; background: none; border: none; cursor: pointer; color: #667eea; font-size: 14px;">🔄 刷新</button>
+                </div>
+                <div id="fileList" class="file-list">
+                    <div class="empty-state">暂无下载文件</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const fs = require('fs');
+        const path = require('path');
+        const https = require('https');
+        const http = require('http');
+        // ZIP解压将使用内置方法
+
+        let isDownloading = false;
+        let currentTab = 'cos';
+
+        // 选项卡切换
+        function switchTab(tabName) {
+            // 更新选项卡按钮状态
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 更新选项卡内容显示
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            currentTab = tabName;
+            
+            // 重置状态
+            updateStatus(getDefaultStatusText());
+            updateProgress(0);
+        }
+
+        // 获取默认状态文本
+        function getDefaultStatusText() {
+            return currentTab === 'cos' ? '请输入腾讯云对象存储文件地址' : '请输入GitHub仓库地址';
+        }
+
+        // 浏览保存目录
+        function browseSaveDirectory() {
+            try {
+                const currentPath = document.getElementById('githubPathInput').value || getSoftwareDir();
+                
+                const selectedPath = ipcRenderer.sendSync('show-open-dialog', {
+                    title: '选择保存位置',
+                    defaultPath: currentPath,
+                    properties: ['openDirectory']
+                });
+                
+                if (selectedPath && selectedPath.length > 0) {
+                    document.getElementById('githubPathInput').value = selectedPath[0];
+                }
+            } catch (error) {
+                console.error('打开文件夹选择对话框失败:', error);
+                alert('打开文件夹选择对话框失败');
+            }
+        }
+
+        // 获取软件目录
+        function getSoftwareDir() {
+            try {
+                const currentDir = __dirname;
+                // 获取插件所在的上级目录（software目录）
+                const softwareDir = path.dirname(currentDir);
+                
+                if (!fs.existsSync(softwareDir)) {
+                    fs.mkdirSync(softwareDir, { recursive: true });
+                }
+                
+                return softwareDir;
+            } catch (error) {
+                console.error('获取软件目录失败:', error);
+                return path.dirname(__dirname);
+            }
+        }
+
+
+
+        // 更新进度
+        function updateProgress(percentage) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            progressBar.style.width = `${percentage}%`;
+            progressText.textContent = `${Math.round(percentage)}%`;
+        }
+
+        // 更新状态
+        function updateStatus(status) {
+            document.getElementById('statusText').textContent = status;
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 获取文件扩展名图标
+        function getFileIcon(filename) {
+            const ext = path.extname(filename).toLowerCase();
+            const iconMap = {
+                '.zip': '📦',
+                '.rar': '📦',
+                '.7z': '📦',
+                '.txt': '📄',
+                '.pdf': '📕',
+                '.doc': '📘',
+                '.docx': '📘',
+                '.xls': '📗',
+                '.xlsx': '📗',
+                '.ppt': '📙',
+                '.pptx': '📙',
+                '.exe': '⚙️',
+                '.msi': '⚙️',
+                '.jpg': '🖼️',
+                '.jpeg': '🖼️',
+                '.png': '🖼️',
+                '.gif': '🖼️',
+                '.mp4': '🎬',
+                '.avi': '🎬',
+                '.mp3': '🎵',
+                '.wav': '🎵'
+            };
+            return iconMap[ext] || '📄';
+        }
+
+        // 解码文件名
+        function decodeFilename(filename) {
+            try {
+                return decodeURIComponent(filename);
+            } catch (error) {
+                return filename;
+            }
+        }
+
+        // 解析GitHub URL
+        function parseGithubUrl(url) {
+            // 清理URL
+            url = url.trim().replace(/^@/, '').replace(/\.git$/, '').replace(/\/$/, '');
+            
+            // 支持多种GitHub URL格式
+            const patterns = [
+                // https://github.com/user/repo
+                /https?:\/\/github\.com\/([^\/\s]+)\/([^\/\s]+)/,
+                // github.com/user/repo
+                /^github\.com\/([^\/\s]+)\/([^\/\s]+)/,
+                // user/repo
+                /^([^\/\s]+)\/([^\/\s]+)$/
+            ];
+            
+            for (const pattern of patterns) {
+                const match = url.match(pattern);
+                if (match) {
+                    const username = match[1];
+                    const repo = match[2];
+                    
+                    // 验证用户名和仓库名格式
+                    if (username && repo && !username.includes(' ') && !repo.includes(' ')) {
+                        return { username, repo };
+                    }
+                }
+            }
+            
+            throw new Error("无效的GitHub仓库地址。支持的格式：\n- https://github.com/user/repo\n- github.com/user/repo\n- user/repo");
+        }
+
+        // 解压ZIP文件（默认解压到同目录）
+        async function extractZip(zipPath) {
+            const outputDir = path.dirname(zipPath);
+            return await extractZipToDirectory(zipPath, outputDir);
+        }
+
+        // 解压ZIP文件到指定目录
+        async function extractZipToDirectory(zipPath, outputDir) {
+            try {
+                const { exec } = require('child_process');
+                
+                return new Promise((resolve) => {
+                    // 检查文件是否存在
+                    if (!fs.existsSync(zipPath)) {
+                        console.error('ZIP文件不存在:', zipPath);
+                        resolve(false);
+                        return;
+                    }
+                    
+                    // 确保输出目录存在
+                    if (!fs.existsSync(outputDir)) {
+                        fs.mkdirSync(outputDir, { recursive: true });
+                    }
+                    
+                    // 使用PowerShell的Expand-Archive命令解压
+                    const command = `powershell -ExecutionPolicy Bypass -Command "try { Expand-Archive -Path '${zipPath}' -DestinationPath '${outputDir}' -Force; Write-Output 'SUCCESS' } catch { Write-Error $_.Exception.Message; exit 1 }"`;
+                    
+                    exec(command, { timeout: 60000 }, (error, stdout, stderr) => {
+                        if (error) {
+                            console.error('解压文件失败:', error);
+                            console.error('stderr:', stderr);
+                            resolve(false);
+                        } else if (stdout.includes('SUCCESS')) {
+                            // 删除原始ZIP文件
+                            try {
+                                fs.unlinkSync(zipPath);
+                                console.log('ZIP文件已删除:', zipPath);
+                            } catch (e) {
+                                console.error('删除ZIP文件失败:', e);
+                            }
+                            resolve(true);
+                        } else {
+                            console.error('解压命令执行失败:', stderr);
+                            resolve(false);
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('解压文件失败:', error);
+                return false;
+            }
+        }
+
+        // 下载腾讯云文件
+        async function downloadCosFile(url) {
+            return new Promise((resolve, reject) => {
+                try {
+                    const filename = decodeFilename(url.split('/').pop()) || 'download';
+                    const softwareDir = getSoftwareDir();
+                    const filePath = path.join(softwareDir, filename);
+                    
+                    const protocol = url.startsWith('https:') ? https : http;
+                    
+                    updateStatus(`正在下载: ${filename}`);
+                    updateProgress(0);
+                    
+                    const file = fs.createWriteStream(filePath);
+                    const request = protocol.get(url, (response) => {
+                        const totalSize = parseInt(response.headers['content-length'], 10);
+                        let downloadedSize = 0;
+                        
+                        response.pipe(file);
+                        
+                        response.on('data', (chunk) => {
+                            downloadedSize += chunk.length;
+                            if (totalSize > 0) {
+                                const percentage = (downloadedSize / totalSize) * 100;
+                                updateProgress(percentage);
+                            }
+                        });
+                        
+                        file.on('finish', async () => {
+                            file.close();
+                            
+                            // 如果是ZIP文件，自动解压
+                            if (filename.toLowerCase().endsWith('.zip')) {
+                                updateStatus('正在解压文件...');
+                                const extracted = await extractZip(filePath);
+                                if (extracted) {
+                                    updateStatus('文件解压完成！');
+                                } else {
+                                    updateStatus('文件解压失败！');
+                                }
+                            } else {
+                                updateStatus('下载完成！');
+                            }
+                            
+                            updateProgress(100);
+                            refreshFileList();
+                            resolve(true);
+                        });
+                    });
+                    
+                    request.on('error', (error) => {
+                        updateStatus(`下载失败: ${error.message}`);
+                        reject(error);
+                    });
+                    
+                } catch (error) {
+                    updateStatus(`下载失败: ${error.message}`);
+                    reject(error);
+                }
+            });
+        }
+
+        // 下载GitHub仓库
+        async function downloadGithubRepo(url) {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const { username, repo } = parseGithubUrl(url);
+                    
+                    // 获取用户选择的保存路径
+                    const saveDir = document.getElementById('githubPathInput').value.trim();
+                    if (!saveDir) {
+                        throw new Error('请选择保存位置');
+                    }
+                    
+                    // 确保保存目录存在
+                    if (!fs.existsSync(saveDir)) {
+                        fs.mkdirSync(saveDir, { recursive: true });
+                    }
+                    
+                    updateStatus(`正在克隆仓库: ${username}/${repo}`);
+                    updateProgress(0);
+                    
+                    // 尝试不同的分支（main, master）
+                    const branches = ['main', 'master'];
+                    let downloadSuccess = false;
+                    let finalFilePath = '';
+                    
+                    for (const branch of branches) {
+                        try {
+                            const downloadUrl = `https://github.com/${username}/${repo}/archive/refs/heads/${branch}.zip`;
+                            const zipName = `${repo}-${branch}.zip`;
+                            const filePath = path.join(saveDir, zipName);
+                            finalFilePath = filePath;
+                            
+                            updateStatus(`正在尝试下载 ${branch} 分支...`);
+                            
+                            const success = await downloadFileWithRedirect(downloadUrl, filePath);
+                            if (success) {
+                                downloadSuccess = true;
+                                break;
+                            }
+                        } catch (error) {
+                            console.log(`下载 ${branch} 分支失败:`, error.message);
+                            continue;
+                        }
+                    }
+                    
+                    if (!downloadSuccess) {
+                        throw new Error('无法下载仓库，请检查仓库地址是否正确');
+                    }
+                    
+                    // 检查是否自动解压
+                    const autoExtract = document.getElementById('autoExtract').checked;
+                    if (autoExtract) {
+                        updateStatus('正在解压仓库...');
+                        const extracted = await extractZipToDirectory(finalFilePath, saveDir);
+                        if (extracted) {
+                            updateStatus('仓库克隆完成！');
+                        } else {
+                            updateStatus('仓库解压失败！');
+                        }
+                    } else {
+                        updateStatus('仓库下载完成！');
+                    }
+                    
+                    updateProgress(100);
+                    refreshFileList();
+                    resolve(true);
+                    
+                } catch (error) {
+                    updateStatus(`克隆失败: ${error.message}`);
+                    reject(error);
+                }
+            });
+        }
+
+        // 处理重定向的文件下载
+        function downloadFileWithRedirect(url, filePath) {
+            return new Promise((resolve, reject) => {
+                const maxRedirects = 5;
+                let redirectCount = 0;
+                
+                function makeRequest(requestUrl) {
+                    const protocol = requestUrl.startsWith('https:') ? https : http;
+                    
+                    const request = protocol.get(requestUrl, (response) => {
+                        // 处理重定向
+                        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                            redirectCount++;
+                            if (redirectCount > maxRedirects) {
+                                reject(new Error('重定向次数过多'));
+                                return;
+                            }
+                            makeRequest(response.headers.location);
+                            return;
+                        }
+                        
+                        // 检查响应状态
+                        if (response.statusCode !== 200) {
+                            reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+                            return;
+                        }
+                        
+                        const totalSize = parseInt(response.headers['content-length'], 10);
+                        let downloadedSize = 0;
+                        
+                        const file = fs.createWriteStream(filePath);
+                        response.pipe(file);
+                        
+                        response.on('data', (chunk) => {
+                            downloadedSize += chunk.length;
+                            if (totalSize > 0) {
+                                const percentage = (downloadedSize / totalSize) * 100;
+                                updateProgress(percentage);
+                            }
+                        });
+                        
+                        file.on('finish', () => {
+                            file.close();
+                            resolve(true);
+                        });
+                        
+                        file.on('error', (error) => {
+                            reject(error);
+                        });
+                    });
+                    
+                    request.on('error', (error) => {
+                        reject(error);
+                    });
+                    
+                    request.setTimeout(30000, () => {
+                        request.destroy();
+                        reject(new Error('下载超时'));
+                    });
+                }
+                
+                makeRequest(url);
+            });
+        }
+
+        // 开始腾讯云下载
+        async function startCosDownload() {
+            const urlInput = document.getElementById('cosUrlInput');
+            const downloadBtn = document.getElementById('cosDownloadBtn');
+            const btnText = document.getElementById('cosBtnText');
+            
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('请输入下载地址');
+                return;
+            }
+            
+            if (isDownloading) {
+                return;
+            }
+            
+            isDownloading = true;
+            downloadBtn.disabled = true;
+            btnText.innerHTML = '<span class="loading"></span> 下载中...';
+            
+            try {
+                await downloadCosFile(url);
+            } catch (error) {
+                console.error('下载失败:', error);
+            } finally {
+                isDownloading = false;
+                downloadBtn.disabled = false;
+                btnText.textContent = '开始下载';
+            }
+        }
+
+        // 开始GitHub克隆
+        async function startGithubDownload() {
+            const urlInput = document.getElementById('githubUrlInput');
+            const downloadBtn = document.getElementById('githubDownloadBtn');
+            const btnText = document.getElementById('githubBtnText');
+            const pathInput = document.getElementById('githubPathInput');
+            
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('请输入GitHub仓库地址');
+                return;
+            }
+            
+            const savePath = pathInput.value.trim();
+            if (!savePath) {
+                alert('请选择保存位置');
+                return;
+            }
+            
+            if (isDownloading) {
+                return;
+            }
+            
+            // 验证GitHub URL格式
+            try {
+                parseGithubUrl(url);
+            } catch (error) {
+                alert(error.message);
+                return;
+            }
+            
+            isDownloading = true;
+            downloadBtn.disabled = true;
+            btnText.innerHTML = '<span class="loading"></span> 克隆中...';
+            
+            try {
+                await downloadGithubRepo(url);
+                // 保存下载历史
+                const { username, repo } = parseGithubUrl(url);
+                saveDownloadHistory(url, `${repo}`, 'github');
+            } catch (error) {
+                console.error('克隆失败:', error);
+                alert(`克隆失败: ${error.message}`);
+            } finally {
+                isDownloading = false;
+                downloadBtn.disabled = false;
+                btnText.textContent = '克隆仓库';
+            }
+        }
+
+        // 检查是否需要滚动提示
+        function checkScrollHint() {
+            const fileList = document.getElementById('fileList');
+            const scrollHint = document.getElementById('scrollHint');
+            
+            if (fileList.scrollHeight > fileList.clientHeight) {
+                scrollHint.style.display = 'inline';
+            } else {
+                scrollHint.style.display = 'none';
+            }
+        }
+
+        // 刷新文件列表
+        function refreshFileList() {
+            const fileList = document.getElementById('fileList');
+            const softwareDir = getSoftwareDir();
+            
+            try {
+                const files = fs.readdirSync(softwareDir);
+                
+                if (files.length === 0) {
+                    fileList.innerHTML = '<div class="empty-state">暂无下载文件</div>';
+                    document.getElementById('scrollHint').style.display = 'none';
+                    return;
+                }
+                
+                let html = '';
+                files.forEach(filename => {
+                    const filePath = path.join(softwareDir, filename);
+                    const stats = fs.statSync(filePath);
+                    const fileSize = formatFileSize(stats.size);
+                    const icon = getFileIcon(filename);
+                    
+                    html += `
+                        <div class="file-item">
+                            <div class="file-info">
+                                <div class="file-icon">${icon}</div>
+                                <div class="file-details">
+                                    <div class="file-name">${filename}</div>
+                                    <div class="file-size">${fileSize}</div>
+                                </div>
+                            </div>
+                            <div class="file-actions">
+                                <button class="action-btn open-btn" onclick="openFile('${filename}')">打开</button>
+                                <button class="action-btn delete-btn" onclick="deleteFile('${filename}')">删除</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                fileList.innerHTML = html;
+                
+                // 检查是否需要显示滚动提示
+                setTimeout(checkScrollHint, 100);
+                
+            } catch (error) {
+                console.error('刷新文件列表失败:', error);
+                fileList.innerHTML = '<div class="empty-state">读取文件列表失败</div>';
+                document.getElementById('scrollHint').style.display = 'none';
+            }
+        }
+
+        // 打开文件
+        function openFile(filename) {
+            const { shell } = require('electron');
+            const softwareDir = getSoftwareDir();
+            const filePath = path.join(softwareDir, filename);
+            
+            shell.openPath(filePath).catch(error => {
+                console.error('打开文件失败:', error);
+                alert('打开文件失败');
+            });
+        }
+
+        // 删除文件
+        function deleteFile(filename) {
+            if (confirm(`确定要删除文件 "${filename}" 吗？`)) {
+                const softwareDir = getSoftwareDir();
+                const filePath = path.join(softwareDir, filename);
+                
+                try {
+                    fs.unlinkSync(filePath);
+                    refreshFileList();
+                    updateStatus(`文件 "${filename}" 已删除`);
+                } catch (error) {
+                    console.error('删除文件失败:', error);
+                    alert('删除文件失败');
+                }
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshFileList();
+            
+            // 设置GitHub保存路径的默认值
+            document.getElementById('githubPathInput').value = getSoftwareDir();
+            
+            // 添加回车键下载功能 - 腾讯云
+            document.getElementById('cosUrlInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !isDownloading) {
+                    startCosDownload();
+                }
+            });
+            
+            // 添加回车键下载功能 - GitHub
+            document.getElementById('githubUrlInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !isDownloading) {
+                    startGithubDownload();
+                }
+            });
+        });
+
+        // 保存下载历史
+        function saveDownloadHistory(url, filename, type = 'cos') {
+            try {
+                const history = ipcRenderer.sendSync('plugin-storage-get', '插件下载', 'download-history') || [];
+                history.unshift({
+                    url,
+                    filename,
+                    type,
+                    timestamp: Date.now()
+                });
+                
+                // 只保留最近50条记录
+                if (history.length > 50) {
+                    history.splice(50);
+                }
+                
+                ipcRenderer.sendSync('plugin-storage-set', '插件下载', 'download-history', history);
+            } catch (error) {
+                console.error('保存下载历史失败:', error);
+            }
+        }
+    </script>
+</body>
+</html> 

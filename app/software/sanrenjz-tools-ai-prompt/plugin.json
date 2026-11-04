@@ -1,0 +1,49 @@
+{
+  "pluginName": "AI 提示词工坊",
+  "description": "管理本地与文件夹提示词，通过 @ 插入、变量填充和 AI 优化生成副本。",
+  "version": "1.1.0",
+  "author": "三人聚智",
+  "category": "AI 工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-ai-prompt",
+      "explain": "提示优化",
+      "description": "搜索提示词、@ 插入、填充变量并将 AI 优化结果另存为模板。",
+      "cmds": [
+        "AI 提示词工坊",
+        "优化提示词",
+        "提示词模板",
+        "提示词变量",
+        {
+          "type": "over",
+          "label": "用AI 提示词工坊处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "AI 工具",
+      "priority": 22,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

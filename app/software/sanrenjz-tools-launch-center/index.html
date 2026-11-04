@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="launch-radar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>启动中心</title>
+<style>
+:root{
+  --accent:#364fc7;--accent-2:#4263eb;--accent-soft:rgba(54,79,199,.1);--accent-line:rgba(54,79,199,.3);
+  --bg:#f5f7fe;--surface:#fff;--surface-2:#eef2fc;--border:#dbe3f5;
+  --ink:#1a2340;--muted:#5a6b8a;--faint:#9aa8c0;
+  --ok:#16a34a;--err:#dc2626;--warn:#d97706;
+  --mono:'JetBrains Mono',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;gap:6px;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex:none}
+.tab{border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:.15s;display:flex;align-items:center;gap:7px}
+.tab svg{width:15px;height:15px}
+.tab:hover{background:var(--surface-2)}.tab.active{background:var(--accent);color:#fff}
+.content{flex:1;min-height:0;overflow:hidden;padding:16px 20px}
+.panel{height:100%;min-height:0;display:none;flex-direction:column;gap:14px}
+.panel.active{display:flex}
+.add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:none}
+.inp{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font:14px var(--sans);color:var(--ink);outline:none}
+.inp:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent-line)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--err);border-color:var(--err)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.toolbar .inp{flex:1;min-width:180px}
+.count{color:var(--muted);font-size:12px;white-space:nowrap}
+.section-label{font-size:12px;font-weight:700;color:var(--muted);margin:0}
+.form-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.form-row .inp{flex:1;min-width:170px}
+.path-line{display:flex;gap:8px;align-items:center;min-width:0;flex:1}
+.path-line span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font:12px var(--mono)}
+.empty{padding:48px 20px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--border);border-radius:12px}
+.empty strong{display:block;color:var(--ink);margin-bottom:4px}
+/* bookmark grid */
+.bm-grid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-content:start}
+.bm-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+.bm-card:hover{border-color:var(--accent);box-shadow:0 6px 18px rgba(54,79,199,.12);transform:translateY(-2px)}
+.bm-card .bm-icon{width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font:700 18px var(--sans);color:var(--accent);margin-bottom:12px}
+.bm-card .bm-title{font-weight:700;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bm-card .bm-url{font:11px var(--mono);color:var(--faint);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bm-actions{display:flex;gap:4px;margin-top:12px}
+.mini{border:0;background:var(--surface-2);color:var(--muted);border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px}
+.mini:hover{color:var(--accent)}.mini.danger:hover{color:var(--err)}
+.bm-meta{font-size:11px;color:var(--muted);margin-top:5px}
+.bm-empty{grid-column:1/-1;color:var(--faint);text-align:center;padding:40px}
+/* project launcher */
+.proj-list{flex:none;max-height:210px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+.proj-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--surface-2);cursor:pointer;transition:.12s}
+.proj-item:hover{background:var(--surface-2)}
+.proj-item.active{background:var(--accent-soft);border-left:3px solid var(--accent)}
+.proj-item .pn{font-weight:600;flex:1}
+.proj-item .pc{font:11px var(--mono);color:var(--faint)}
+.proj-item .pd{font:11px var(--mono);color:var(--faint)}
+.proj-item .info{flex:1;min-width:0}.proj-item .pn,.proj-item .pc,.proj-item .pd{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proj-item .pn.running::before{content:'●';color:var(--ok);margin-right:7px}
+.project-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.project-actions .status-bar{margin-left:auto}
+.note{font-size:11px;color:var(--muted)}
+.terminal{flex:1;min-height:0;background:#1a2340;border-radius:10px;padding:14px;overflow:auto;font:13px/1.6 var(--mono);color:#a8b4d8}
+.terminal .log-line{white-space:pre-wrap;word-break:break-word}
+.terminal .log-ok{color:var(--ok)}.terminal .log-err{color:var(--err)}.terminal .log-info{color:#748ffc}
+.status-bar{flex:none;display:flex;gap:14px;align-items:center;font:12px var(--mono);color:var(--muted)}
+.status-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.status-bar.running .dot{background:var(--ok);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2340;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#c8d4f0;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="tabs">
+    <button class="tab active" data-tool="bookmark-launcher"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>书签启动</button>
+    <button class="tab" data-tool="project-launcher"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h6l2 3h10v11a2 2 0 0 1-2 2H3z"/><path d="M5 9h14M7 13l2 2 3-3"/></svg>项目启动</button>
+  </div>
+  <div class="content">
+    <div class="panel active" data-panel="bookmark-launcher">
+      <div class="toolbar"><input class="inp" id="bmSearch" placeholder="搜索名称、网址或分组" aria-label="搜索书签"><span class="count" id="bmCount"></span></div>
+      <div class="form-row">
+        <input class="inp" id="bmTitle" placeholder="书签名称" style="width:200px">
+        <input class="inp" id="bmUrl" placeholder="https://..." style="flex:1;min-width:200px">
+        <input class="inp" id="bmGroup" placeholder="分组（可选）" style="width:150px">
+        <button class="btn primary" id="bmAdd">添加书签</button><button class="btn" id="bmCancel" hidden>取消编辑</button>
+      </div>
+      <div class="bm-grid" id="bmGrid"></div>
+    </div>
+    <div class="panel" data-panel="project-launcher">
+      <div class="toolbar"><input class="inp" id="pjSearch" placeholder="搜索项目名称、命令或目录" aria-label="搜索项目"><span class="count" id="pjCount"></span></div>
+      <div class="form-row">
+        <input class="inp" id="pjName" placeholder="项目名称" style="width:160px">
+        <div class="path-line"><button class="btn" id="pjPickDir">选择目录</button><span id="pjDir">未选择</span></div>
+        <input class="inp" id="pjCmd" placeholder="启动命令 如 npm run dev" style="flex:1;min-width:200px">
+        <button class="btn primary" id="pjAdd">保存项目</button><button class="btn" id="pjCancel" hidden>取消编辑</button>
+      </div>
+      <div class="proj-list" id="projList"><div style="padding:20px;text-align:center;color:var(--faint)">添加项目后显示在这里</div></div>
+      <div class="project-actions">
+        <button class="btn primary" id="pjRun"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>启动</button>
+        <button class="btn danger" id="pjStop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>停止</button>
+        <button class="btn" id="pjOpenDir">打开目录</button><button class="btn" id="pjEdit">编辑</button><button class="btn" id="pjDelete">删除</button><button class="btn" id="pjClearLog">清空日志</button>
+        <div class="status-bar" id="pjStatus"><span class="dot"></span><span>未运行</span></div>
+      </div>
+      <div class="terminal" id="pjTerminal"><div class="log-line log-info">选择项目后可启动并查看日志</div></div>
+      <div class="note">关闭启动中心窗口时，会停止从本窗口启动的项目进程。</div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="renderer.js"></script>
+</body></html>

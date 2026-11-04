@@ -1,0 +1,54 @@
+{
+  "pluginName": "图片悬浮板",
+  "description": "拖入、粘贴或选择图片，调整视图并悬浮置顶。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-image-pinboard",
+      "explain": "图片悬浮",
+      "description": "拖入、粘贴或选择图片，调整视图并悬浮置顶。",
+      "cmds": [
+        "图片悬浮",
+        "贴图",
+        "pin image",
+        {
+          "type": "over",
+          "label": "用图片悬浮板处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  },
+  "indicatorSetting": {
+    "width": 400,
+    "height": 300,
+    "resizable": true,
+    "focusable": true
+  }
+}

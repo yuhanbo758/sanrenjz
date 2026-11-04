@@ -1,0 +1,75 @@
+{
+  "pluginName": "启动中心",
+  "description": "集中管理网址书签与项目命令，支持检索、编辑和运行日志。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-bookmark-launcher",
+      "explain": "网址书签",
+      "description": "网址、项目目录、启动命令和运行日志统一启动。",
+      "cmds": [
+        "书签",
+        "网址启动",
+        "bookmark",
+        {
+          "type": "over",
+          "label": "用启动中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-project-launcher",
+      "explain": "项目启动",
+      "description": "网址、项目目录、启动命令和运行日志统一启动。",
+      "cmds": [
+        "项目启动",
+        "服务管理",
+        "project launcher",
+        {
+          "type": "over",
+          "label": "用启动中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

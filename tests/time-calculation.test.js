@@ -1,0 +1,20 @@
+const assert = require('node:assert/strict');
+const core = require('../app/software/sanrenjz-tools-time-calculation/time-core');
+
+assert.equal(core.timeDetails('0'.repeat(10), 'UTC').seconds, 0);
+assert.equal(core.timeDetails('2026-01-15T12:30:00+08:00', 'UTC').iso, '2026-01-15T04:30:00.000Z');
+assert.equal(core.timeDetails('1768451400000', 'UTC').milliseconds, 1768451400000);
+assert.throws(() => core.parseInstant('2026/01/15'), /ISO/);
+assert.throws(() => core.parseInstant('2026-02-30T12:00:00'), /不存在/);
+assert.throws(() => core.parseDay('2026-02-30'), /不存在/);
+assert.equal(core.addDays('2024-02-28', 1), '2024-02-29');
+assert.equal(core.addDays('2024-03-10', 1), '2024-03-11');
+assert.equal(core.dayDifference('2024-02-28', '2024-03-01'), 2);
+assert.equal(core.addBusinessDays('2026-09-25', 1), '2026-09-28');
+assert.equal(core.addBusinessDays('2026-09-28', -1), '2026-09-25');
+assert.throws(() => core.addBusinessDays('2026-09-28', 1.5), /整数/);
+assert.equal(core.convertUnit('1', 'data', 'MiB', 'KiB'), 1024);
+assert.equal(core.convertUnit('32', 'temperature', '°F', '°C'), 0);
+assert.equal(core.convertUnit('1', 'length', 'mi', 'm'), 1609.344);
+assert.throws(() => core.convertUnit('-1', 'temperature', 'K', '°C'), /绝对零度/);
+console.log('时间与计算中心核心计算通过');

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="query-plan">
+<head data-business>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI SQL 助手</title>
+<style>
+:root{--a:#ca8a04;--a2:#eab308;--as:rgba(202,138,4,.1);--al:rgba(202,138,4,.3);--bg:#fdfbf3;--sf:#fff;--s2:#f7f0d8;--bd:#ede0b8;--ink:#2d2400;--mt:#7a6b40;--ft:#a89860;--ok:#16a34a;--err:#dc2626;--mono:'JetBrains Mono','Fira Code',Consolas,monospace;--sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif}
+*{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.head{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none}
+.icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--a),var(--a2));display:flex;align-items:center;justify-content:center;flex:none}.icon svg{width:18px;height:18px;color:#fff}
+.head h1{margin:0;font-size:17px;font-weight:700}.head p{margin:0;color:var(--mt);font-size:12px}
+.spacer{flex:1}.gear{border:1px solid var(--bd);background:var(--sf);color:var(--a);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}.gear svg{width:14px;height:14px}
+.modes{display:flex;gap:6px;padding:10px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none}
+.mode{border:1px solid var(--bd);background:var(--sf);color:var(--mt);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:.12s}.mode:hover{border-color:var(--al);color:var(--a)}.mode.active{background:var(--a);color:#fff;border-color:transparent}
+.opt-row{display:flex;gap:10px;align-items:center;padding:10px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none;flex-wrap:wrap}
+.opt-row label{font-size:12px;color:var(--mt);font-weight:500}
+.sel{background:var(--s2);color:var(--ink);border:1px solid var(--bd);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;outline:none}
+.body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 24px;overflow:hidden}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.card-h{padding:10px 16px;border-bottom:1px solid var(--bd);font:600 12px var(--sans);color:var(--mt);flex:none;display:flex;justify-content:space-between;align-items:center}
+.card-h .cnt{font:11px var(--mono);color:var(--ft)}
+.input-area{flex:1;border:0;outline:0;resize:none;padding:14px;font:14px/1.7 var(--sans);background:var(--sf);min-height:0}.input-area::placeholder{color:var(--ft)}
+.result-area{flex:1;overflow:auto;padding:14px;font:14px/1.7 var(--mono);white-space:pre-wrap;word-break:break-word;background:#2d2400;color:#f0e8b8}
+.result-area.empty{display:flex;align-items:center;justify-content:center;color:var(--ft);font-style:italic;background:var(--sf)}
+.result-area{white-space:normal;background:var(--sf);color:var(--ink);font:14px/1.7 var(--sans)}
+.result-section{margin:0 0 18px}.result-section h3{margin:0 0 8px;color:var(--mt);font-size:12px}.result-section p{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10px}.result-section pre{margin:0;background:#221c0b;color:#f8e7a9;border-radius:8px;padding:14px;overflow:auto;font:13px/1.65 var(--mono);white-space:pre;tab-size:2}
+.hint{padding:5px 24px;color:var(--mt);font-size:12px;background:var(--bg);border-bottom:1px solid var(--bd)}
+.code-block{background:#1a1500;border-radius:8px;padding:14px;margin:8px 0;overflow-x:auto;font:14px/1.6 var(--mono);color:#fde68a}
+.act-bar{padding:12px 24px;border-top:1px solid var(--bd);background:var(--sf);display:flex;gap:10px;align-items:center;flex:none}
+.btn{border:1px solid var(--bd);background:var(--sf);color:var(--ink);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;transition:.12s;display:inline-flex;align-items:center;gap:6px}.btn:hover{border-color:var(--al)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border-color:transparent}.btn.primary:hover{filter:brightness(1.08)}.btn:disabled{opacity:.5}
+.drawer{position:fixed;top:32px;right:0;bottom:0;width:min(420px,92vw);background:var(--sf);box-shadow:-12px 0 40px rgba(0,0,0,.1);z-index:50;transform:translateX(100%);transition:.25s;overflow:auto;padding:24px}.drawer.open{transform:translateX(0)}.drawer h2{margin:0 0 16px;font-size:16px}.drawer .close{position:absolute;top:16px;right:16px;border:0;background:transparent;font-size:20px;color:var(--ft);cursor:pointer}
+.field{margin-bottom:16px}.field label{display:block;font-size:12px;color:var(--mt);font-weight:600;margin-bottom:6px}.field input{width:100%;border:1px solid var(--bd);border-radius:8px;padding:9px 12px;font:14px var(--sans);outline:none;background:var(--s2);color:var(--ink)}.field input:focus{border-color:var(--al)}
+.overlay{position:fixed;inset:32px 0 0 0;background:rgba(0,0,0,.3);z-index:40;display:none}.overlay.show{display:block}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2d2400;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#dacba8;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="head">
+    <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0"/></svg></div>
+    <div><h1>AI SQL 助手</h1><p>按数据库方言生成、解释、格式化和优化 SQL，不连接数据库</p></div>
+    <div class="spacer"></div>
+    <button class="gear" onclick="toggleDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 1-.1 1.2l2 1.5-2 3.4-2.3-1a7 7 0 0 1-2 1.2l-.4 2.5H9l-.4-2.5a7 7 0 0 1-2-1.2l-2.3 1-2-3.4 2-1.5A7 7 0 0 1 4 12a7 7 0 0 1 .1-1.2l-2-1.5 2-3.4 2.3 1a7 7 0 0 1 2-1.2L9 1h4l.4 2.5a7 7 0 0 1 2 1.2l2.3-1 2 3.4-2 1.5A7 7 0 0 1 19 12z"/></svg>供应商设置</button>
+  </div>
+  <div class="modes">
+    <button class="mode active" data-mode="生成">生成 SQL</button>
+    <button class="mode" data-mode="解释">解释 SQL</button>
+    <button class="mode" data-mode="优化">优化 SQL</button>
+    <button class="mode" data-mode="格式化">格式化</button>
+    <button class="mode" data-mode="检查">风险检查</button>
+    <button class="mode" data-mode="计划">查询计划</button>
+  </div>
+  <div class="opt-row">
+    <label>数据库</label><select class="sel" id="dialect"><option>MySQL</option><option>PostgreSQL</option><option>SQLite</option><option>SQL Server</option><option>Oracle</option></select>
+    <label>表结构（可选）</label><input style="flex:1;min-width:200px;border:1px solid var(--bd);border-radius:7px;padding:6px 10px;font:12px var(--mono);outline:none;background:var(--s2)" id="schema" placeholder="如：users(id, name, email, created_at)">
+  </div>
+  <div class="hint" id="modeHint">用自然语言描述查询需求。生成结果只供审阅，不会连接数据库或执行 SQL。</div>
+  <div class="body">
+    <div class="card"><div class="card-h">输入 <span class="cnt" id="inCnt">0 字</span></div><textarea class="input-area" id="input" placeholder="生成：用自然语言描述查询需求，如「查询最近 7 天注册的用户」&#10;解释/优化：粘贴 SQL 语句"></textarea></div>
+    <div class="card"><div class="card-h">SQL 结果 <span class="cnt" id="resStat">等待</span></div><div class="result-area empty" id="result">结果将显示在这里</div></div>
+  </div>
+  <div class="act-bar">
+    <button class="btn primary" id="genBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span id="genLabel">生成 SQL</span></button>
+    <button class="btn" id="stopBtn" disabled>取消</button>
+    <div class="spacer"></div>
+    <button class="btn" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制</button>
+    <button class="btn" id="copySqlBtn" disabled>复制 SQL</button>
+  </div>
+</main>
+<div class="overlay" id="overlay" onclick="toggleDrawer()"></div>
+<aside class="drawer" id="drawer"></aside>
+<div class="toast" id="toast"></div>
+<script src="../../plugin_runtime/ai-provider-manager.js"></script>
+<script src="sql-tools.js"></script>
+<script src="app.js"></script>
+</body></html>

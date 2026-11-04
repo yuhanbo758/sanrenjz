@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="启动中心">
+  <defs><linearGradient id="bg" x1="24" y1="18" x2="230" y2="238" gradientUnits="userSpaceOnUse"><stop stop-color="#5a6fd1"/><stop offset=".52" stop-color="#364fc7"/><stop offset="1" stop-color="#19275e"/></linearGradient><filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="9" stdDeviation="8" flood-color="#000" flood-opacity=".22"/></filter></defs>
+  <rect x="14" y="12" width="228" height="228" rx="58" fill="url(#bg)" filter="url(#shadow)"/>
+  <circle cx="54" cy="52" r="44" fill="#fff" opacity=".08"/><circle cx="210" cy="204" r="58" fill="#fff" opacity=".08"/>
+  <rect x="23" y="21" width="210" height="210" rx="49" fill="none" stroke="#fff" stroke-width="2" opacity=".16"/>
+  <g transform="translate(48 48) scale(6.6667)" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13a8 8 0 0 1 7 7a6 6 0 0 0 3 -5a9 9 0 0 0 6 -8a3 3 0 0 0 -3 -3a9 9 0 0 0 -8 6a6 6 0 0 0 -5 3" />
+  <path d="M7 14a6 6 0 0 0 -3 6a6 6 0 0 0 6 -3" />
+  <path d="M14 9a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></g>
+</svg>

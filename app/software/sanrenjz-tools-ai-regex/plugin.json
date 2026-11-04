@@ -1,0 +1,51 @@
+{
+  "pluginName": "AI 正则助手",
+  "description": "生成、解释和修复正则，支持匹配高亮、捕获组、替换预览与正反样本校验。",
+  "version": "1.1.0",
+  "author": "三人聚智",
+  "category": "AI 工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-ai-regex",
+      "explain": "正则生成",
+      "description": "生成、解释和修复正则，支持匹配高亮、捕获组、替换预览与正反样本校验。",
+      "cmds": [
+        "AI 正则助手",
+        "生成正则",
+        "解释正则",
+        "修复正则",
+        "正则测试",
+        "正则替换预览",
+        {
+          "type": "over",
+          "label": "用AI 正则助手处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "AI 工具",
+      "priority": 22,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

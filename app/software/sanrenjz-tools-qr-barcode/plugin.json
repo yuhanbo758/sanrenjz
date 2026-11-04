@@ -1,0 +1,51 @@
+{
+  "pluginName": "二维码与条码工具",
+  "description": "生成二维码与常用条码，识别图片、复制和导出图码。",
+  "version": "2.1.0",
+  "updateDate": "2026-09-27",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-qr-barcode",
+      "explain": "二维码",
+      "description": "生成二维码与常用条码，识别图片、复制和导出图码。",
+      "cmds": [
+        "二维码",
+        "qr code",
+        "二维码识别",
+        "条码生成",
+        "条码识别",
+        {
+          "type": "over",
+          "label": "用二维码与条码工具处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

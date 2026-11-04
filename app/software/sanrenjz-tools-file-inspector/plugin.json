@@ -1,0 +1,102 @@
+{
+  "pluginName": "文件检查工作台",
+  "description": "拖入文件或目录，搜索内容、比较目录并导出结果，生成目录树。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-file-content-search",
+      "explain": "内容搜索",
+      "description": "搜索内容、比较目录并生成结构树。",
+      "cmds": [
+        "文件搜索",
+        "内容搜索",
+        "grep",
+        {
+          "type": "over",
+          "label": "用文件检查工作台处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-folder-compare",
+      "explain": "文件对比",
+      "description": "搜索内容、比较目录并生成结构树。",
+      "cmds": [
+        "文件夹对比",
+        "目录比较",
+        "folder diff",
+        {
+          "type": "over",
+          "label": "用文件检查工作台处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-directory-tree",
+      "explain": "目录结构",
+      "description": "搜索内容、比较目录并生成结构树。",
+      "cmds": [
+        "目录树",
+        "文件树",
+        "tree",
+        {
+          "type": "over",
+          "label": "用文件检查工作台处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "pluginName": "图片创作台",
+  "description": "支持拖放粘贴、文字水印、可排序图片拼接和截图美化，导出 PNG、JPEG、WebP。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-image-watermark",
+      "explain": "图片水印",
+      "description": "水印、拼接和截图美化共用一块可视画布。",
+      "cmds": [
+        "图片水印",
+        "文字水印",
+        "watermark",
+        {
+          "type": "over",
+          "label": "用图片创作台处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-image-collage",
+      "explain": "图片拼接",
+      "description": "水印、拼接和截图美化共用一块可视画布。",
+      "cmds": [
+        "图片拼接",
+        "长图",
+        "宫格图",
+        {
+          "type": "over",
+          "label": "用图片创作台处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-screenshot-beautifier",
+      "explain": "截图美化",
+      "description": "水印、拼接和截图美化共用一块可视画布。",
+      "cmds": [
+        "截图美化",
+        "图片加背景",
+        "screenshot",
+        {
+          "type": "over",
+          "label": "用图片创作台处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

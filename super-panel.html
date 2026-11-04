@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超级面板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-color: rgba(30, 30, 35, 0.95);
+            --text-color: #e0e0e0;
+            --accent-color: #60a5fa;
+            --accent-hover: #3b82f6;
+            --item-bg: rgba(255, 255, 255, 0.05);
+            --item-hover-bg: rgba(255, 255, 255, 0.1);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --danger-color: #ef4444;
+            --success-color: #4CAF50;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            user-select: none;
+            overflow: hidden;
+            border-radius: 16px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .super-panel {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-height: 450px;
+            width: 100%;
+            max-width: 480px;
+        }
+
+        .panel-header {
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .panel-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #ffffff;
+            margin: 0;
+            letter-spacing: 0.5px;
+        }
+
+        .panel-subtitle {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            margin: 0;
+            flex: 1;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .header-btn {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        .add-btn:hover {
+            background: rgba(76, 175, 80, 0.15);
+            color: var(--success-color);
+        }
+
+        .settings-btn:hover {
+            background: rgba(96, 165, 250, 0.15);
+            color: var(--accent-color);
+        }
+
+        .close-btn:hover {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger-color);
+        }
+
+        .selected-text-info {
+            padding: 10px 20px;
+            background: rgba(96, 165, 250, 0.08);
+            border-left: 3px solid var(--accent-color);
+            margin: 0;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.9);
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: none;
+            line-height: 1.5;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .actions-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+            gap: 10px;
+            justify-items: center;
+        }
+
+        .action-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 76px;
+            height: 92px;
+            padding: 8px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--item-bg);
+            border: 1px solid transparent;
+            position: relative;
+        }
+
+        .action-item:hover {
+            background: var(--item-hover-bg);
+            border-color: rgba(255, 255, 255, 0.1);
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .action-item.selected {
+            background: rgba(96, 165, 250, 0.15);
+            border-color: var(--accent-color);
+            transform: scale(1.02);
+            box-shadow: 0 0 0 1px var(--accent-color), 0 4px 12px rgba(96, 165, 250, 0.2);
+        }
+
+        .action-icon {
+            width: 28px;
+            height: 28px;
+            background: transparent;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-bottom: 6px;
+            transition: transform 0.2s ease;
+        }
+
+        .action-item:hover .action-icon {
+            transform: scale(1.1);
+        }
+
+        .action-title {
+            font-size: 12px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            text-align: center;
+            line-height: 1.35;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+        }
+
+        .empty-title {
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+        }
+
+        .empty-description {
+            font-size: 13px;
+            line-height: 1.5;
+            max-width: 200px;
+            margin: 0 auto;
+        }
+
+        .add-action-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 76px;
+            height: 92px;
+            padding: 8px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(76, 175, 80, 0.05);
+            border: 1px dashed rgba(76, 175, 80, 0.4);
+            position: relative;
+        }
+
+        .add-action-item:hover {
+            background: rgba(76, 175, 80, 0.15);
+            border-color: var(--success-color);
+            transform: translateY(-2px);
+        }
+
+        .add-action-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: var(--success-color);
+            margin-bottom: 6px;
+        }
+
+        .add-action-title {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--success-color);
+            text-align: center;
+        }
+
+        /* 滚动条样式 */
+        .actions-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .actions-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .actions-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .actions-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* 删除按钮样式 */
+        .delete-btn {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            left: auto;
+            /* 覆盖原来的 left: -5px */
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--danger-color);
+            color: white;
+            border: 2px solid var(--bg-color);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .action-item:hover .delete-btn {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .delete-btn:hover {
+            background: #ff4444;
+            transform: scale(1.15);
+        }
+
+        /* 动画 */
+        .action-item,
+        .add-action-item {
+            animation: fadeInScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation-fill-mode: backwards;
+        }
+
+        /* 为每个项目添加交错延迟 */
+        .action-item:nth-child(1) {
+            animation-delay: 0.05s;
+        }
+
+        .action-item:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .action-item:nth-child(3) {
+            animation-delay: 0.15s;
+        }
+
+        .action-item:nth-child(4) {
+            animation-delay: 0.2s;
+        }
+
+        .action-item:nth-child(5) {
+            animation-delay: 0.25s;
+        }
+
+        .action-item:nth-child(6) {
+            animation-delay: 0.3s;
+        }
+
+        .action-item:nth-child(7) {
+            animation-delay: 0.35s;
+        }
+
+        .action-item:nth-child(8) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.8) translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        /* 加载动画 */
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent-color);
+            animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body oncontextmenu="return false;">
+    <div class="super-panel">
+        <div class="panel-header">
+            <div class="panel-title">超级面板</div>
+            <div class="panel-subtitle">插件快速访问</div>
+            <div class="header-buttons">
+                <button class="header-btn add-btn" id="add-btn" onclick="openAddPluginDialog()" title="添加插件功能">
+                    ➕
+                </button>
+                <button class="header-btn settings-btn" id="settings-btn" onclick="openPanelSettings()" title="面板设置">
+                    ⚙️
+                </button>
+                <button class="header-btn close-btn" onclick="closePanel()" title="关闭面板">
+                    ✕
+                </button>
+            </div>
+        </div>
+
+        <!-- 选中文本信息区域 -->
+        <div class="selected-text-info" id="selected-text-info"></div>
+
+        <div class="actions-container" id="actions-container">
+            <div class="empty-state">
+                <div class="loading-spinner"></div>
+                <div class="empty-title">正在加载功能...</div>
+                <div class="empty-description">检测选中内容并加载相关功能</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        let selectedIndex = 0;
+        let actions = [];
+        let currentClipboardText = '';
+        let currentContext = { text: '', hasImage: false, source: 'clipboard' };
+
+        // 打开添加插件功能对话框
+        async function openAddPluginDialog() {
+            try {
+                await ipcRenderer.invoke('open-add-plugin-dialog');
+            } catch (error) {
+                console.error('打开添加插件对话框失败:', error);
+                showNotification('打开添加功能对话框失败', 'error');
+            }
+        }
+
+        // 打开面板设置
+        async function openPanelSettings() {
+            try {
+                await ipcRenderer.invoke('open-super-panel-settings');
+            } catch (error) {
+                console.error('打开面板设置失败:', error);
+                showNotification('打开设置失败', 'error');
+            }
+        }
+
+        // 初始化超级面板 - 纯框架版本
+        async function initSuperPanel(explicitContext = null) {
+            try {
+                console.log('🚀 超级面板框架初始化开始');
+                if (explicitContext) currentContext = explicitContext;
+                else currentContext = await ipcRenderer.invoke('get-clipboard-context');
+                currentClipboardText = currentContext.text || '';
+
+                // 从插件API加载所有注册的功能
+                const newActions = await ipcRenderer.invoke('get-super-panel-actions', currentContext);
+                console.log('🔧 重新加载到的功能:', newActions.length, '个');
+                updateClipboardInfo(currentClipboardText, newActions[0]?.contextTypes || []);
+
+                // 更新功能列表
+                actions = newActions;
+
+                renderActions();
+
+            } catch (error) {
+                console.error('❌ 初始化超级面板失败:', error);
+                showEmptyState('🚫', '初始化失败', '无法加载功能，请检查插件状态');
+            }
+        }
+
+        // 更新剪贴板信息显示
+        function updateClipboardInfo(text, types) {
+            const infoElement = document.getElementById('selected-text-info');
+            if ((text && text.trim()) || currentContext.hasImage) {
+                const displayText = text.length > 50 ? text.substring(0, 50) + '...' : text;
+                const typeText = currentContext.hasImage ? '图片' : (Array.isArray(types) && types.length ? types.join('/') : '文本');
+                const sourceText = currentContext.source === 'selection' ? '选区' : '剪贴板';
+                infoElement.textContent = `[${sourceText}:${typeText}] ${displayText}`;
+                infoElement.style.display = 'block';
+            } else {
+                infoElement.style.display = 'none';
+            }
+        }
+
+        // 拖拽相关变量
+        let draggedItemIndex = -1;
+
+        // 渲染功能列表 - 纯动态渲染
+        function renderActions() {
+            const container = document.getElementById('actions-container');
+
+            if (!actions || actions.length === 0) {
+                showEmptyState('📭', '暂无功能', '点击 ➕ 添加插件功能到面板');
+                return;
+            }
+
+            container.innerHTML = '';
+            const gridDiv = document.createElement('div');
+            gridDiv.className = 'actions-grid';
+
+            // 添加所有功能项
+            actions.forEach((action, index) => {
+                const actionDiv = createActionElement(action, index);
+                gridDiv.appendChild(actionDiv);
+            });
+
+            // 添加"添加功能"按钮
+            const addActionDiv = createAddActionElement();
+            gridDiv.appendChild(addActionDiv);
+
+            container.appendChild(gridDiv);
+
+            // 选中第一个功能项
+            updateSelection(0);
+        }
+
+        // 创建功能元素
+        function createActionElement(action, index) {
+            const actionDiv = document.createElement('div');
+            actionDiv.className = 'action-item';
+            actionDiv.dataset.index = index;
+            actionDiv.draggable = true; // 启用拖拽
+
+            // 拖拽事件处理
+            actionDiv.ondragstart = (e) => {
+                draggedItemIndex = index;
+                e.dataTransfer.effectAllowed = 'move';
+                actionDiv.style.opacity = '0.5';
+            };
+
+            actionDiv.ondragend = (e) => {
+                actionDiv.style.opacity = '1';
+                document.querySelectorAll('.action-item').forEach(item => {
+                    item.classList.remove('drag-over');
+                });
+            };
+
+            actionDiv.ondragover = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                actionDiv.classList.add('drag-over');
+            };
+
+            actionDiv.ondragleave = (e) => {
+                actionDiv.classList.remove('drag-over');
+            };
+
+            actionDiv.ondrop = (e) => {
+                e.preventDefault();
+                actionDiv.classList.remove('drag-over');
+                if (draggedItemIndex !== -1 && draggedItemIndex !== index) {
+                    // 交换位置
+                    const item = actions.splice(draggedItemIndex, 1)[0];
+                    actions.splice(index, 0, item);
+                    renderActions();
+                    // 保存新顺序（可选，如果需要持久化）
+                    // saveActionOrder(); 
+                }
+            };
+
+            actionDiv.onclick = () => executeAction(action);
+
+            // 添加删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '✕';
+            deleteBtn.title = '移除此功能';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation(); // 阻止冒泡，不触发父元素的点击事件
+                removeAction(action, index);
+            };
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'action-icon';
+
+            // 检查是否是图片文件路径或数据URL
+            if (action.icon && (action.icon.startsWith('data:') || action.icon.startsWith('file://') || action.icon.includes('.ico') || action.icon.includes('.png') || action.icon.includes('.jpg') || action.icon.includes('.svg'))) {
+                // 创建img元素显示图片
+                const img = document.createElement('img');
+                img.src = action.icon;
+                img.alt = 'icon';
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'contain';
+                iconDiv.appendChild(img);
+            } else {
+                // 直接显示emoji或文本
+                iconDiv.textContent = action.icon || '🔧';
+            }
+
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'action-title';
+            const fullTitle = String(action.title || '').trim() || '未命名';
+            // 标题在动作来源处按功能语义控制长度，面板不再截断造成歧义。
+            titleDiv.textContent = fullTitle;
+            // 鼠标悬浮显示完整标题和描述，便于查看动作详情。
+            titleDiv.title = action.description ? fullTitle + '\n' + action.description : fullTitle;
+
+            actionDiv.appendChild(deleteBtn);
+            actionDiv.appendChild(iconDiv);
+            actionDiv.appendChild(titleDiv);
+
+            return actionDiv;
+        }
+
+        // 创建"添加功能"元素
+        function createAddActionElement() {
+            const addDiv = document.createElement('div');
+            addDiv.className = 'add-action-item';
+            addDiv.onclick = openAddPluginDialog;
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'add-action-icon';
+            iconDiv.textContent = '➕';
+
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'add-action-title';
+            titleDiv.textContent = '添加功能';
+
+            addDiv.appendChild(iconDiv);
+            addDiv.appendChild(titleDiv);
+
+            return addDiv;
+        }
+
+        // 显示空状态
+        function showEmptyState(icon, title, description) {
+            const container = document.getElementById('actions-container');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">${icon}</div>
+                    <div class="empty-title">${title}</div>
+                    <div class="empty-description">${description}</div>
+                </div>
+            `;
+        }
+
+        // 更新选择
+        function updateSelection(index) {
+            const items = document.querySelectorAll('.action-item');
+            items.forEach((item, i) => {
+                item.classList.toggle('selected', i === index);
+            });
+            selectedIndex = index;
+
+            // 滚动到选中项
+            if (items[index]) {
+                items[index].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+
+        // 执行功能 - 通过插件API
+        async function executeAction(action) {
+            try {
+                console.log('🎯 执行功能:', action.title);
+
+                // 关闭面板
+                closePanel();
+
+                // 通过插件API执行功能
+                const result = await ipcRenderer.invoke('execute-super-panel-action', {
+                    action: action,
+                    clipboardText: currentClipboardText
+                });
+
+                if (!result.success) {
+                    console.error('功能执行失败:', result.error);
+                    showNotification(result.error || '功能执行失败', 'error');
+                }
+
+            } catch (error) {
+                console.error('❌ 执行功能失败:', error);
+                showNotification(`执行失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            // 这里可以实现通知显示逻辑
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        /**
+         * 关闭超级面板
+         * - 同步输入框活动状态为非活动，避免主进程阻止隐藏
+         * - 调用主进程关闭面板
+         */
+        function closePanel() {
+            ipcRenderer.invoke('notify-input-active', false);
+            ipcRenderer.invoke('close-super-panel');
+        }
+
+        // 键盘导航
+        document.addEventListener('keydown', (e) => {
+            const items = document.querySelectorAll('.action-item');
+            const gridCols = Math.floor(430 / 70); // 根据容器宽度计算列数
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (selectedIndex >= gridCols) {
+                        updateSelection(selectedIndex - gridCols);
+                    }
+                    break;
+
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (selectedIndex + gridCols < actions.length) {
+                        updateSelection(selectedIndex + gridCols);
+                    }
+                    break;
+
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    if (selectedIndex > 0) {
+                        updateSelection(selectedIndex - 1);
+                    }
+                    break;
+
+                case 'ArrowRight':
+                    e.preventDefault();
+                    if (selectedIndex < actions.length - 1) {
+                        updateSelection(selectedIndex + 1);
+                    }
+                    break;
+
+                case 'Enter':
+                    e.preventDefault();
+                    if (actions[selectedIndex]) {
+                        executeAction(actions[selectedIndex]);
+                    }
+                    break;
+
+                case 'Escape':
+                    e.preventDefault();
+                    // 检查主进程是否要求忽略 ESC（处理右键菜单冲突）
+                    ipcRenderer.invoke('should-ignore-esc').then(shouldIgnore => {
+                        if (!shouldIgnore) {
+                            closePanel();
+                        } else {
+                            console.log('🛡️ 忽略 ESC 关闭 (右键菜单冲突保护)');
+                        }
+                    });
+                    break;
+
+                case '+':
+                case 'Insert':
+                    e.preventDefault();
+                    openAddPluginDialog();
+                    break;
+            }
+        });
+
+        // 初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🎉 超级面板框架加载完成');
+            initSuperPanel();
+
+            // 为所有输入框添加焦点保持逻辑
+            // 已移除激进的焦点保护逻辑，避免干扰正常使用
+        });
+
+        // 监听面板刷新请求
+        ipcRenderer.on('refresh-super-panel', () => {
+            console.log('🔄 收到刷新超级面板请求');
+            // 确保完全重新初始化面板
+            actions = []; // 清空现有功能列表
+            initSuperPanel();
+        });
+
+        // 右键长按由主进程直接传入选区，避免再次读取已被恢复的剪贴板。
+        ipcRenderer.on('super-panel-context', (event, context) => {
+            actions = [];
+            initSuperPanel(context || { text: '', hasImage: false, source: 'selection' });
+        });
+
+        // 监听功能列表直接更新
+        ipcRenderer.on('super-panel-actions-updated', (event, newActions) => {
+            console.log('🔄 直接接收功能列表更新:', newActions.length, '个');
+            actions = newActions;
+            renderActions();
+        });
+
+        // 移除功能
+        async function removeAction(action, index) {
+            try {
+                if (confirm(`确定要移除"${action.title}"功能吗？`)) {
+                    const result = await ipcRenderer.invoke('delete-super-panel-action', action.id);
+                    if (result) {
+                        // 从本地数组中移除
+                        actions.splice(index, 1);
+                        renderActions();
+                        showNotification(`已移除"${action.title}"功能`, 'success');
+                    } else {
+                        showNotification('移除功能失败', 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('移除功能失败:', error);
+                showNotification(`移除失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 失焦处理：一旦窗口失去焦点，延迟后强制关闭
+        window.addEventListener('blur', () => {
+            setTimeout(() => {
+                ipcRenderer.invoke('notify-input-active', false);
+                ipcRenderer.invoke('has-super-panel-child-window').then((hasChildWindow) => {
+                    if (!document.hasFocus() && !hasChildWindow) {
+                        closePanel();
+                    }
+                }).catch(() => {
+                    if (!document.hasFocus()) {
+                        closePanel();
+                    }
+                });
+            }, 100);
+        });
+    </script>
+</body>
+
+</html>

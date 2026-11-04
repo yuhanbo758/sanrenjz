@@ -1,0 +1,90 @@
+name: Windows 自动打包
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SANRENJZ_PYTHON_LIVE: '0'
+      PYTHONUTF8: '1'
+    steps:
+      - name: 检出公开源码
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: 设置 Python 编译工具
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖前检查公开文件
+        run: |
+          python -X utf8 tests/privacy-scanner.test.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -X utf8 scripts/check-privacy.py --git
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 安装锁定依赖
+        run: npm ci --ignore-scripts
+
+      - name: 安装 Electron 和原生模块
+        run: |
+          node node_modules/electron/install.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install electron-builder install-app-deps
+
+      - name: 检查隐私和公开插件范围
+        run: |
+          npm run audit:privacy
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run audit:public
+
+      - name: 验证合并功能
+        run: npm run test:merge
+
+      - name: 验证快捷键和中文日志
+        run: |
+          npm run test:hotkeys
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run test:console
+
+      - name: 构建公开 Windows x64 安装包
+        run: npm run build-win -- --x64
+
+      - name: 检查公开暂存内容
+        run: |
+          $taskStages = @(Get-ChildItem -LiteralPath dist -Directory | Where-Object { $_.Name -match '^public-stage-\d+-\d+$' })
+          if ($taskStages.Count -ne 1) { throw '必须只有本次公开构建暂存目录' }
+          python -X utf8 scripts/check-privacy.py --target $taskStages[0].FullName
+
+      - name: 审计并收集安装包
+        run: node scripts/collect-ci-artifacts.cjs
+
+      - name: 上传已验证产物
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sanrenjz-windows-x64-${{ github.run_number }}
+          path: dist/ci-artifacts/*
+          if-no-files-found: error
+          retention-days: 30

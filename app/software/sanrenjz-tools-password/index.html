@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>密码管理器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 14px;
+        }
+
+        /* 锁屏界面样式 */
+        .lock-screen, .setup-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .lock-container, .setup-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            min-width: 360px;
+            backdrop-filter: blur(10px);
+        }
+
+        .lock-container h2, .setup-container h2 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .lock-container p, .setup-container p {
+            color: #666;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+
+        .lock-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .lock-input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .lock-input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .lock-input {
+            width: 100%;
+            height: 44px;
+            padding: 0 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .lock-input:focus {
+            border-color: #1890ff;
+            box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
+        }
+
+        .lock-btn {
+            width: 100%;
+            height: 44px;
+            border: none;
+            background: #1890ff;
+            color: white;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 12px;
+        }
+
+        .lock-btn:hover {
+            background: #40a9ff;
+            transform: translateY(-1px);
+        }
+
+        .lock-btn:active {
+            transform: translateY(0);
+        }
+
+        .lock-footer {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .lock-footer button {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .lock-footer button:hover {
+            background: #f0f0f0;
+            color: #1890ff;
+        }
+
+        .error-message {
+            color: #ff4d4f;
+            font-size: 13px;
+            margin-top: 8px;
+            text-align: center;
+            min-height: 18px;
+        }
+
+        .error-message.hidden {
+            visibility: hidden;
+        }
+
+        .main-container {
+            display: flex;
+            height: 100%;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        /* 侧边栏样式 */
+        .sidebar {
+            width: 240px;
+            background: #fafafa;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+        }
+
+        .search-container {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .search-input {
+            width: 100%;
+            height: 32px;
+            padding: 0 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            outline: none;
+            font-size: 13px;
+            background: #ffffff;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .search-input::placeholder {
+            color: #bfbfbf;
+        }
+
+        .category-header {
+            padding: 12px;
+            font-size: 12px;
+            color: #8c8c8c;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .category-manage-btn {
+            width: 20px;
+            height: 20px;
+            border: none;
+            background: none;
+            color: #8c8c8c;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .category-manage-btn:hover {
+            background: #f0f0f0;
+            color: #1890ff;
+        }
+
+        .category-list {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+            padding-bottom: 60px; /* 调整为与新的footer高度匹配 */
+        }
+
+        .category-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            margin: 2px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            font-size: 13px;
+            user-select: none;
+        }
+
+        .category-item:hover {
+            background: #f0f0f0;
+        }
+
+        .category-item.active {
+            background: #e6f7ff;
+            color: #1890ff;
+        }
+
+        .category-name {
+            flex: 1;
+        }
+
+        .category-count {
+            background: #f0f0f0;
+            color: #666;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 11px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .category-item.active .category-count {
+            background: #1890ff;
+            color: white;
+        }
+
+        .category-item.drag-over {
+            background: #e6f7ff;
+            border: 1px dashed #1890ff;
+        }
+
+        /* 主内容区样式 */
+        .content-area {
+            flex: 1;
+            display: flex;
+        }
+
+        .password-list-container {
+            width: 300px;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .list-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #fafafa;
+        }
+
+        .current-category {
+            font-weight: 500;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .add-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: #1890ff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .add-btn:hover {
+            background: #40a9ff;
+        }
+
+        .password-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .password-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-item:hover {
+            background: #fafafa;
+        }
+
+        .password-item.active {
+            background: #e6f7ff;
+            border-left: 3px solid #1890ff;
+        }
+
+        .password-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            margin-right: 12px;
+            font-size: 14px;
+        }
+
+        .password-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .password-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .password-username {
+            font-size: 12px;
+            color: #8c8c8c;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .password-actions {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .password-item:hover .password-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: #f0f0f0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #1890ff;
+            color: white;
+        }
+
+        /* 详情面板样式 */
+        .detail-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+        }
+
+        .detail-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #fafafa;
+        }
+
+        .detail-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .detail-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .btn-primary {
+            background: #1890ff;
+            border-color: #1890ff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #40a9ff;
+            border-color: #40a9ff;
+        }
+
+        .btn-secondary {
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            border-color: #40a9ff;
+            color: #40a9ff;
+        }
+
+        .btn-danger {
+            color: #ff4d4f;
+            border-color: #ff4d4f;
+        }
+
+        .btn-danger:hover {
+            background: #ff4d4f;
+            color: white;
+        }
+
+        .detail-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 36px;
+            padding: 0 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .form-textarea {
+            height: 200px;
+            padding: 8px 12px;
+            resize: vertical;
+            min-height: 200px;
+        }
+
+        .field-hint {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #8c8c8c;
+        }
+
+        .field-hint.weak {
+            color: #fa541c;
+        }
+
+        .field-hint.medium {
+            color: #faad14;
+        }
+
+        .field-hint.strong {
+            color: #52c41a;
+        }
+
+        .password-input-group {
+            position: relative;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #8c8c8c;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+        }
+
+        .password-toggle:hover {
+            color: #1890ff;
+        }
+
+        /* 带复制按钮的输入框组样式 */
+        .input-with-copy-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-with-copy-group .form-input {
+            padding-right: 40px;
+        }
+
+        /* 网址输入框特殊样式 - 需要容纳两个按钮 */
+        .url-input-group .form-input {
+            padding-right: 70px;
+        }
+
+        .copy-input-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #8c8c8c;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .copy-input-btn:hover {
+            color: #1890ff;
+            background: #f0f8ff;
+        }
+
+        .copy-input-btn:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        .open-url-btn {
+            position: absolute;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #8c8c8c;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .open-url-btn:hover {
+            color: #52c41a;
+            background: #f6ffed;
+        }
+
+        .open-url-btn:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        /* 密码输入框特殊处理 - 需要为眼睛按钮和复制按钮都留空间 */
+        .password-input-group .form-input {
+            padding-right: 70px;
+        }
+
+        .password-input-group .copy-input-btn {
+            right: 40px;
+        }
+
+        .password-input-group .password-toggle {
+            right: 8px;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #8c8c8c;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-text {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .empty-hint {
+            font-size: 12px;
+            color: #bfbfbf;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 0;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .modal-close {
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #8c8c8c;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .modal-close:hover {
+            background: #f0f0f0;
+        }
+
+        .modal-body {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .generator-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 8px;
+            width: 14px;
+            height: 14px;
+        }
+
+        .checkbox-group label {
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .length-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .length-slider {
+            flex: 1;
+            height: 4px;
+        }
+
+        .length-input {
+            width: 60px;
+            height: 32px;
+            text-align: center;
+        }
+
+        .generated-password {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            margin-bottom: 16px;
+            word-break: break-all;
+            position: relative;
+        }
+
+        .copy-generated-btn {
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: #1890ff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .modal-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        /* 通知样式 */
+        .notification {
+            position: fixed;
+            top: 50px;
+            right: 20px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            z-index: 2000;
+            font-size: 13px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .notification.success {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #52c41a;
+        }
+
+        .notification.error {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #ff4d4f;
+        }
+
+        .notification.info {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            color: #1890ff;
+        }
+
+        .notification.warning {
+            background: #fffbe6;
+            border: 1px solid #ffe58f;
+            color: #faad14;
+        }
+
+        /* 分类管理样式 */
+        .category-manager-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .category-manager-list {
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .category-manager-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            background: #fafafa;
+        }
+
+        .category-manager-info {
+            flex: 1;
+        }
+
+        .category-manager-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .default-badge {
+            background: #1890ff;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: normal;
+        }
+
+        .custom-badge {
+            background: #52c41a;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: normal;
+        }
+
+        .category-manager-count {
+            font-size: 12px;
+            color: #8c8c8c;
+        }
+
+        .category-manager-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 12px;
+            height: auto;
+        }
+
+        .btn-small:disabled {
+            background: #f5f5f5;
+            color: #bfbfbf;
+            border-color: #d9d9d9;
+            cursor: not-allowed;
+        }
+
+        .category-manager-tip {
+            background: #f0f8ff;
+            border: 1px solid #d6e4ff;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .category-manager-tip p {
+            margin: 0 0 8px 0;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .category-manager-tip ul {
+            margin: 0;
+            padding-left: 16px;
+        }
+
+        .category-manager-tip li {
+            margin-bottom: 4px;
+        }
+
+        /* 导入导出样式 */
+        .import-export-section {
+            margin-bottom: 24px;
+        }
+
+        .import-export-section h3 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .import-export-section p {
+            color: #666;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .import-export-divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 24px 0;
+        }
+
+        .export-format {
+            margin-bottom: 16px;
+        }
+
+        .format-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-outline-primary {
+            background: white;
+            color: #1890ff;
+            border: 1px solid #1890ff;
+        }
+
+        .btn-outline-primary:hover {
+            background: #1890ff;
+            color: white;
+        }
+
+        .btn-outline-secondary {
+            background: white;
+            color: #666;
+            border: 1px solid #d9d9d9;
+        }
+
+        .btn-outline-secondary:hover {
+            background: #f5f5f5;
+            border-color: #40a9ff;
+            color: #40a9ff;
+        }
+
+        .export-options-detail,
+        .import-options-detail {
+            margin-top: 16px;
+            padding: 12px;
+            background: #fafafa;
+            border-radius: 6px;
+        }
+
+        .file-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .file-name {
+            font-size: 13px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .import-export-tip {
+            background: #fff7e6;
+            border: 1px solid #ffd591;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 20px;
+        }
+
+        .import-export-tip p {
+            margin: 0 0 8px 0;
+            font-weight: 500;
+            color: #d46b08;
+        }
+
+        .import-export-tip ul {
+            margin: 0;
+            padding-left: 16px;
+        }
+
+        .import-export-tip li {
+            margin-bottom: 4px;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #d9d9d9;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #bfbfbf;
+        }
+
+        .sidebar-footer {
+            padding: 8px 12px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 6px;
+            flex-direction: row;
+            flex-shrink: 0;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #fafafa;
+            z-index: 10;
+        }
+
+        .sidebar-btn {
+            flex: 1;
+            height: 32px;
+            border: 1px solid #d9d9d9;
+            background: white;
+            color: #666;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+
+        .sidebar-btn:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+            background: #f0f8ff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 锁屏界面 -->
+    <div id="lockScreen" class="lock-screen">
+        <div class="lock-container">
+            <div class="lock-icon">🔐</div>
+            <h2>输入密码</h2>
+            <p>请输入开屏密码以解锁密码管理器</p>
+            
+            <div class="lock-input-group">
+                <label for="unlockPassword">开屏密码</label>
+                <input type="password" id="unlockPassword" class="lock-input" placeholder="请输入密码">
+                <div id="unlockError" class="error-message hidden"></div>
+            </div>
+            
+            <button class="lock-btn" onclick="unlockApp()">解锁</button>
+            
+            <div class="lock-footer">
+                <button id="resetLockPasswordButton" onclick="resetLockPassword()">重置密码</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置密码界面 -->
+    <div id="setupScreen" class="setup-screen">
+        <div class="setup-container">
+            <div class="lock-icon">🛡️</div>
+            <h2>设置开屏密码</h2>
+            <p>为了保护您的密码数据安全，请设置一个开屏密码</p>
+            
+            <div class="lock-input-group">
+                <label for="setupPassword">设置密码</label>
+                <input type="password" id="setupPassword" class="lock-input" placeholder="请输入密码（至少4位）">
+            </div>
+            
+            <div class="lock-input-group">
+                <label for="confirmPassword">确认密码</label>
+                <input type="password" id="confirmPassword" class="lock-input" placeholder="请再次输入密码">
+                <div id="setupError" class="error-message hidden"></div>
+            </div>
+            
+            <button class="lock-btn" onclick="setupLockPassword()">设置密码</button>
+        </div>
+    </div>
+
+    <!-- 主应用界面 -->
+    <div id="mainApp" class="main-container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="搜索密码..." id="searchInput">
+            </div>
+            
+            <div class="category-header">
+                <span>分类</span>
+                <button class="category-manage-btn" onclick="showCategoryManager()" title="管理分类">⚙️</button>
+            </div>
+            
+            <div class="category-list" id="categoryList">
+                <!-- 分类列表将通过JavaScript动态生成 -->
+            </div>
+            
+            <div class="sidebar-footer">
+                <button class="sidebar-btn" onclick="showImportExport()" title="数据导入导出">
+                    📁 导入导出
+                </button>
+                <button class="sidebar-btn" onclick="lockApp()" title="锁定应用">
+                    🔒 锁定
+                </button>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="content-area">
+            <!-- 密码列表 -->
+            <div class="password-list-container">
+                <div class="list-header">
+                    <div class="current-category" id="currentCategory">重要</div>
+                    <button class="add-btn" onclick="addNewPassword()" title="添加密码">+</button>
+                </div>
+                
+                <div class="password-list" id="passwordList">
+                    <!-- 密码列表将通过JavaScript动态生成 -->
+                </div>
+            </div>
+
+            <!-- 详情面板 -->
+            <div class="detail-panel">
+                <!-- 空状态 -->
+                <div class="empty-state" id="emptyDetail">
+                    <div class="empty-icon">🔐</div>
+                    <div class="empty-text">选择一个密码项目查看详情</div>
+                    <div class="empty-hint">或者添加新的密码记录</div>
+                </div>
+
+                <!-- 密码表单 -->
+                <div id="passwordForm" class="hidden">
+                    <div class="detail-header">
+                        <div class="detail-title" id="detailTitle">密码详情</div>
+                        <div class="detail-actions">
+                            <button class="btn btn-secondary" onclick="showPasswordGenerator()">生成密码</button>
+                            <button id="deletePasswordButton" class="btn btn-danger" onclick="deleteCurrentPassword()">删除</button>
+                            <button class="btn btn-primary" onclick="saveCurrentPassword()">保存</button>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-content">
+                        <div class="form-group">
+                            <label class="form-label">标题 *</label>
+                            <div class="input-with-copy-group">
+                                <input type="text" class="form-input" id="passwordTitle" placeholder="输入密码项目标题">
+                                <button type="button" class="copy-input-btn" onclick="copyInputValue('passwordTitle')" title="复制标题">📋</button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">用户名</label>
+                            <div class="input-with-copy-group">
+                                <input type="text" class="form-input" id="passwordUsername" placeholder="输入用户名或邮箱">
+                                <button type="button" class="copy-input-btn" onclick="copyInputValue('passwordUsername')" title="复制用户名">📋</button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">密码 *</label>
+                            <div class="password-input-group">
+                                <input type="password" class="form-input" id="passwordValue" placeholder="输入密码">
+                                <button type="button" class="copy-input-btn" onclick="copyInputValue('passwordValue')" title="复制密码">📋</button>
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility()" title="显示/隐藏密码">👁</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">API 密钥</label>
+                            <div class="password-input-group">
+                                <input type="password" class="form-input" id="apiKeyValue" placeholder="输入API密钥（不会自动生成）">
+                                <button type="button" class="copy-input-btn" onclick="copyInputValue('apiKeyValue')" title="复制API密钥">📋</button>
+                                <button type="button" class="password-toggle" onclick="toggleApiKeyVisibility()" title="显示/隐藏API密钥">👁</button>
+                            </div>
+                            <div id="apiKeyStrength" class="field-hint"></div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">网址</label>
+                            <div class="input-with-copy-group url-input-group">
+                                <input type="url" class="form-input" id="passwordUrl" placeholder="https://example.com">
+                                <button type="button" class="open-url-btn" onclick="openUrl('passwordUrl')" title="打开网址">🔗</button>
+                                <button type="button" class="copy-input-btn" onclick="copyInputValue('passwordUrl')" title="复制网址">📋</button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">分类</label>
+                            <select class="form-input" id="passwordCategory">
+                                <!-- 分类选项将通过JavaScript动态生成 -->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">备注</label>
+                            <textarea class="form-input form-textarea" id="passwordNotes" placeholder="添加备注信息..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 密码生成器模态框 -->
+    <div id="generatorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">密码生成器</div>
+                <button class="modal-close" onclick="closeModal('generatorModal')">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">包含字符类型</label>
+                    <div class="generator-options">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="includeNumbers" checked>
+                            <label for="includeNumbers">数字 (0-9)</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="includeLowercase" checked>
+                            <label for="includeLowercase">小写字母 (a-z)</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="includeUppercase" checked>
+                            <label for="includeUppercase">大写字母 (A-Z)</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="includeSymbols" checked>
+                            <label for="includeSymbols">特殊符号</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">密码长度</label>
+                    <div class="length-control">
+                        <input type="range" class="length-slider" id="passwordLength" min="4" max="50" value="12">
+                        <input type="number" class="form-input length-input" id="lengthInput" min="4" max="50" value="12">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">生成的密码</label>
+                    <div class="generated-password">
+                        <span id="generatedPassword">生成中...</span>
+                        <button type="button" class="copy-generated-btn" onclick="copyToClipboard(document.getElementById('generatedPassword').textContent)" title="复制">📋</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="generatePassword()">重新生成</button>
+                <button type="button" class="btn btn-primary" onclick="useGeneratedPassword(); closeModal('generatorModal');">使用此密码</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分类管理模态框 -->
+    <div id="categoryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">分类管理</div>
+                <button class="modal-close" onclick="closeModal('categoryModal')">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="category-manager-header">
+                    <button type="button" class="btn btn-primary" onclick="addCategory()">添加新分类</button>
+                </div>
+                
+                <div class="category-manager-list" id="categoryManagerList">
+                    <!-- 分类列表将通过JavaScript动态生成 -->
+                </div>
+                
+                <div class="category-manager-tip">
+                    <p><strong>提示：</strong></p>
+                    <ul>
+                        <li>必须至少保留一个分类</li>
+                        <li>删除分类会同时删除该分类下的所有密码</li>
+                        <li>分类名称不能超过10个字符</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入导出模态框 -->
+    <div id="importExportModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">数据导入导出</div>
+                <button class="modal-close" onclick="closeModal('importExportModal')">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- 导出功能 -->
+                <div class="import-export-section">
+                    <h3>📤 导出数据</h3>
+                    <p>将您的密码数据导出为文件，方便备份和迁移。</p>
+                    
+                    <div class="export-options">
+                        <div class="export-format">
+                            <label class="form-label">选择导出格式：</label>
+                            <div class="format-buttons">
+                                <button type="button" class="btn btn-outline-primary" onclick="exportData('db')">
+                                    💾 JSON格式 (.json)
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" onclick="exportData('csv')">
+                                    📊 CSV格式 (.csv)
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" onclick="exportData('txt')">
+                                    📄 文本格式 (.txt)
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="export-options-detail">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="includePasswords" checked>
+                                <label for="includePasswords">包含密码（不勾选则只导出标题和用户名）</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="exportAllCategories" checked>
+                                <label for="exportAllCategories">导出所有分类</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="import-export-divider"></div>
+                
+                <!-- 导入功能 -->
+                <div class="import-export-section">
+                    <h3>📥 导入数据</h3>
+                    <p>从文件导入密码数据，支持多种格式。</p>
+                    
+                    <div class="import-options">
+                        <div class="file-input-wrapper">
+                            <input type="file" id="importFile" accept=".db,.csv,.txt,.json" style="display: none;">
+                            <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('importFile').click()">
+                                📁 选择文件
+                            </button>
+                            <span class="file-name" id="fileName">未选择文件</span>
+                        </div>
+                        
+                        <div class="import-options-detail">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="mergeImport" checked>
+                                <label for="mergeImport">合并导入（不勾选则清空现有数据）</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="skipDuplicates" checked>
+                                <label for="skipDuplicates">跳过重复项目</label>
+                            </div>
+                        </div>
+                        
+                        <button type="button" class="btn btn-primary" onclick="importData()" id="importBtn" disabled>
+                            📥 开始导入
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="import-export-tip">
+                    <p><strong>⚠️ 重要提示：</strong></p>
+                    <ul>
+                        <li>导入前请备份现有数据</li>
+                        <li>JSON格式包含完整的加密数据和分类信息</li>
+                        <li>CSV和TXT格式数据为明文，请注意安全</li>
+                        <li>不支持SQLite数据库文件(.db)，请使用JSON格式</li>
+                        <li>导入操作无法撤销，请谨慎操作</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加分类模态框 -->
+    <div id="addCategoryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">添加新分类</div>
+                <button class="modal-close" onclick="closeModal('addCategoryModal')">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">分类名称 *</label>
+                    <input type="text" class="form-input" id="newCategoryName" placeholder="请输入分类名称（最多10个字符）" maxlength="10">
+                    <div id="categoryNameError" class="error-message hidden"></div>
+                </div>
+                
+                <div class="import-export-tip">
+                    <p><strong>提示：</strong></p>
+                    <ul>
+                        <li>分类名称不能为空</li>
+                        <li>分类名称不能超过10个字符</li>
+                        <li>不能与现有分类重名</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addCategoryModal')">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmAddCategory()">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

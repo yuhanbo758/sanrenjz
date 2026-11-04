@@ -1,0 +1,139 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-layout="network-nodes">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>局域网快传</title>
+<style>
+:root{
+  --accent:#00838f;--accent-2:#00acc1;--accent-soft:rgba(0,131,143,.1);--accent-line:rgba(0,131,143,.3);
+  --bg:#f0fafc;--surface:#fff;--surface-2:#e0f4f7;--border:#c0e3ea;
+  --ink:#0a2e33;--muted:#4a757a;--faint:#8aaab0;
+  --ok:#16a34a;--err:#dc2626;--info:#0ea5e9;
+  --mono:'JetBrains Mono',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.spacer{flex:1}
+.status-badge{display:flex;align-items:center;gap:6px;font:600 13px var(--mono);padding:6px 14px;border-radius:999px}
+.status-badge.offline{background:var(--surface-2);color:var(--faint)}
+.status-badge.online{background:var(--accent-soft);color:var(--accent)}
+.status-badge .dot{width:8px;height:8px;border-radius:50%}
+.status-badge.offline .dot{background:var(--faint)}
+.status-badge.online .dot{background:var(--ok);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 24px;overflow:hidden}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.card-h{padding:14px 18px;border-bottom:1px solid var(--border);font:700 14px var(--sans);flex:none;display:flex;align-items:center;gap:8px;-webkit-app-region:no-drag}
+.card-h svg{width:18px;height:18px;color:var(--accent)}
+.card-body{padding:18px;flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:14px}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:hover{border-color:var(--accent-line)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--err);border-color:var(--err)}
+.inp{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font:14px var(--sans);color:var(--ink);outline:none}
+.inp:focus{border-color:var(--accent-line)}
+.url-card{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.url-card:hover{border-color:var(--accent);background:var(--accent-soft)}
+.url-card .url{font:600 15px var(--mono);color:var(--accent);word-break:break-all}
+.url-card .hint{font-size:11px;color:var(--faint)}
+.url-card .copy{flex:none}
+.recv-item{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border)}
+.recv-item .ri-icon{width:36px;height:36px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;flex:none}
+.recv-item .ri-icon svg{width:18px;height:18px;color:var(--accent)}
+.recv-item .ri-info{flex:1;min-width:0}
+.recv-item .ri-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recv-item .ri-meta{font:11px var(--mono);color:var(--faint)}
+.recv-item .ri-open{border:0;background:transparent;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline}
+.qr-box{display:flex;align-items:center;justify-content:center;padding:20px;background:var(--surface-2);border-radius:10px}
+.qr-box canvas{border-radius:8px}
+.share-row{border-top:1px solid var(--border);padding-top:13px;display:flex;flex-direction:column;gap:9px}
+.share-row textarea{width:100%;min-height:66px;resize:vertical}
+.share-actions{display:flex;gap:8px;flex-wrap:wrap}
+.share-actions .btn{padding:7px 11px}
+.card-body[hidden],#urlArea[hidden],#qrArea[hidden]{display:none!important}
+.select-url{width:100%;margin-bottom:8px}
+.list-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.switch{display:flex;gap:4px;background:var(--surface-2);padding:3px;border-radius:8px}
+.switch button{border:0;border-radius:6px;background:transparent;color:var(--muted);padding:5px 8px;cursor:pointer}
+.switch button.active{background:#fff;color:var(--accent);font-weight:700}
+.item-actions{display:flex;gap:5px;flex-wrap:wrap}
+.item-actions .btn{padding:4px 8px;font-size:11px}
+.ri-preview{font-size:12px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;max-height:50px;overflow:auto}
+.small-note{font-size:11px;color:var(--muted)}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--faint);gap:10px}
+.empty svg{width:48px;height:48px;opacity:.3}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#0a2e33;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#b0d8de;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="body">
+    <div class="card">
+      <div class="card-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>接收与分享<div class="spacer"></div><div class="status-badge offline" id="statusBadge"><span class="dot"></span><span id="statusText">未启动</span></div></div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:13px;color:var(--muted)">保存目录</label>
+          <input class="inp" id="saveDir" readonly placeholder="请选择文件保存目录" style="flex:1;min-width:0">
+          <button class="btn" id="pickDir">选择</button>
+        </div>
+        <button class="btn primary" id="startBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 5l12 7-12 7z"/></svg>启动接收站</button>
+        <button class="btn danger" id="stopBtn" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>停止接收站</button>
+        <div id="urlArea" style="display:none">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:8px">手机连接同一网络后访问：</div>
+          <select class="inp select-url" id="urlSelect" aria-label="选择网络地址"></select>
+          <div class="share-actions"><button class="btn" id="copyUrl">复制连接链接</button></div>
+        </div>
+        <div id="qrArea" style="display:none">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:8px">或扫描二维码：</div>
+          <div class="qr-box" id="qrBox"></div>
+        </div>
+        <div class="share-row"><div class="list-heading"><strong>电脑分享给手机</strong><span class="small-note" id="shareCount">0 项</span></div><textarea class="inp" id="shareText" placeholder="输入文字，手机可查看和复制"></textarea><div class="share-actions"><button class="btn" id="pasteBtn">粘贴剪贴板</button><button class="btn primary" id="shareTextBtn">分享文字</button><button class="btn" id="shareFilesBtn">分享文件…</button></div><span class="small-note">分享文件保持在原位置；停止接收站后链接失效。</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H4zM2 20h20M8 8h8M8 12h5"/></svg>传输记录<div class="spacer"></div><div class="switch"><button id="receivedTab" class="active">手机发来</button><button id="sharedTab">电脑分享</button></div></div>
+      <div class="card-body" id="recvList">
+        <div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v12H4zM2 20h20"/></svg><span>启动接收站后，收到的文件会显示在这里</span></div>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const api=window.pluginAPI,$=s=>document.querySelector(s);
+let state={running:false,received:[],shares:[],urls:[]},selectedUrl='',tab='received',busy=false,pollTimer;
+function toast(message){const node=$('#toast');node.textContent=message;node.classList.add('show');clearTimeout(node.timer);node.timer=setTimeout(()=>node.classList.remove('show'),2600);}
+function size(bytes){if(bytes<1024)return `${bytes} B`;if(bytes<1048576)return `${(bytes/1024).toFixed(1)} KB`;return `${(bytes/1048576).toFixed(1)} MB`;}
+function element(tag,className,text){const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;}
+function action(parent,label,handler,danger=false){const button=element('button',`btn ${danger?'danger':''}`,label);button.onclick=handler;parent.append(button);}
+function apply(next){state=next;const on=!!state.running;$('#statusBadge').className=`status-badge ${on?'online':'offline'}`;$('#statusText').textContent=on?'接收中':'未启动';$('#startBtn').style.display=on?'none':'flex';$('#stopBtn').style.display=on?'flex':'none';$('#urlArea').style.display=on?'block':'none';$('#qrArea').style.display=on?'block':'none';$('#shareTextBtn').disabled=!on;$('#shareFilesBtn').disabled=!on;$('#pasteBtn').disabled=!on;$('#shareText').disabled=!on;$('#shareCount').textContent=`${state.shares.length} 项`;
+  if(on){const urls=state.urls||[];if(!urls.includes(selectedUrl))selectedUrl=urls[0]||'';const select=$('#urlSelect');select.replaceChildren(...urls.map(url=>{const option=element('option','',url);option.value=url;return option;}));select.value=selectedUrl;generateQr(selectedUrl);}render();}
+async function generateQr(url){const box=$('#qrBox');box.replaceChildren();if(!url){box.textContent='未找到局域网 IPv4 地址';return;}const result=await api.generateQr(url,240);if(url!==selectedUrl)return;if(result.ok){const image=element('img');image.src=result.dataUrl;image.alt='连接二维码';image.style.cssText='width:160px;height:160px';box.append(image);}else box.textContent='二维码不可用';}
+function render(){const box=$('#recvList'),items=tab==='received'?state.received:state.shares;box.replaceChildren();$('#receivedTab').classList.toggle('active',tab==='received');$('#sharedTab').classList.toggle('active',tab==='shared');if(!items.length){const empty=element('div','empty');empty.append(element('span','',tab==='received'?'手机发送的文字和文件会显示在这里':'分享文字或文件后，手机可查看或下载'));box.append(empty);return;}
+  for(const item of items){const row=element('div','recv-item');const icon=element('div','ri-icon',item.kind==='file'?'▣':'≡');row.append(icon);const info=element('div','ri-info');const name=item.kind==='file'?(item.name||item.file?.split(/[\\/]/).pop()):item.text.slice(0,50);info.append(element('div','ri-name',name));info.append(element('div','ri-meta',tab==='received'?`${new Date(item.time).toLocaleString('zh-CN')} · ${size(item.bytes)}`:`${size(item.bytes)} · 手机可${item.kind==='file'?'下载':'复制'}`));if(item.kind==='text')info.append(element('div','ri-preview',item.text));row.append(info);const actions=element('div','item-actions');if(item.kind==='file'&&tab==='received')action(actions,'定位',()=>api.showPath(item.file));if(item.kind==='text')action(actions,'复制',()=>{api.copyText(item.text);toast('文字已复制');});if(tab==='shared')action(actions,'移除',async()=>{try{apply(await api.transfer.removeShare(item.id));}catch(error){toast(error.message);}},true);row.append(actions);box.append(row);}}
+async function refresh(){try{const next=await api.transfer.status();if(!busy&&JSON.stringify(next)!==JSON.stringify(state))apply(next);}catch(error){toast(error.message);}finally{clearTimeout(pollTimer);pollTimer=setTimeout(refresh,1800);}}
+async function task(fn){if(busy)return;busy=true;try{apply(await fn());}catch(error){toast(error.message||String(error));}finally{busy=false;}}
+$('#pickDir').onclick=async()=>{const directory=api.selectDirectory('选择接收文件保存目录');if(directory){$('#saveDir').value=directory;try{await api.storage.set('lan-save-directory',directory);}catch(error){toast(error.message);}}};
+$('#startBtn').onclick=()=>task(async()=>{const directory=$('#saveDir').value;if(!directory)throw new Error('请先选择保存目录');const next=await api.transfer.start(directory);toast('接收站已启动');return next;});
+$('#stopBtn').onclick=()=>task(async()=>{selectedUrl='';const next=await api.transfer.stop();toast('接收站已停止');return next;});
+$('#urlSelect').onchange=event=>{selectedUrl=event.target.value;generateQr(selectedUrl);};
+$('#copyUrl').onclick=()=>{if(selectedUrl){api.copyText(selectedUrl);toast('连接链接已复制');}};
+$('#pasteBtn').onclick=()=>{$('#shareText').value=api.readClipboardText();$('#shareText').focus();};
+$('#shareTextBtn').onclick=()=>task(async()=>{const next=await api.transfer.shareText($('#shareText').value);$('#shareText').value='';tab='shared';toast('文字已分享');return next;});
+$('#shareFilesBtn').onclick=()=>task(async()=>{const files=api.selectFiles({title:'选择要分享给手机的文件'});if(!files.length)return state;const next=await api.transfer.shareFiles(files);tab='shared';toast(`已分享 ${files.length} 个文件`);return next;});
+$('#receivedTab').onclick=()=>{tab='received';render();};$('#sharedTab').onclick=()=>{tab='shared';render();};
+window.addEventListener('beforeunload',()=>clearTimeout(pollTimer));
+async function init(){try{const saved=await api.storage.get('lan-save-directory');if(typeof saved==='string')$('#saveDir').value=saved;}catch(error){toast(error.message);}apply(await api.transfer.status());refresh();}
+init().catch(error=>toast(error.message));
+</script>
+</body></html>

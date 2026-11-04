@@ -1,0 +1,144 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-layout="draft-quill">
+<head data-business>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 写作工作室</title>
+<style>
+:root{--a:#c026d3;--a2:#e879f9;--as:rgba(192,38,211,.1);--al:rgba(192,38,211,.3);--bg:#fdf6fc;--sf:#fff;--s2:#fbe8f8;--bd:#f0d4ec;--ink:#2d0a24;--mt:#7a5670;--ft:#a880a0;--ok:#16a34a;--err:#dc2626;--mono:'JetBrains Mono',Consolas,monospace;--sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif}
+*{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.head{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none}
+.icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--a),var(--a2));display:flex;align-items:center;justify-content:center;flex:none}.icon svg{width:18px;height:18px;color:#fff}
+.head h1{margin:0;font-size:17px;font-weight:700}.head p{margin:0;color:var(--mt);font-size:12px}
+.spacer{flex:1}
+.gear{border:1px solid var(--bd);background:var(--sf);color:var(--a);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}.gear svg{width:14px;height:14px}
+.modes{display:flex;gap:6px;padding:10px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none;overflow-x:auto}
+.mode{border:1px solid var(--bd);background:var(--sf);color:var(--mt);padding:8px 16px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:.15s}
+.mode:hover{border-color:var(--al);color:var(--a)}
+.mode.active{background:var(--a);color:#fff;border-color:transparent}
+.options{display:flex;gap:10px;align-items:end;padding:10px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none;flex-wrap:wrap}
+.option{display:flex;flex-direction:column;gap:3px;color:var(--mt);font-size:11px;font-weight:600}.option select,.option input{height:32px;min-width:120px;max-width:180px;border:1px solid var(--bd);border-radius:7px;padding:4px 8px;background:#fff;color:var(--ink);font:12px var(--sans)}.option.grow{flex:1}.option.grow input{max-width:none;width:100%}
+.desk{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 24px;overflow:hidden}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.card-h{padding:10px 16px;border-bottom:1px solid var(--bd);font:600 12px var(--sans);color:var(--mt);display:flex;justify-content:space-between;align-items:center;flex:none}
+.card-h .cnt{font:11px var(--mono);color:var(--ft)}
+.src{flex:1;border:0;outline:0;resize:none;padding:16px;font:15px/1.8 var(--sans);background:var(--sf);min-height:0}
+.src::placeholder{color:var(--ft)}
+.source-wrap{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}.file-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--bd);flex-wrap:wrap;max-height:94px;overflow:auto}.file-row .btn{padding:5px 9px}.file-hint{font-size:11px;color:var(--ft)}.files{display:flex;gap:5px;flex-wrap:wrap}.file-chip{border:1px solid var(--bd);background:var(--s2);border-radius:6px;padding:3px 7px;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-chip button{border:0;background:none;color:var(--a);cursor:pointer;margin-left:5px}.drop-cover{display:none;position:absolute;inset:5px;border:2px dashed var(--a);border-radius:10px;background:rgba(253,246,252,.94);align-items:center;justify-content:center;color:var(--a);font-weight:700;pointer-events:none}.source-wrap.dragging .drop-cover{display:flex}
+.res{flex:1;overflow:auto;padding:16px 20px;font:15px/1.8 var(--sans);word-break:break-word;user-select:text}
+.res p{margin:0 0 1em;white-space:pre-wrap}.res h1,.res h2,.res h3{line-height:1.4;margin:1.2em 0 .5em}.res h1{font-size:21px}.res h2{font-size:18px}.res h3{font-size:16px}.res ul,.res ol{margin:.4em 0 .9em;padding-left:1.5em}.res li{margin:.3em 0;white-space:pre-wrap}.res.raw{white-space:pre-wrap}
+.res.empty{display:flex;align-items:center;justify-content:center;color:var(--ft);font-size:13px}
+.act-bar{padding:12px 24px;border-top:1px solid var(--bd);background:var(--sf);display:flex;gap:10px;align-items:center;flex:none}
+.btn{border:1px solid var(--bd);background:var(--sf);color:var(--ink);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--al)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border-color:transparent}.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.5}
+.btn:focus-visible,.mode:focus-visible,.option input:focus-visible,.option select:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.stat{font:12px var(--mono);color:var(--mt)}
+/* settings drawer */
+.drawer{position:fixed;top:32px;right:0;bottom:0;width:min(420px,92vw);background:var(--sf);box-shadow:-12px 0 40px rgba(0,0,0,.1);z-index:50;transform:translateX(100%);transition:.25s;overflow:auto;padding:24px}
+.drawer.open{transform:translateX(0)}
+.drawer h2{margin:0 0 16px;font-size:16px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;color:var(--mt);font-weight:600;margin-bottom:6px}
+.field input,.field select{width:100%;border:1px solid var(--bd);border-radius:8px;padding:9px 12px;font:14px var(--sans);outline:none;background:var(--s2);color:var(--ink)}
+.field input:focus{border-color:var(--al)}
+.drawer .close{position:absolute;top:16px;right:16px;border:0;background:transparent;font-size:20px;color:var(--ft);cursor:pointer}
+.overlay{position:fixed;inset:32px 0 0 0;background:rgba(0,0,0,.3);z-index:40;display:none}.overlay.show{display:block}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2d0a24;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#e0b8d8;border-radius:4px}
+@media(max-width:980px){.head{padding:10px 14px}.modes,.options{padding-left:14px;padding-right:14px}.desk{padding:10px 14px;gap:9px}.act-bar{padding:9px 14px}.option select,.option input{min-width:95px}.file-hint{display:none}.act-bar .btn{padding:7px 10px}}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="head">
+    <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/></svg></div>
+    <div><h1>AI 写作工作室</h1><p>导入素材，设定写作要求，生成可继续编辑的内容</p></div>
+    <div class="spacer"></div>
+    <button class="gear" onclick="toggleDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>供应商设置</button>
+  </div>
+  <div class="modes" id="modes">
+    <button class="mode active" data-mode="润色">润色</button>
+    <button class="mode" data-mode="改写">改写</button>
+    <button class="mode" data-mode="扩写">扩写</button>
+    <button class="mode" data-mode="缩写">缩写</button>
+    <button class="mode" data-mode="标题">标题生成</button>
+    <button class="mode" data-mode="大纲">大纲</button>
+    <button class="mode" data-mode="续写">续写</button>
+    <button class="mode" data-mode="校对">校对</button>
+    <button class="mode" data-mode="摘要">摘要</button>
+  </div>
+  <div class="options">
+    <label class="option">目标读者<select id="audience"><option value="">通用</option><option>普通读者</option><option>专业读者</option><option>客户</option><option>社交媒体读者</option></select></label>
+    <label class="option">表达语气<select id="tone"><option value="">保持原文</option><option>专业清晰</option><option>亲切自然</option><option>简洁直接</option><option>正式严谨</option><option>生动有趣</option></select></label>
+    <label class="option">期望篇幅<select id="length"><option value="">按任务决定</option><option>约 100 字</option><option>约 300 字</option><option>约 800 字</option><option>尽量精简</option></select></label>
+    <label class="option grow">补充要求<input id="instruction" maxlength="1000" placeholder="例如：保留术语、加入行动建议"></label>
+  </div>
+  <div class="desk">
+    <div class="card"><div class="card-h">素材与要求 <span class="cnt" id="srcCnt">0 字</span></div><div class="source-wrap" id="sourceWrap"><textarea class="src" id="source" placeholder="粘贴或输入文字，也可添加文件作为写作素材"></textarea><div class="file-row"><button class="btn" id="addFileBtn" type="button">＋ 添加文件</button><span class="file-hint">支持拖入 TXT、MD、CSV、JSON、DOCX、PDF；最多 5 个</span><div class="files" id="files"></div></div><div class="drop-cover">松开以添加参考文件</div></div></div>
+    <div class="card"><div class="card-h">生成结果 <span class="cnt" id="resStat">等待</span></div><div class="res empty" id="result" aria-live="polite">结果将显示在这里</div></div>
+  </div>
+  <div class="act-bar">
+    <button class="btn primary" id="genBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span id="genLabel">开始润色</span></button>
+    <button class="btn" id="stopBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>取消</button>
+    <div class="spacer"></div>
+    <button class="btn" id="viewBtn" disabled>查看原文</button>
+    <button class="btn" id="reuseBtn" disabled>用结果继续写</button>
+    <button class="btn" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制结果</button>
+    <button class="btn" id="saveBtn" disabled>保存 Markdown</button>
+    <button class="btn" id="clearBtn">清空</button>
+  </div>
+</main>
+<div class="overlay" id="overlay" onclick="toggleDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <button class="close" onclick="toggleDrawer()">×</button>
+  <h2>统一供应商配置</h2>
+  <div class="field"><label>服务名称</label><input id="pName" value="OpenAI 兼容服务"></div>
+  <div class="field"><label>Base URL</label><input id="pUrl" value="https://api.openai.com/v1"></div>
+  <div class="field"><label>模型 ID</label><input id="pModel" value="gpt-4o-mini"></div>
+  <div class="field"><label>API Key</label><input id="pKey" type="password" placeholder="仅保存到系统安全存储"></div>
+  <button class="btn primary" onclick="saveProvider()" style="width:100%;justify-content:center">保存并共享</button>
+</aside>
+<div class="toast" id="toast"></div>
+<script src="../../plugin_runtime/ai-provider-manager.js"></script>
+<script src="writing-core.js"></script>
+<script>
+const api=window.aiAPI;const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
+let mode='润色';let requestId='';let streaming=false;let resultText='';let rawView=false;let files=[];let importBusy=false;let importRevision=0;
+const providerManager=AIProviderManager.create(api,{capability:'text',notify:toast});
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2300);}
+function toggleDrawer(){$('#drawer').classList.toggle('open');$('#overlay').classList.toggle('show');}
+function updateCount(){$('#srcCnt').textContent=$('#source').value.length+' 字'+(files.length?` · ${files.length} 文件`:'');}
+function renderFiles(){const box=$('#files');box.replaceChildren();files.forEach((file,index)=>{const chip=document.createElement('span');chip.className='file-chip';chip.title=`${file.name} · ${file.characters} 字`;chip.append(document.createTextNode(file.name));const remove=document.createElement('button');remove.textContent='×';remove.title='移除文件';remove.setAttribute('aria-label',`移除 ${file.name}`);remove.onclick=()=>{files.splice(index,1);renderFiles();updateCount();};chip.append(remove);box.append(chip);});}
+function renderResult(){const box=$('#result');box.replaceChildren();box.classList.toggle('empty',!resultText);box.classList.toggle('raw',rawView);if(!resultText){box.textContent='结果将显示在这里';return;}if(rawView){box.textContent=resultText;return;}let list=null;for(const block of WritingCore.parseBlocks(resultText)){if(block.type==='ul'||block.type==='ol'){if(!list||list.tagName.toLowerCase()!==block.type){list=document.createElement(block.type);box.append(list);}const li=document.createElement('li');li.textContent=block.text;list.append(li);}else{list=null;const node=document.createElement(block.type);node.textContent=block.text;box.append(node);}}}
+function setResult(value){resultText=String(value||'');renderResult();$('#viewBtn').disabled=!resultText;$('#reuseBtn').disabled=!resultText;$('#saveBtn').disabled=!resultText;$('#resStat').textContent=streaming?'生成中…':resultText.length+' 字';}
+async function addFiles(items,fromDrop){if(importBusy)return;importBusy=true;const revision=importRevision;$('#addFileBtn').disabled=true;$('#genBtn').disabled=true;let added=0;try{for(const item of items){if(revision!==importRevision)break;if(files.length>=5){toast('最多添加 5 个文件');break;}try{if(fromDrop&&item.size>10*1024*1024)throw new Error('单个文件不能超过 10 MB');const file=fromDrop?await api.readDroppedFile(item.name,await item.arrayBuffer()):await api.readFile(item);if(revision!==importRevision)break;files.push(file);added++;}catch(error){toast(`${fromDrop?item.name:item.split(/[\\/]/).pop()}：${error.message}`);}}if(added)toast(`已添加 ${added} 个文件`);}finally{importBusy=false;$('#addFileBtn').disabled=false;$('#genBtn').disabled=streaming;renderFiles();updateCount();}}
+$$('#modes .mode').forEach(b=>b.onclick=()=>{$$('#modes .mode').forEach(x=>x.classList.remove('active'));b.classList.add('active');mode=b.dataset.mode;$('#genLabel').textContent='开始'+(mode==='标题'?'标题生成':mode);});
+$('#source').addEventListener('input',updateCount);
+$('#addFileBtn').onclick=()=>{const paths=api.pickFiles();if(paths.length)addFiles(paths,false);};
+let dragDepth=0;const wrap=$('#sourceWrap');
+window.addEventListener('dragenter',event=>{if([...event.dataTransfer.types].includes('Files')){event.preventDefault();dragDepth++;wrap.classList.add('dragging');}});
+window.addEventListener('dragover',event=>{if([...event.dataTransfer.types].includes('Files')){event.preventDefault();event.dataTransfer.dropEffect='copy';}});
+window.addEventListener('dragleave',()=>{dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)wrap.classList.remove('dragging');});
+window.addEventListener('drop',event=>{event.preventDefault();dragDepth=0;wrap.classList.remove('dragging');const dropped=[...event.dataTransfer.files];if(dropped.length)addFiles(dropped,true);});
+api.onChunk(chunk=>{if(streaming&&chunk.requestId===requestId)setResult(chunk.text);});
+$('#genBtn').onclick=async()=>{if(streaming||importBusy)return;let prompt;try{prompt=WritingCore.buildPrompt({mode,source:$('#source').value,files,audience:$('#audience').value,tone:$('#tone').value,length:$('#length').value,instruction:$('#instruction').value.trim()});}catch(error){toast(error.message);return;}
+  const current=crypto.randomUUID();requestId=current;streaming=true;$('#genBtn').disabled=true;$('#stopBtn').disabled=false;setResult('');$('#resStat').textContent='生成中…';
+  try{const answer=await api.complete({requestId:current,capability:'text',selection:await providerManager.getSelection(),stream:true,messages:[{role:'user',content:prompt}]});if(requestId===current){streaming=false;setResult(answer.text);$('#resStat').textContent=answer.text?'已完成 · '+answer.text.length+' 字':'未生成内容';}}
+  catch(error){if(requestId===current){streaming=false;$('#resStat').textContent=error.message==='请求已取消'?'已取消':'失败';toast(error.message);}}
+  finally{if(requestId===current){streaming=false;$('#genBtn').disabled=false;$('#stopBtn').disabled=true;}}
+};
+$('#stopBtn').onclick=()=>{if(streaming){const stopped=requestId;requestId='';streaming=false;api.cancel(stopped);$('#genBtn').disabled=false;$('#stopBtn').disabled=true;$('#resStat').textContent='已取消';}};
+$('#viewBtn').onclick=()=>{rawView=!rawView;$('#viewBtn').textContent=rawView?'查看排版':'查看原文';renderResult();};
+$('#reuseBtn').onclick=()=>{if(!resultText)return;$('#source').value=resultText;updateCount();$('#source').focus();toast('结果已放入素材区');};
+$('#copyBtn').onclick=()=>{if(!resultText){toast('暂无结果');return;}api.copyText(resultText);toast('已复制原文');};
+$('#saveBtn').onclick=async()=>{if(!resultText)return;try{if(await api.saveMarkdown(resultText))toast('已保存 Markdown');}catch(error){toast('保存失败：'+error.message);}};
+$('#clearBtn').onclick=()=>{if(streaming)$('#stopBtn').click();importRevision++;$('#source').value='';files=[];renderFiles();updateCount();setResult('');$('#resStat').textContent='等待';};
+// 总指挥传入的文本先填入素材；仅明确指定 autoRun 才启动模型请求。
+window.addEventListener('plugin-enter',event=>{const detail=event.detail||{};const text=detail.payload||detail.clipboardText||'';if(text){$('#source').value=text;updateCount();if(detail.featureArgs?.autoRun)setTimeout(()=>{if(!$('#genBtn').disabled)$('#genBtn').click();},150);}});
+</script>
+</body></html>

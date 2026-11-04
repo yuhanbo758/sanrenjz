@@ -1,0 +1,31 @@
+{
+  "pluginName": "微信多开",
+  "description": "电脑端微信多开工具：选择微信程序路径，一键启动多个实例",
+  "version": "1.0.0",
+  "author": "三人聚智",
+  "category": "系统工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "multi-wechat",
+      "explain": "微信多开",
+      "description": "选择微信程序后，一键启动多个微信实例",
+      "cmds": ["微信多开", "多开微信", "微信多实例", "WeChat 多开"],
+      "icon": "logo.ico",
+      "platform": ["win32"],
+      "mode": "none",
+      "superPanel": true,
+      "category": "系统工具",
+      "priority": 10
+    }
+  ],
+  "pluginSetting": {
+    "width": 1000,
+    "height": 680,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

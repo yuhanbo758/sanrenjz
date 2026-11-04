@@ -1,0 +1,166 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-layout="vision-lens">
+<head data-business>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 图片理解</title>
+<style>
+:root{--a:#db2777;--a2:#ec4899;--as:rgba(219,39,119,.1);--al:rgba(219,39,119,.3);--bg:#fdf5f9;--sf:#fff;--s2:#fce8f1;--bd:#f0d4e2;--ink:#2d0a1f;--mt:#7a526a;--ft:#a88098;--ok:#16a34a;--err:#dc2626;--mono:'JetBrains Mono',Consolas,monospace;--sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif}
+*{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.head{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none}
+.icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--a),var(--a2));display:flex;align-items:center;justify-content:center;flex:none}.icon svg{width:18px;height:18px;color:#fff}
+.head h1{margin:0;font-size:17px;font-weight:700}.head p{margin:0;color:var(--mt);font-size:12px}
+.spacer{flex:1}.gear{border:1px solid var(--bd);background:var(--sf);color:var(--a);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}.gear svg{width:14px;height:14px}
+.modes{display:flex;gap:6px;padding:10px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none;overflow-x:auto}
+.mode{border:1px solid var(--bd);background:var(--sf);color:var(--mt);padding:7px 16px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:.12s}.mode:hover{border-color:var(--al);color:var(--a)}.mode.active{background:var(--a);color:#fff;border-color:transparent}
+.body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 24px;overflow:hidden}
+.img-side{display:flex;flex-direction:column;min-height:0;gap:12px}
+.img-stage{flex:1;min-height:0;border:2px dashed var(--bd);border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;transition:.15s;color:var(--ft);background:repeating-conic-gradient(var(--s2) 0% 25%,var(--sf) 0% 50%) 50%/16px 16px}
+.img-stage:hover{border-color:var(--a);color:var(--a)}
+.img-stage img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+.img-stage .empty-img{display:flex;flex-direction:column;align-items:center;gap:10px}.img-stage .empty-img svg{width:56px;height:56px;opacity:.3}
+.img-ctrl{display:flex;gap:8px;flex:none}
+.img-info{color:var(--mt);font-size:12px;min-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prompt-field{padding:8px 24px;background:var(--sf);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex:none}.prompt-field label{font-size:12px;color:var(--mt);white-space:nowrap}.prompt-field input{flex:1;min-width:0;border:1px solid var(--bd);border-radius:8px;padding:7px 10px;font:13px var(--sans);outline:none}.prompt-field input:focus{border-color:var(--a)}
+.result-side{display:flex;flex-direction:column;min-height:0}
+.res-card{flex:1;min-height:0;background:var(--sf);border:1px solid var(--bd);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+.res-h{padding:10px 16px;border-bottom:1px solid var(--bd);font:600 14px var(--sans);flex:none;display:flex;justify-content:space-between;align-items:center}
+.res-h .stat{font:11px var(--mono);color:var(--ft)}
+.res-out{flex:1;overflow:auto;padding:16px;font:14px/1.7 var(--sans);white-space:pre-wrap;word-break:break-word}
+.res-out.empty{display:flex;align-items:center;justify-content:center;color:var(--ft);font-style:italic}
+.tags{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px;border-top:1px solid var(--bd);flex:none}
+.tag{background:var(--as);color:var(--a);border:1px solid var(--al);border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer}.tag:hover{background:var(--a);color:#fff}
+.act-bar{padding:12px 24px;border-top:1px solid var(--bd);background:var(--sf);display:flex;gap:10px;align-items:center;flex:none}
+.btn{border:1px solid var(--bd);background:var(--sf);color:var(--ink);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;transition:.12s;display:inline-flex;align-items:center;gap:6px}.btn:hover{border-color:var(--al)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border-color:transparent}.btn.primary:hover{filter:brightness(1.08)}.btn:disabled{opacity:.5}
+.drawer{position:fixed;top:32px;right:0;bottom:0;width:min(420px,92vw);background:var(--sf);box-shadow:-12px 0 40px rgba(0,0,0,.1);z-index:50;transform:translateX(100%);transition:.25s;overflow:auto;padding:24px}.drawer.open{transform:translateX(0)}.drawer h2{margin:0 0 16px;font-size:16px}.drawer .close{position:absolute;top:16px;right:16px;border:0;background:transparent;font-size:20px;color:var(--ft);cursor:pointer}
+.field{margin-bottom:16px}.field label{display:block;font-size:12px;color:var(--mt);font-weight:600;margin-bottom:6px}.field input{width:100%;border:1px solid var(--bd);border-radius:8px;padding:9px 12px;font:14px var(--sans);outline:none;background:var(--s2);color:var(--ink)}.field input:focus{border-color:var(--al)}
+.overlay{position:fixed;inset:32px 0 0 0;background:rgba(0,0,0,.3);z-index:40;display:none}.overlay.show{display:block}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2d0a1f;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#e0b8d0;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="head">
+    <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg></div>
+    <div><h1>AI 图片理解</h1><p>生成图片描述、标签、无障碍文本、分析和反向提示词</p></div>
+    <div class="spacer"></div>
+    <button class="gear" onclick="toggleDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 1-.1 1.2l2 1.5-2 3.4-2.3-1a7 7 0 0 1-2 1.2l-.4 2.5H9l-.4-2.5a7 7 0 0 1-2-1.2l-2.3 1-2-3.4 2-1.5A7 7 0 0 1 4 12a7 7 0 0 1 .1-1.2l-2-1.5 2-3.4 2.3 1a7 7 0 0 1 2-1.2L9 1h4l.4 2.5a7 7 0 0 1 2 1.2l2.3-1 2 3.4-2 1.5A7 7 0 0 1 19 12z"/></svg>供应商设置</button>
+  </div>
+  <div class="modes">
+    <button class="mode active" data-mode="描述">图片描述</button>
+    <button class="mode" data-mode="标题">标题</button>
+    <button class="mode" data-mode="标签">标签</button>
+    <button class="mode" data-mode="无障碍">无障碍文本</button>
+    <button class="mode" data-mode="文字提取">文字提取</button>
+    <button class="mode" data-mode="问答">图片问答</button>
+    <button class="mode" data-mode="分析">分析</button>
+    <button class="mode" data-mode="反向">反向提示词</button>
+  </div>
+  <div class="prompt-field"><label for="extraPrompt">补充要求</label><input id="extraPrompt" maxlength="500" placeholder="例如：用于小红书封面；问答模式请输入具体问题"></div>
+  <div class="body">
+    <div class="img-side">
+      <div class="img-stage" id="imgStage" onclick="pickImage()">
+        <div class="empty-img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg><span>点击或拖放选择图片</span></div>
+      </div>
+      <div class="img-ctrl">
+        <button class="btn" onclick="pickImage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg>选择图片</button>
+        <button class="btn" onclick="pasteImage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M5 5h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/></svg>从剪贴板</button>
+        <button class="btn" id="clearBtn" disabled>清除图片</button>
+      </div>
+      <div class="img-info" id="imgInfo">支持 PNG、JPG、WebP、BMP、GIF；粘贴或拖入也可加载</div>
+    </div>
+    <div class="result-side">
+      <div class="res-card">
+        <div class="res-h">结果 <span class="stat" id="resStat">等待</span></div>
+        <div class="res-out empty" id="result">选择图片并点击生成</div>
+        <div class="tags" id="tagsArea" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+  <div class="act-bar">
+    <button class="btn primary" id="genBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span id="genLabel">生成描述</span></button>
+    <button class="btn" id="stopBtn" disabled>取消</button>
+    <div class="spacer"></div>
+    <button class="btn" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制</button>
+    <button class="btn" id="saveBtn">保存结果</button>
+  </div>
+</main>
+<div class="overlay" id="overlay" onclick="toggleDrawer()"></div>
+<aside class="drawer" id="drawer"><button class="close" onclick="toggleDrawer()">×</button><h2>统一供应商配置</h2>
+  <div class="field"><label>服务名称</label><input id="pName" value="OpenAI 兼容服务"></div>
+  <div class="field"><label>Base URL</label><input id="pUrl" value="https://api.openai.com/v1"></div>
+  <div class="field"><label>模型 ID（需支持视觉）</label><input id="pModel" value="gpt-4o-mini"></div>
+  <div class="field"><label>API Key</label><input id="pKey" type="password" placeholder="仅保存到系统安全存储"></div>
+  <button class="btn primary" style="width:100%;justify-content:center" onclick="saveProvider()">保存并共享</button>
+</aside>
+<div class="toast" id="toast"></div>
+<script src="../../plugin_runtime/ai-provider-manager.js"></script>
+<script>
+const api=window.aiAPI;const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
+let mode='描述';let requestId='';let imageDataUrl='';let resultText='';let imageName='';let imageLoadVersion=0;
+const providerManager=AIProviderManager.create(api,{capability:'vision',notify:toast});
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1600);}
+function toggleDrawer(){$('#drawer').classList.toggle('open');$('#overlay').classList.toggle('show');}
+function resetResult(message='选择图片并点击生成') {resultText='';$('#result').textContent=message;$('#result').classList.add('empty');$('#resStat').textContent='等待';$('#tagsArea').style.display='none';}
+function cancelRequest(){if(requestId){const old=requestId;requestId='';api.cancel(old);}$('#genBtn').disabled=false;$('#stopBtn').disabled=true;}
+$$('.modes .mode').forEach(b=>b.onclick=()=>{cancelRequest();$$('.modes .mode').forEach(x=>x.classList.remove('active'));b.classList.add('active');mode=b.dataset.mode;$('#genLabel').textContent=mode==='问答'?'回答问题':'生成'+mode;$('#extraPrompt').placeholder=mode==='问答'?'请输入关于图片的具体问题':'例如：用于小红书封面、要求简短';resetResult();});
+function loadFile(file){if(!file||!/^image\/(png|jpeg|webp|bmp|gif)$/i.test(file.type)){toast('仅支持 PNG、JPG、WebP、BMP、GIF 图片');return;}const reader=new FileReader();reader.onload=()=>setImage(reader.result,file.name);reader.onerror=()=>toast('图片读取失败');reader.readAsDataURL(file);}
+function pickImage(){const inp=document.createElement('input');inp.type='file';inp.accept='image/png,image/jpeg,image/webp,image/bmp,image/gif';inp.onchange=e=>loadFile(e.target.files[0]);inp.click();}
+function pasteImage(){const dataUrl=api.readClipboardImage();if(dataUrl)setImage(dataUrl,'剪贴板图片');else toast('剪贴板无图片');}
+function setImage(dataUrl,name='图片'){if(!/^data:image\/(png|jpeg|webp|bmp|gif);base64,/i.test(dataUrl)){toast('不支持的图片数据');return;}cancelRequest();const version=++imageLoadVersion;const img=new Image();img.onload=()=>{if(version!==imageLoadVersion)return;try{const scale=Math.min(1,2048/Math.max(img.naturalWidth,img.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);imageDataUrl=canvas.toDataURL('image/png');imageName=name;$('#imgStage').replaceChildren(img);$('#imgStage').onclick=pickImage;$('#imgInfo').textContent=`${name} · ${img.naturalWidth} × ${img.naturalHeight}`+(scale<1?' · 分析时缩至 2048px':'');$('#clearBtn').disabled=false;resetResult();}catch(e){toast(`图片处理失败：${e.message}`);}};img.onerror=()=>{if(version===imageLoadVersion)toast('图片解码失败');};img.src=dataUrl;}
+$('#clearBtn').onclick=()=>{imageLoadVersion++;cancelRequest();imageDataUrl='';imageName='';$('#imgStage').innerHTML='<div class="empty-img">点击或拖放选择图片</div>';$('#imgInfo').textContent='支持 PNG、JPG、WebP、BMP、GIF；粘贴或拖入也可加载';$('#clearBtn').disabled=true;resetResult();};
+api.onChunk(chunk=>{if(chunk.requestId===requestId){resultText=chunk.text;$('#result').classList.remove('empty');$('#result').textContent=chunk.text;}});
+function renderTags(text){const tags=text.split(/[,，\n]/).map(t=>t.trim()).filter(Boolean);const area=$('#tagsArea');area.innerHTML='';area.style.display=tags.length?'flex':'none';tags.forEach(text=>{const tag=document.createElement('span');tag.className='tag';tag.textContent=text;tag.onclick=()=>navigator.clipboard.writeText(text);area.appendChild(tag);});}
+const prompts={
+  '描述':'客观描述图片中的主体、动作、环境及重要细节；看不清的部分不要猜测。',
+  '标题':'根据图片生成 5 个适合发布的中文标题，每行一个，风格各有侧重；标题要准确、简洁，不编造图片外的事实。',
+  '标签':'生成 5 到 10 个与画面直接相关的中文标签，仅用逗号分隔，不添加解释。',
+  '无障碍':'生成简洁、准确的中文替代文本，用于屏幕阅读器；突出关键信息，不推测身份或背景。',
+  '文字提取':'按阅读顺序逐行转写图片中能辨认的文字，保留换行；看不清处标记[无法辨认]，不要补写或翻译；若无文字只回答“未识别到文字”。',
+  '问答':'根据图片回答用户的问题，只依据可见内容；无法确定时明确说明。',
+  '分析':'分析图片的色彩、构图、风格和可能的用途；事实与推测分别说明。',
+  '反向':'根据可见画面生成一段适用于 AI 绘画的中文提示词，包含主体、构图、光线和风格；不要臆造不可见细节。'
+};
+$('#genBtn').onclick=async()=>{
+  if(!imageDataUrl){toast('请先选择图片');return;}
+  const extra=$('#extraPrompt').value.trim();if(mode==='问答'&&!extra){toast('请输入关于图片的问题');$('#extraPrompt').focus();return;}
+  const currentId=crypto.randomUUID(),currentMode=mode;requestId=currentId;resultText='';$('#genBtn').disabled=true;$('#stopBtn').disabled=false;$('#resStat').textContent='分析中…';
+  $('#result').classList.remove('empty');$('#result').textContent='';$('#tagsArea').style.display='none';
+  // 请求使用当前模式和图片快照，取消或更换图片后旧响应不得覆盖新结果。
+  const prompt=prompts[currentMode]+(extra?'\n用户补充要求：'+extra:'');const currentImage=imageDataUrl;
+  try{const selection=await providerManager.getSelection();if(requestId!==currentId)return;const r=await api.complete({requestId:currentId,capability:'vision',selection,stream:true,messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:currentImage}}]}]});if(requestId!==currentId)return;resultText=r.text||'';$('#result').textContent=resultText||'模型未返回内容';$('#resStat').textContent=resultText?'已完成':'空结果';if(currentMode==='标签')renderTags(resultText);}
+  catch(e){if(requestId!==currentId)return;resultText='';$('#result').textContent=e.message;$('#resStat').textContent=e.message==='请求已取消'?'已取消':'失败';}
+  finally{if(requestId===currentId){requestId='';$('#genBtn').disabled=false;$('#stopBtn').disabled=true;}}
+};
+$('#stopBtn').onclick=()=>{if(requestId){cancelRequest();$('#resStat').textContent='已取消';}};
+$('#copyBtn').onclick=()=>{if(resultText){api.copyText(resultText);toast('已复制');}else toast('暂无结果');};
+$('#saveBtn').onclick=()=>{if(!resultText){toast('暂无结果');return;}try{const body=`# AI 图片理解 · ${mode}\n\n图片：${imageName}\n\n${resultText}\n`;if(api.saveResult(body))toast('已保存');}catch(e){toast(`保存失败：${e.message}`);}};
+// 超级面板进入：优先识别本地图片路径，其次读取剪贴板图片（覆盖选中图片与截图场景）
+window.addEventListener('plugin-enter',e=>{
+  const payload=String(e.detail?.payload||e.detail?.clipboardText||e.detail?.action?.payload||'').trim();
+  const filePath=payload.split(/\r?\n/).map(s=>s.trim().replace(/^"+|"+$/g,'')).find(s=>/\.(png|jpe?g|webp|bmp|gif)$/i.test(s));
+  if(filePath){try{setImage(api.readImage(filePath));return;}catch(_){/* 路径失效时继续尝试剪贴板 */}}
+  const clip=api.readClipboardImage();if(clip)setImage(clip);
+});
+// 拖放支持：拦截窗口级默认行为，任意位置拖入图片均可加载
+window.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';$('#imgStage').style.borderColor='var(--a)';});
+window.addEventListener('dragleave',e=>{if(!e.relatedTarget)$('#imgStage').style.borderColor='';});
+window.addEventListener('drop',e=>{
+  e.preventDefault();e.stopPropagation();$('#imgStage').style.borderColor='';
+  const dt=e.dataTransfer;
+  if(dt.files&&dt.files.length){
+    const file=[...dt.files].find(f=>f.type.startsWith('image/'));
+    if(file)loadFile(file);
+    else toast('仅支持图片文件');return;
+  }
+  const url=String(dt.getData('text/uri-list')||dt.getData('text/plain')||'').trim();
+  if(/^data:image\//i.test(url))setImage(url);
+});
+// Ctrl+V 粘贴剪贴板图片（输入框内保持系统默认粘贴行为）
+window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='v'&&!e.target.closest('input,textarea'))pasteImage();});
+</script>
+</body></html>

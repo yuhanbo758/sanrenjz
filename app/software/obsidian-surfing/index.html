@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网页浏览</title>
+    <link rel="stylesheet" href="browser.css">
+</head>
+<body>
+    <main class="browser-shell">
+        <header class="toolbar">
+            <div class="nav-group">
+                <button id="backBtn" class="icon-btn" title="后退" aria-label="后退">←</button>
+                <button id="forwardBtn" class="icon-btn" title="前进" aria-label="前进">→</button>
+                <button id="reloadBtn" class="icon-btn" title="刷新" aria-label="刷新">↻</button>
+                <button id="homeBtn" class="icon-btn" title="主页" aria-label="主页">⌂</button>
+            </div>
+            <form id="addressForm" class="address-form">
+                <span id="siteState" class="site-state" title="站点状态">○</span>
+                <input id="addressBar" type="text" autocomplete="off" spellcheck="false" aria-label="网址或搜索内容" placeholder="输入网址或搜索内容">
+            </form>
+            <div class="tool-group">
+                <button id="bookmarkBtn" class="icon-btn" title="收藏当前页面" aria-label="收藏当前页面">☆</button>
+                <button id="findBtn" class="icon-btn" title="在网页中查找" aria-label="在网页中查找">⌕</button>
+                <button id="copyBtn" class="icon-btn" title="复制网址" aria-label="复制网址">⧉</button>
+                <button id="externalBtn" class="icon-btn" title="在系统浏览器中打开" aria-label="在系统浏览器中打开">↗</button>
+                <button id="menuBtn" class="icon-btn" title="更多" aria-label="更多">⋯</button>
+            </div>
+        </header>
+        <div id="bookmarkBar" class="bookmark-bar"></div>
+        <div id="findBar" class="find-bar hidden">
+            <input id="findInput" type="text" placeholder="查找当前网页" aria-label="查找当前网页">
+            <span id="findCount">0/0</span>
+            <button id="findPrev" class="icon-btn" title="上一个">↑</button>
+            <button id="findNext" class="icon-btn" title="下一个">↓</button>
+            <button id="findClose" class="icon-btn" title="关闭查找">×</button>
+        </div>
+        <section class="page-area">
+            <webview id="pageView" class="page-view" partition="persist:surfing-browser" webpreferences="contextIsolation=yes, nodeIntegration=no, webSecurity=yes, sandbox=yes" allowpopups></webview>
+            <div id="pageError" class="page-error hidden" role="alert">
+                <h2>网页无法打开</h2>
+                <p id="errorDetail"></p>
+                <div class="error-actions"><button id="retryBtn">重试</button><button id="errorExternalBtn">在系统浏览器中打开</button></div>
+            </div>
+            <aside id="drawer" class="drawer hidden" aria-label="浏览器面板">
+                <div class="drawer-head"><h2 id="drawerTitle"></h2><button id="drawerClose" class="icon-btn" title="关闭">×</button></div>
+                <div id="drawerContent" class="drawer-content"></div>
+            </aside>
+        </section>
+        <footer class="status-bar"><span id="pageTitle">网页浏览</span><span id="zoomLabel">100%</span></footer>
+    </main>
+    <script src="browser.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "pluginName": "图片裁剪工具",
+  "description": "图片裁剪与编辑，支持窗口拖入、剪贴板粘贴、翻转旋转、文字和多格式导出",
+  "version": "1.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "image-crop",
+      "explain": "图片裁剪",
+      "description": "拖入或粘贴图片，按比例裁剪、旋转翻转并添加文字",
+      "cmds": ["图片裁剪", "裁剪图片", "图片编辑", "封面制作", "图片处理"],
+      "icon": "logo.ico",
+      "platform": ["win32", "darwin", "linux"],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 10
+    }
+  ],
+  "pluginSetting": {
+    "width": 1200,
+    "height": 800,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

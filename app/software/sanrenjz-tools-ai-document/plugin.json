@@ -1,0 +1,56 @@
+{
+  "pluginName": "AI 文档阅读器",
+  "description": "拖拽导入 Word、PDF、XLSX 与文本，提取信息、审校、对比文档并问答。",
+  "version": "1.3.0",
+  "updateDate": "2026-09-26",
+  "author": "三人聚智",
+  "category": "AI 工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-ai-document",
+      "explain": "文档速读",
+      "description": "拖拽导入 Word、PDF、XLSX 与文本，提取信息、审校、对比文档并问答。",
+      "cmds": [
+        "AI 文档阅读器",
+        "摘要",
+        "目录",
+        "文档问答",
+        "DOCX 阅读",
+        "DOC 阅读",
+        "PDF 阅读",
+        "XLSX 阅读",
+        "文档对比",
+        "文档审校",
+        {
+          "type": "over",
+          "label": "用AI 文档阅读器处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "AI 工具",
+      "priority": 22,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

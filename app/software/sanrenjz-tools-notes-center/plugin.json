@@ -1,0 +1,75 @@
+{
+  "pluginName": "本地笔记中心",
+  "description": "本地 Markdown 笔记支持分屏预览、搜索排序、复制、置顶、导入导出与轻便便签。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-markdown-notes",
+      "explain": "本地笔记",
+      "description": "Markdown 资料库与轻便便签并排管理。",
+      "cmds": [
+        "markdown笔记",
+        "笔记",
+        "md",
+        {
+          "type": "over",
+          "label": "用本地笔记中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-floating-notes",
+      "explain": "悬浮便签",
+      "description": "Markdown 资料库与轻便便签并排管理。",
+      "cmds": [
+        "便签",
+        "悬浮便签",
+        "sticky note",
+        {
+          "type": "over",
+          "label": "用本地笔记中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

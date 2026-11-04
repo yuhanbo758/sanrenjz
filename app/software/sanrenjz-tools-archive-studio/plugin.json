@@ -1,0 +1,48 @@
+{
+  "pluginName": "压缩包工作台",
+  "description": "批量预览和安全解压 ZIP，筛选条目，并打包文件与文件夹。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-archive-tool",
+      "explain": "压缩解压",
+      "description": "批量预览和安全解压 ZIP，筛选条目，并打包文件与文件夹。",
+      "cmds": [
+        "zip",
+        "压缩包",
+        "解压",
+        {
+          "type": "over",
+          "label": "用压缩包工作台处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

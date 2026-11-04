@@ -1,0 +1,187 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-layout="clock-dial">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>时间与计算中心</title>
+<style>
+:root{
+  --accent:#1565c0;--accent-2:#42a5f5;--accent-soft:rgba(21,101,192,.1);--accent-line:rgba(21,101,192,.3);
+  --bg:#f4f8fc;--surface:#fff;--surface-2:#eef4fa;--border:#d6e3ef;
+  --ink:#0f2a44;--muted:#5a7187;--faint:#9aafc0;
+  --ok:#16a34a;--err:#dc2626;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.spacer{flex:1}
+.live{font:600 13px var(--mono);color:var(--accent);background:var(--accent-soft);padding:6px 14px;border-radius:999px;border:1px solid var(--accent-line)}
+.tabs{display:flex;gap:6px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex:none;overflow-x:auto;align-items:center}
+.tab{border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:.15s;display:flex;align-items:center;gap:7px}
+.tab svg{width:15px;height:15px}
+.tab:hover{background:var(--surface-2)}
+.tab.active{background:var(--accent);color:#fff}
+.content{flex:1;min-height:0;overflow:auto;padding:20px 24px}
+.panel{display:none;flex-direction:column;gap:16px;max-width:1000px;margin:0 auto}
+.panel.active{display:flex}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px}
+.field{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+.field .f{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.inp{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font:14px var(--mono);color:var(--ink);outline:none;min-width:160px}
+.inp:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+.inp::placeholder{color:var(--faint)}
+.sel{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer;outline:none}
+.run{border:0;border-radius:8px;padding:10px 24px;font-weight:600;font-size:14px;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;transition:.15s}
+.run:hover{filter:brightness(1.08)}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.result-item{background:var(--surface-2);border-radius:10px;padding:14px}
+.result-item .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.result-item .v{font:600 15px var(--mono);color:var(--ink);word-break:break-all}
+.result-item .v.big{font-size:20px;color:var(--accent)}
+.calc-area{width:100%;min-height:200px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px;font:14px/1.8 var(--mono);color:var(--ink);resize:vertical;outline:none}
+.calc-out{background:#0f2a44;color:#cfe8ff;border-radius:10px;padding:16px;font:14px/1.8 var(--mono);white-space:pre-wrap;min-height:80px;overflow:auto}
+.unit-pair{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.unit-pair .arrow{color:var(--accent);font-size:20px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#0f2a44;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.hint{font-size:12px;color:var(--muted);margin:8px 0 0}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.secondary{background:var(--surface);color:var(--accent);border:1px solid var(--accent-line);padding:9px 14px;border-radius:8px;cursor:pointer}
+.secondary:hover{background:var(--accent-soft)}
+.clock-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px}
+.clock-card{background:var(--surface-2);border-radius:10px;padding:14px}
+.clock-card strong{display:block;color:var(--accent);font:600 20px var(--mono);margin-top:4px}
+.clock-card small{color:var(--muted)}
+@media(max-width:700px){.tabs{padding:8px 12px}.content{padding:12px}.card{padding:16px}.live{display:none}.inp{min-width:120px}}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#bcd0e0;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="tabs">
+    <button class="tab active" data-tool="time-converter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/><circle cx="12" cy="12" r="7"/><path d="M12 9v3l2 2"/></svg>时间戳转换</button>
+    <button class="tab" data-tool="date-world-clock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18"/></svg>世界时钟</button>
+    <button class="tab" data-tool="date-tools">日期计算</button>
+    <button class="tab" data-tool="clock-check">校时检测</button>
+    <button class="tab" data-tool="unit-converter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4M7 4L4 7M7 4l3 3M17 8v12M17 20l3-3M17 20l-3-3"/></svg>单位换算</button>
+    <button class="tab" data-tool="calculation-paper"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>计算草稿</button>
+    <div class="spacer"></div><span class="live" id="liveClock">--:--:--</span>
+  </div>
+  <div class="content">
+    <!-- Time converter -->
+    <div class="panel active" data-panel="time-converter">
+      <div class="card">
+        <div class="field">
+          <div class="f"><label for="tcInput">输入</label><input class="inp" id="tcInput" placeholder="2026-01-15T12:30:00+08:00 或 1768451400" style="min-width:290px"></div>
+          <div class="f"><label for="tcTz">显示时区</label><select class="sel" id="tcTz"></select></div>
+          <button class="run" data-run>转换</button>
+          <button class="secondary" id="tcNow">使用现在</button>
+        </div>
+        <p class="hint">支持 10/13 位 Unix 时间戳与 ISO 日期时间；无时区输入按系统本地时间解释。</p>
+        <div class="result-grid" id="tcResult"></div>
+        <div class="actions" id="tcActions" hidden><button class="secondary" data-copy="seconds">复制秒时间戳</button><button class="secondary" data-copy="milliseconds">复制毫秒时间戳</button><button class="secondary" data-copy="iso">复制 ISO</button></div>
+      </div>
+    </div>
+    <!-- World clock -->
+    <div class="panel" data-panel="date-world-clock">
+      <div class="card">
+        <div class="field">
+          <div class="f"><label for="wcInput">会议时间</label><input class="inp" id="wcInput" placeholder="留空=现在；也可输入 ISO / 时间戳" style="min-width:300px"></div>
+          <button class="run" data-run>比较各地时间</button>
+        </div>
+        <p class="hint">各地时钟同步刷新；输入会议时间后按同一瞬间比较，目标地区夏令时自动生效。</p>
+        <div class="clock-grid" id="wcResult"></div>
+      </div>
+    </div>
+    <div class="panel" data-panel="date-tools">
+      <div class="card">
+        <div class="field"><div class="f"><label for="dtStart">起始日期</label><input class="inp" id="dtStart" type="date"></div><div class="f"><label for="dtEnd">结束日期</label><input class="inp" id="dtEnd" type="date"></div><button class="run" id="dtDiff">计算间隔</button></div>
+        <div class="field"><div class="f"><label for="dtAmount">增减天数</label><input class="inp" id="dtAmount" type="number" step="1" value="7" style="width:120px"></div><button class="secondary" id="dtAdd">计算日历日</button><button class="secondary" id="dtBusiness">计算工作日</button></div>
+        <p class="hint">工作日仅排除周末，不含法定节假日和调休。</p>
+        <div class="result-grid" id="dtResult"></div>
+      </div>
+    </div>
+    <div class="panel" data-panel="clock-check">
+      <div class="card">
+        <div class="actions"><button class="run" id="clockCheck">检测本机时间</button><span class="hint" id="clockStatus" role="status"></span></div>
+        <p class="hint">查询 pool.ntp.org；仅诊断时钟偏差，不更改系统时间。若 UDP 123 被阻断，会提示超时。</p>
+        <div class="result-grid" id="clockResult" style="margin-top:16px"></div>
+        <p class="hint">NTP 响应未经身份认证，结果是一次网络测量估计值；需要校准系统时间时请使用操作系统的时间设置。</p>
+      </div>
+    </div>
+    <!-- Unit converter -->
+    <div class="panel" data-panel="unit-converter">
+      <div class="card">
+        <div class="field">
+          <div class="f"><label>数值</label><input class="inp" id="ucValue" type="number" value="1" style="width:120px"></div>
+          <div class="f"><label for="ucType">类别</label><select class="sel" id="ucType"><option value="length">长度</option><option value="mass">质量</option><option value="area">面积</option><option value="volume">体积</option><option value="speed">速度</option><option value="data">数据容量</option><option value="duration">时长</option><option value="temperature">温度</option></select></div>
+        </div>
+        <div class="field unit-pair">
+          <div class="f"><label>从</label><select class="sel" id="ucFrom"></select></div>
+          <span class="arrow">→</span>
+          <div class="f"><label>到</label><select class="sel" id="ucTo"></select></div>
+          <button class="run" data-run>换算</button><button class="secondary" id="ucSwap">交换单位</button>
+        </div>
+        <p class="hint">数据容量中的 KB/MB 使用十进制，KiB/MiB 使用二进制。</p>
+        <div class="result-grid"><div class="result-item"><div class="k">结果</div><div class="v big" id="ucResult">—</div></div></div>
+      </div>
+    </div>
+    <!-- Calculation paper -->
+    <div class="panel" data-panel="calculation-paper">
+      <div class="card">
+        <textarea class="calc-area" id="cpInput" spellcheck="false" placeholder="a = 100&#10;b = a * 1.08&#10;b + 200&#10;3.14 * 2 * 2"></textarea>
+        <p class="hint">每行一个表达式，可赋值变量；支持 +、-、*、/、%、括号。</p>
+        <div style="margin-top:12px"><button class="run" data-run>计算</button></div>
+        <div style="margin-top:14px"><div class="result-item" style="padding:0"><div class="calc-out" id="cpOutput">结果将显示在这里</div></div></div>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const api=window.pluginAPI, core=api.timeTools, $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+let current='time-converter', lastTime=null;
+const zoneLabels={'local':'系统本地','UTC':'UTC','Asia/Shanghai':'上海','Asia/Tokyo':'东京','Europe/London':'伦敦','America/New_York':'纽约','America/Los_Angeles':'洛杉矶','Australia/Sydney':'悉尼'};
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2400);}
+function show(id){current=id;$$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tool===id));$$('.panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===id));}
+function renderGrid(sel,items){$(sel).innerHTML=items.map(([k,v,big])=>`<div class="result-item"><div class="k">${esc(k)}</div><div class="v${big?' big':''}">${esc(v)}</div></div>`).join('');}
+function withError(action){try{action();}catch(error){toast(error.message||String(error));}}
+function formatNumber(value){return Number(value.toPrecision(12)).toString();}
+$$('.tab').forEach(t=>t.onclick=()=>show(t.dataset.tool));
+core.ZONES.forEach(z=>$('#tcTz').add(new Option(zoneLabels[z],z)));
+function renderClocks(){withError(()=>{const value=$('#wcInput').value.trim();const date=core.parseInstant(value);$('#wcResult').innerHTML=core.ZONES.map(zone=>`<div class="clock-card"><small>${esc(zoneLabels[zone])} · ${esc(zone)}</small><strong>${esc(core.formatZone(date,zone))}</strong></div>`).join('');});}
+function tick(){const now=new Date();$('#liveClock').textContent=now.toLocaleTimeString('zh-CN',{hour12:false});if(current==='date-world-clock'&&!$('#wcInput').value.trim())renderClocks();}
+tick();setInterval(tick,1000);
+function fillUnits(){const type=$('#ucType').value, names=type==='temperature'?['°C','°F','K']:Object.keys(core.UNIT_GROUPS[type]);for(const id of ['#ucFrom','#ucTo']){$(id).replaceChildren(...names.map(name=>new Option(name,name)));}$('#ucTo').selectedIndex=1;}
+$('#ucType').onchange=fillUnits;fillUnits();
+$('#ucSwap').onclick=()=>{const from=$('#ucFrom'),to=$('#ucTo'),value=from.value;from.value=to.value;to.value=value;run();};
+$('#tcNow').onclick=()=>{$('#tcInput').value='';run();};
+$$('[data-copy]').forEach(button=>button.onclick=()=>{if(lastTime){api.copyText(String(lastTime[button.dataset.copy]));toast('已复制');}});
+const today=new Date();$('#dtStart').value=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+$('#dtEnd').value=$('#dtStart').value;
+$('#dtDiff').onclick=()=>withError(()=>{const days=core.dayDifference($('#dtStart').value,$('#dtEnd').value);renderGrid('#dtResult',[['相隔日历日',`${days} 天`,true],['含起止日期',`${Math.abs(days)+1} 天`]]);});
+$('#dtAdd').onclick=()=>withError(()=>renderGrid('#dtResult',[['日历日结果',core.addDays($('#dtStart').value,Number($('#dtAmount').value)),true]]));
+$('#dtBusiness').onclick=()=>withError(()=>renderGrid('#dtResult',[['工作日结果',core.addBusinessDays($('#dtStart').value,Number($('#dtAmount').value)),true]]));
+$('#clockCheck').onclick=async()=>{const button=$('#clockCheck');button.disabled=true;$('#clockStatus').textContent='正在检测…';try{const result=await api.checkClock();renderGrid('#clockResult',[['估计时钟偏差',`${result.offsetMs>0?'+':''}${result.offsetMs} 毫秒`,true],['网络往返延迟',`${result.delayMs} 毫秒`],['检测时间',result.checkedAt],['时间源',result.host]]);$('#clockStatus').textContent='检测完成';}catch(error){$('#clockStatus').textContent=error.message||String(error);}finally{button.disabled=false;}};
+$$('[data-run]').forEach(b=>b.onclick=run);
+async function run(){
+  if(current==='time-converter')withError(()=>{const r=core.timeDetails($('#tcInput').value,$('#tcTz').value);lastTime=r;renderGrid('#tcResult',[['所选时区',r.display,true],['ISO 8601',r.iso],['UTC',r.utc],['秒时间戳',r.seconds],['毫秒时间戳',r.milliseconds]]);$('#tcActions').hidden=false;});
+  else if(current==='date-world-clock')renderClocks();
+  else if(current==='unit-converter')withError(()=>{$('#ucResult').textContent=formatNumber(core.convertUnit($('#ucValue').value,$('#ucType').value,$('#ucFrom').value,$('#ucTo').value))+' '+$('#ucTo').value;});
+  else if(current==='calculation-paper'){
+    const input=$('#cpInput').value.trim();if(!input){toast('请输入表达式');return;}
+    const res=await api.runTask({toolId:'calculation-paper',input,options:{},execute:false});
+    $('#cpOutput').textContent=res.ok?res.result:'错误：'+res.error;
+  }
+}
+window.addEventListener('plugin-enter',e=>{const id=e.detail?.toolId;if(id)show(id);const text=e.detail?.action?.payload||e.detail?.action?.clipboardText||e.detail?.payload||e.detail?.clipboardText||'';if(text){const map={'time-converter':'#tcInput','date-world-clock':'#wcInput','unit-converter':'#ucValue','calculation-paper':'#cpInput'};const el=$(map[current]);if(el)el.value=text;}});
+run();
+</script>
+</body></html>

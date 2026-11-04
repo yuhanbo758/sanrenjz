@@ -1,0 +1,75 @@
+{
+  "pluginName": "文件批处理中心",
+  "description": "拖入文件或目录，预览并安全批量改名，计算与导出 SHA-256 校验清单。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-batch-renamer",
+      "explain": "批量改名",
+      "description": "拖入文件或目录，按规则筛选、预览并安全批量改名。",
+      "cmds": [
+        "批量重命名",
+        "文件改名",
+        "rename",
+        {
+          "type": "over",
+          "label": "用文件批处理中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-file-checksum",
+      "explain": "文件校验",
+      "description": "计算与比对文件 SHA-256，导出 CSV 校验清单。",
+      "cmds": [
+        "文件校验",
+        "checksum",
+        "sha256文件",
+        {
+          "type": "over",
+          "label": "用文件批处理中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

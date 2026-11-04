@@ -1,0 +1,48 @@
+{
+  "pluginName": "PDF 页面工作台",
+  "description": "拖入 PDF，按页码提取、排序、旋转、合并或逐页拆分。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-pdf-organizer",
+      "explain": "PDF编辑",
+      "description": "拖入 PDF，按页码提取、排序、旋转、合并或逐页拆分。",
+      "cmds": [
+        "pdf合并",
+        "pdf拆分",
+        "pdf旋转",
+        {
+          "type": "over",
+          "label": "用PDF 页面工作台处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

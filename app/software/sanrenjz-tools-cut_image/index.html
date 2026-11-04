@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片裁剪工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow: hidden;
+            user-select: none;
+        }
+        
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            background: #f8f9fa;
+        }
+        
+        .sidebar {
+            width: 280px;
+            background: #fff;
+            border-right: 1px solid #e9ecef;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f8f9fa;
+        }
+        
+        .toolbar {
+            min-height: 60px;
+            background: #fff;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            padding: 8px 20px;
+            gap: 8px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #f8f9fa;
+        }
+        
+        .upload-zone {
+            width: 400px;
+            height: 300px;
+            border: 3px dashed #6c757d;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+        
+        .upload-zone:hover {
+            border-color: #007bff;
+            background: #f8f9ff;
+        }
+        
+        .upload-zone.dragover {
+            border-color: #28a745;
+            background: #f8fff8;
+            transform: scale(1.02);
+        }
+
+        .canvas-area.dragover .upload-zone,
+        .canvas-area.dragover .canvas-container {
+            outline: 3px dashed #28a745;
+            outline-offset: -8px;
+        }
+
+        .image-info {
+            margin: 10px 0;
+            color: #495057;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            color: #6c757d;
+            margin-bottom: 15px;
+        }
+        
+        .upload-text {
+            font-size: 16px;
+            color: #6c757d;
+            text-align: center;
+            line-height: 1.5;
+        }
+        
+        .canvas-container {
+            margin: auto;
+            position: relative;
+            display: none;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* 禁用滚动条 */
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .canvas-container.active {
+            display: flex;
+        }
+        
+        #imageCanvas {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            cursor: crosshair;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* 保持图片比例并适应容器 */
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .btn.active {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+        
+        .btn.active:hover {
+            background: #218838;
+            border-color: #1e7e34;
+        }
+        
+        .section {
+            margin-bottom: 25px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #495057;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        
+        .size-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .size-btn {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        
+        .size-btn:hover {
+            border-color: #007bff;
+            background: #f8f9ff;
+        }
+        
+        .size-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .input-group input {
+            width: 100px;
+            padding: 6px 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .text-controls {
+            display: none;
+        }
+        
+        .text-controls.active {
+            display: block;
+        }
+        
+        .font-controls {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .font-size-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .font-size-btn {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        
+        .font-size-btn:hover {
+            background: #f8f9fa;
+            border-color: #007bff;
+        }
+        
+        .font-size-btn:active {
+            background: #e9ecef;
+        }
+        
+        select, input[type="color"] {
+            padding: 6px 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        /* 滑块样式优化 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: #dee2e6;
+            outline: none;
+            padding: 0;
+            margin: 8px 0;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        input[type="range"]::-webkit-slider-track {
+            height: 6px;
+            border-radius: 3px;
+            background: #dee2e6;
+        }
+        
+        input[type="range"]::-moz-range-track {
+            height: 6px;
+            border-radius: 3px;
+            background: #dee2e6;
+            border: none;
+        }
+        
+        .color-controls {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .color-controls label {
+            font-size: 12px;
+            color: #495057;
+            margin: 0;
+        }
+        
+        .color-controls input[type="color"] {
+            width: 50px;
+            height: 30px;
+            padding: 2px;
+        }
+        
+        .export-section {
+            border-top: 1px solid #e9ecef;
+            padding-top: 20px;
+        }
+        
+        .format-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .format-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        
+        .format-btn:hover {
+            border-color: #007bff;
+            background: #f8f9ff;
+        }
+        
+        .format-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .quality-control {
+            margin-bottom: 15px;
+        }
+        
+        .quality-control label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #495057;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .crop-overlay {
+            position: absolute;
+            border: 2px dashed #007bff;
+            background: rgba(0, 123, 255, 0.1);
+            cursor: move;
+            display: none;
+            z-index: 10;
+        }
+        
+        .crop-overlay.active {
+            display: block;
+        }
+        
+        .crop-handle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #007bff;
+            border: 1px solid #fff;
+            cursor: nw-resize;
+        }
+        
+        .crop-handle.nw { top: -4px; left: -4px; }
+        .crop-handle.ne { top: -4px; right: -4px; cursor: ne-resize; }
+        .crop-handle.sw { bottom: -4px; left: -4px; cursor: sw-resize; }
+        .crop-handle.se { bottom: -4px; right: -4px; cursor: se-resize; }
+        
+        .text-element {
+            position: absolute;
+            cursor: move;
+            border: 1px dashed transparent;
+            padding: 2px;
+            min-width: 20px;
+            min-height: 20px;
+        }
+        
+        .text-element.selected {
+            border-color: #007bff;
+        }
+        
+        .text-element:hover {
+            border-color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="section">
+                <div class="section-title">📐 裁剪尺寸</div>
+                <div class="size-grid">
+                    <div class="size-btn" data-ratio="1:1">1:1 正方形</div>
+                    <div class="size-btn" data-ratio="16:9">16:9 横屏</div>
+                    <div class="size-btn" data-ratio="9:16">9:16 竖屏</div>
+                    <div class="size-btn" data-ratio="4:3">4:3 传统</div>
+                    <div class="size-btn" data-ratio="3:4">3:4 竖封面</div>
+                    <div class="size-btn" data-ratio="21:9">21:9 超宽</div>
+                    <div class="size-btn" data-ratio="custom">自定义</div>
+                    <div class="size-btn" data-ratio="free">自由裁剪</div>
+                </div>
+                <div class="input-group">
+                    <input type="number" id="cropWidth" placeholder="宽度" min="1">
+                    <input type="number" id="cropHeight" placeholder="高度" min="1">
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">🎨 文字工具</div>
+                <button class="btn btn-success" id="addTextBtn" style="width: 100%; margin-bottom: 10px;">添加文字</button>
+                <div class="text-controls" id="textControls">
+                    <div class="font-controls">
+                        <select id="fontFamily">
+                            <option value="Microsoft YaHei">微软雅黑</option>
+                            <option value="SimSun">宋体</option>
+                            <option value="SimHei">黑体</option>
+                            <option value="KaiTi">楷体</option>
+                            <option value="Arial">Arial</option>
+                            <option value="Times New Roman">Times New Roman</option>
+                        </select>
+                        <div class="font-size-controls">
+                            <button class="font-size-btn" id="decreaseFontBtn">-</button>
+                            <input type="number" id="fontSize" value="24" min="8" max="200">
+                            <button class="font-size-btn" id="increaseFontBtn">+</button>
+                        </div>
+                        <div class="font-style-controls" style="display: flex; gap: 5px; margin-top: 8px; align-items: center;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="fontBold" style="margin-right: 4px;">
+                                <span style="font-size: 12px; font-weight: bold;">粗体</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="fontItalic" style="margin-right: 4px;">
+                                <span style="font-size: 12px; font-style: italic;">斜体</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="color-controls">
+                        <label>颜色:</label>
+                        <input type="color" id="textColor" value="#000000">
+                        <label>透明度:</label>
+                        <input type="range" id="textOpacity" min="0" max="100" value="100">
+                    </div>
+                    
+                    <!-- 艺术字效果控件 -->
+                    <div class="art-text-section" style="margin-bottom: 10px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #495057;">✨ 艺术字效果:</label>
+                        
+                        <!-- 描边效果 -->
+                        <div class="effect-control">
+                            <label style="display: flex; align-items: center; margin-bottom: 5px;">
+                                <input type="checkbox" id="strokeEnabled" style="margin-right: 5px;">
+                                <span style="font-size: 12px;">描边</span>
+                            </label>
+                            <div class="stroke-controls" style="display: none; padding-left: 20px; margin-bottom: 8px;">
+                                <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 3px;">
+                                    <input type="color" id="strokeColor" value="#ffffff" style="width: 30px; height: 20px;">
+                                    <input type="range" id="strokeWidth" min="1" max="10" value="2" style="flex: 1;">
+                                    <span id="strokeWidthValue" style="font-size: 10px; min-width: 20px;">2px</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 阴影效果 -->
+                        <div class="effect-control">
+                            <label style="display: flex; align-items: center; margin-bottom: 5px;">
+                                <input type="checkbox" id="shadowEnabled" style="margin-right: 5px;">
+                                <span style="font-size: 12px;">阴影</span>
+                            </label>
+                            <div class="shadow-controls" style="display: none; padding-left: 20px; margin-bottom: 8px;">
+                                <div style="display: flex; gap: 3px; align-items: center; margin-bottom: 3px;">
+                                    <input type="color" id="shadowColor" value="#000000" style="width: 25px; height: 18px;">
+                                    <div style="display: flex; flex-direction: column; flex: 1;">
+                                        <div style="display: flex; gap: 2px; align-items: center;">
+                                            <span style="font-size: 9px; min-width: 15px;">X:</span>
+                                            <input type="range" id="shadowX" min="-10" max="10" value="2" style="flex: 1;">
+                                            <span id="shadowXValue" style="font-size: 9px; min-width: 15px;">2</span>
+                                        </div>
+                                        <div style="display: flex; gap: 2px; align-items: center;">
+                                            <span style="font-size: 9px; min-width: 15px;">Y:</span>
+                                            <input type="range" id="shadowY" min="-10" max="10" value="2" style="flex: 1;">
+                                            <span id="shadowYValue" style="font-size: 9px; min-width: 15px;">2</span>
+                                        </div>
+                                        <div style="display: flex; gap: 2px; align-items: center;">
+                                            <span style="font-size: 9px; min-width: 15px;">模糊:</span>
+                                            <input type="range" id="shadowBlur" min="0" max="20" value="4" style="flex: 1;">
+                                            <span id="shadowBlurValue" style="font-size: 9px; min-width: 15px;">4</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 发光效果 -->
+                        <div class="effect-control">
+                            <label style="display: flex; align-items: center; margin-bottom: 5px;">
+                                <input type="checkbox" id="glowEnabled" style="margin-right: 5px;">
+                                <span style="font-size: 12px;">发光</span>
+                            </label>
+                            <div class="glow-controls" style="display: none; padding-left: 20px; margin-bottom: 8px;">
+                                <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 3px;">
+                                    <input type="color" id="glowColor" value="#00ffff" style="width: 30px; height: 20px;">
+                                    <input type="range" id="glowIntensity" min="1" max="20" value="10" style="flex: 1;">
+                                    <span id="glowIntensityValue" style="font-size: 10px; min-width: 20px;">10px</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 渐变效果 -->
+                        <div class="effect-control">
+                            <label style="display: flex; align-items: center; margin-bottom: 5px;">
+                                <input type="checkbox" id="gradientEnabled" style="margin-right: 5px;">
+                                <span style="font-size: 12px;">渐变</span>
+                            </label>
+                            <div class="gradient-controls" style="display: none; padding-left: 20px; margin-bottom: 8px;">
+                                <div style="display: flex; gap: 3px; align-items: center; margin-bottom: 3px;">
+                                    <input type="color" id="gradientColor1" value="#ff0000" style="width: 25px; height: 18px;">
+                                    <input type="color" id="gradientColor2" value="#0000ff" style="width: 25px; height: 18px;">
+                                    <select id="gradientDirection" style="flex: 1; font-size: 10px; padding: 2px;">
+                                        <option value="vertical">垂直</option>
+                                        <option value="horizontal">水平</option>
+                                        <option value="diagonal1">对角↗</option>
+                                        <option value="diagonal2">对角↘</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <textarea id="textContent" placeholder="输入文字内容（Ctrl+回车换行）" style="width: 100%; height: 60px; margin-bottom: 10px; resize: vertical; font-family: inherit; font-size: 14px; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px;"></textarea>
+                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                        <button class="btn btn-primary" id="saveTextStyleBtn" style="flex: 1;">保存样式</button>
+                        <button class="btn btn-danger" id="deleteTextBtn" style="flex: 1;">删除文字</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section export-section">
+                <div class="section-title">💾 导出设置</div>
+                <div class="format-group">
+                    <div class="format-btn active" data-format="png">PNG</div>
+                    <div class="format-btn" data-format="jpg">JPG</div>
+                    <div class="format-btn" data-format="webp">WebP</div>
+                </div>
+                
+                <div class="resolution-control" style="margin-top: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">🔍 输出分辨率:</label>
+                    <select id="resolutionScale" style="width: 100%; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: #fff;">
+                        <option value="1">1x (当前画布尺寸)</option>
+                        <option value="1.5">1.5x (150%)</option>
+                        <option value="2" selected>2x (200%)</option>
+                        <option value="3">3x (300%)</option>
+                        <option value="4">4x (400%)</option>
+                    </select>
+                    <small style="color: #6c757d; font-size: 12px; margin-top: 5px; display: block;">按当前画布尺寸缩放导出；放大不会增加原图细节</small>
+                </div>
+                <div class="image-info" id="imageInfo" aria-live="polite">尚未加载图片</div>
+                <div class="quality-control">
+                    <label for="quality">图片质量: <span id="qualityValue">90</span>%</label>
+                    <input type="range" id="quality" min="10" max="100" value="90" style="width: 100%;">
+                </div>
+                <button class="btn btn-success" id="downloadBtn" style="width: 100%;">下载图片</button>
+            </div>
+        </div>
+        
+        <div class="main-area">
+            <div class="toolbar">
+                <button class="btn" id="selectImageBtn">📁 选择图片</button>
+                <button class="btn" id="addBackgroundBtn">🖼️ 添加背景</button>
+                <button class="btn" id="undoBtn" disabled title="撤销 (Ctrl+Z)">↶ 撤销</button>
+                <button class="btn" id="redoBtn" disabled title="重做 (Ctrl+Y)">↷ 重做</button>
+                <button class="btn" id="rotateLeftBtn">↺ 左转</button>
+                <button class="btn" id="rotateRightBtn">↻ 右转</button>
+                <button class="btn" id="flipHorizontalBtn">↔ 水平翻转</button>
+                <button class="btn" id="flipVerticalBtn">↕ 垂直翻转</button>
+                <button class="btn" id="resetBtn">重置</button>
+                <button class="btn btn-danger" id="deleteBtn">🗑️ 删除</button>
+                <button class="btn btn-warning" id="cropBtn">✂️ 裁剪</button>
+            </div>
+            
+            <div class="canvas-area">
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📷</div>
+                    <div class="upload-text">
+                        拖拽图片到窗口任意位置<br>
+                        或点击选择、按 Ctrl+V 粘贴图片<br>
+                        <small>支持 JPG、PNG、WebP、GIF、BMP</small>
+                    </div>
+                </div>
+                
+                <div class="canvas-container" id="canvasContainer">
+                    <canvas id="imageCanvas"></canvas>
+                    <div class="crop-overlay" id="cropOverlay">
+                        <div class="crop-handle nw"></div>
+                        <div class="crop-handle ne"></div>
+                        <div class="crop-handle sw"></div>
+                        <div class="crop-handle se"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+    <input type="file" id="backgroundInput" accept="image/*" style="display: none;">
+    
+    <script src="script.js"></script>
+</body>
+</html>

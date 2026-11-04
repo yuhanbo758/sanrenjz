@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="page-stack">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDF 页面工作台</title>
+<style>
+:root{
+  --accent:#b42318;--accent-2:#e0382e;--accent-soft:rgba(180,35,24,.1);--accent-line:rgba(180,35,24,.3);
+  --bg:#fdf6f5;--surface:#fff;--surface-2:#fbeae9;--border:#f0d4d2;
+  --ink:#2d1410;--muted:#7a5a56;--faint:#a8908a;
+  --ok:#16a34a;--err:#dc2626;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.spacer{flex:1}
+.body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(310px,340px) minmax(0,1fr);gap:0}
+.side{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.side-h{padding:16px 20px;border-bottom:1px solid var(--border);flex:none}
+.side-h h2{margin:0 0 4px;font-size:15px;font-weight:700}
+.drop{margin:16px 20px;padding:18px 12px;border:2px dashed var(--border);border-radius:14px;text-align:center;cursor:pointer;transition:.15s;color:var(--faint);flex:none}
+.drop:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.drop.dragging,.body.dragging .drop{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.drop svg{width:40px;height:40px;margin-bottom:8px}
+.drop .d2{font-size:12px}
+.opts{padding:0 20px;flex:1;min-height:0;overflow:auto}
+.opt{margin-bottom:16px}
+.opt label{display:block;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.sel{width:100%;background:var(--surface-2);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer;outline:none}
+.sel:focus{border-color:var(--accent-line)}
+.rot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mode-btn{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:9px 5px;color:var(--muted);cursor:pointer}
+.mode-btn.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
+.hint{font-size:11px;color:var(--muted);margin:7px 0 0}
+.rot-btn{border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:8px;padding:10px 4px;cursor:pointer;font-size:12px;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.rot-btn svg{width:20px;height:20px}
+.rot-btn:hover{border-color:var(--accent-line);color:var(--accent)}
+.rot-btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:700}
+.actions{padding:16px 20px;margin-top:auto;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px;flex:none}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:hover{border-color:var(--accent-line)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.main{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.main-h{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex:none;background:var(--surface)}
+.stat{display:flex;align-items:center;gap:6px;font:600 13px var(--mono);color:var(--muted)}
+.stat .n{font-size:20px;color:var(--accent)}
+.file-list{flex:1;overflow:auto;padding:16px 24px}
+.pdf-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;transition:.15s}
+.pdf-card:hover{border-color:var(--accent-line);box-shadow:0 4px 12px rgba(180,35,24,.08)}
+.pdf-thumb{width:40px;height:52px;border-radius:5px;background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex:none;position:relative}
+.pdf-thumb svg{width:20px;height:20px;color:var(--accent)}
+.pdf-thumb .ord{position:absolute;top:-6px;left:-6px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.pdf-info{flex:1;min-width:0}
+.pdf-info .nm{font-weight:600;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdf-info .meta{font:12px var(--mono);color:var(--muted);margin-top:3px}
+.pdf-config{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+.pdf-config input{min-width:130px;max-width:210px;flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;color:var(--ink)}
+.pdf-config label{font-size:12px;color:var(--muted);white-space:nowrap}
+.pdf-config input[type=checkbox]{min-width:0;flex:none;margin-right:2px}
+.pdf-actions{display:flex;gap:6px;flex:none}
+.mini{border:0;background:var(--surface-2);color:var(--muted);border-radius:6px;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s}
+.mini:hover{background:var(--accent-soft);color:var(--accent)}
+.mini svg{width:14px;height:14px}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--faint);gap:12px}
+.empty svg{width:56px;height:56px;opacity:.35}
+.bar{flex:none;padding:10px 24px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);display:flex;align-items:center;gap:8px;background:var(--surface)}
+.bar .d{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.bar.ok .d{background:var(--ok)}.bar.err .d{background:var(--err)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2d1410;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:950px){.body{grid-template-columns:310px minmax(0,1fr)}.pdf-card{align-items:flex-start}.pdf-actions{flex-direction:column}}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#e0c4c0;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="body">
+    <aside class="side">
+      <div class="side-h"><h2>处理设置</h2></div>
+      <div class="drop" id="dropZone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7M12 13v4M10 15l2-2 2 2"/></svg>
+        <div style="font-weight:600;font-size:14px;color:var(--ink)">点击选择或拖入 PDF 文件</div>
+        <div class="d2">可一次添加多个文件，也可继续追加</div>
+      </div>
+      <div class="opts">
+        <div class="opt"><label>输出方式</label><div class="mode-grid"><button class="mode-btn active" data-mode="merge">合并／提取</button><button class="mode-btn" data-mode="split">逐页拆分</button></div><p class="hint">每个文件可单独指定页码；留空表示全部。</p></div>
+        <div class="opt"><label>页面旋转</label>
+          <div class="rot-grid">
+            <button class="rot-btn active" data-rot="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>0°</button>
+            <button class="rot-btn" data-rot="90"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg>90°</button>
+            <button class="rot-btn" data-rot="180"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v6M9 6l3-3 3 3M3 12a9 9 0 0 0 9 9"/></svg>180°</button>
+            <button class="rot-btn" data-rot="270"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v5h5"/></svg>270°</button>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="previewBtn" disabled>预览输出</button>
+        <button class="btn primary" id="saveBtn" disabled>处理并保存</button>
+      </div>
+    </aside>
+    <section class="main">
+      <div class="main-h">
+        <div class="stat"><span class="n" id="fileCount">0</span><span>个文件</span></div>
+        <div class="stat"><span class="n" id="pageCount">-</span><span>页</span></div>
+        <div class="spacer"></div>
+        <button class="btn" id="addBtn">＋ 添加</button><button class="btn" id="clearBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>清空</button>
+      </div>
+      <div class="file-list" id="fileList">
+        <div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span>点击左侧或拖入 PDF 文件</span></div>
+      </div>
+      <div class="bar" id="bar"><span class="d"></span><span>等待选择文件</span></div>
+    </section>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="renderer.js"></script>
+</body></html>

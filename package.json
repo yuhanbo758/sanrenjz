@@ -1,0 +1,302 @@
+{
+  "name": "sanrenjz",
+  "version": "0.1.6",
+  "description": "三人聚智：效率工具与 Python 程序管理",
+  "main": "main.js",
+  "scripts": {
+    "start": "node scripts/start-app.cjs",
+    "dev": "node scripts/start-app.cjs --inspect=9229",
+    "build": "node scripts/package-local.js",
+    "build-win": "node scripts/package-local.js --win",
+    "build-mac": "node scripts/package-local.js --mac",
+    "build-linux": "node scripts/package-local.js --linux",
+    "release-win": "node scripts/package-local.js --win",
+    "dist": "npm run build-win",
+    "test": "npm run test:merge",
+    "test:logic": "node tests/logic.test.js && node tests/plugin-store.test.js && node tests/plugin-window-ready.test.js && node tests/commander-router.test.js && node tests/commander-jev.test.js && node tests/plugin-market.test.js && node tests/ai-runtime.test.js && node tests/ai-provider-manager.test.js && node tests/opencode-runtime.test.js && node tests/opencode-profile.test.js && node tests/opencode-lifecycle.test.js",
+    "generate:plugins": "electron scripts/render-plugin-icons.js",
+    "generate:icons": "electron scripts/render-plugin-icons.js",
+    "test:plugins": "node scripts/validate-plugins.js && node tests/main-runtime-paths.test.js && node tests/plugin-store.test.js && node tests/plugin-window-ready.test.js && node tests/commander-router.test.js && node tests/commander-jev.test.js && node tests/plugin-market.test.js && node tests/ai-runtime.test.js && node tests/ai-provider-manager.test.js && node tests/opencode-runtime.test.js && node tests/opencode-profile.test.js && node tests/opencode-lifecycle.test.js && node tests/ai-document.test.js && node tests/ai-meeting.test.js",
+    "test:plugins:electron": "electron tests/electron-plugin-smoke.js && electron tests/password-manager-electron.test.js && electron tests/account-manager-electron.test.js && electron tests/ai-document-electron.test.js && electron tests/ai-meeting-electron.test.js",
+    "test:password-plugin": "electron tests/password-manager-electron.test.js",
+    "test:account-plugin": "electron tests/account-manager-electron.test.js",
+    "test:hooks": "node tests/windows-hook-runtime.test.js",
+    "test:plugin-management": "node tests/plugin-management.test.js && node tests/plugin-autostart.test.js && node tests/plugin-autostart.test.js --default-userdata && electron tests/plugin-management-electron.test.js",
+    "test:plugins:gallery": "electron tests/electron-plugin-gallery.js",
+    "test:plugins:icons": "electron tests/electron-icon-gallery.js",
+    "preinstall": "echo \"检查Node.js环境...\"",
+    "postinstall": "electron-builder install-app-deps && echo \"依赖安装完成，可以运行 npm start 启动应用\"",
+    "test:remote": "node tests/remote-protocol.test.js && node tests/remote-chat.test.js && electron tests/remote-without-cast.test.js",
+    "build:personal": "node scripts/package-local.js --personal",
+    "audit:public": "node scripts/audit-public-scope.js",
+    "audit:privacy": "python scripts/check-privacy.py --git",
+    "test:merge": "node --test tests/merged-*.test.js tests/python-manager*.test.js tests/python-environment*.test.js tests/migration*.test.js tests/package-scope*.test.js",
+    "test:hotkeys": "node --test tests/hotkey-controller.test.js tests/hotkey-restart.test.js",
+    "test:console": "node --test tests/console-encoding.test.js"
+  },
+  "author": {
+    "name": "三人聚智"
+  },
+  "license": "MIT",
+  "keywords": [
+    "electron",
+    "plugins",
+    "utools",
+    "efficiency",
+    "javascript"
+  ],
+  "dependencies": {
+    "@electron/remote": "^2.1.2",
+    "axios": "^1.6.5",
+    "better-sqlite3": "^9.4.5",
+    "electron-updater": "^6.8.3",
+    "fflate": "^0.8.3",
+    "iconv-lite": "^0.7.3",
+    "jsqr": "^1.4.0",
+    "mammoth": "^1.12.3",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^2.16.105",
+    "qrcode": "^1.5.4",
+    "read-excel-file": "6.0.3",
+    "selfsigned": "2.4.1",
+    "word-extractor": "^1.0.4",
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "electron": "^25.9.8",
+    "electron-builder": "23.6.0",
+    "rimraf": "^5.0.5"
+  },
+  "build": {
+    "appId": "com.sanrenjz.app",
+    "productName": "三人聚智",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": true,
+    "compression": "maximum",
+    "files": [
+      "main.js",
+      "index.html",
+      "search-window.html",
+      "super-panel.html",
+      "screenshot-overlay.html",
+      "merged-ui.js",
+      "merged-ui.css",
+      "assets/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!**/AGENTS.md",
+      "!**/PROJECT_MEMORY.md"
+    ],
+    "asarUnpack": [
+      "node_modules/@electron/remote/**/*",
+      "node_modules/electron-updater/**/*",
+      "node_modules/builder-util-runtime/**/*",
+      "node_modules/fs-extra/**/*",
+      "node_modules/jsonfile/**/*",
+      "node_modules/graceful-fs/**/*",
+      "node_modules/universalify/**/*",
+      "node_modules/lazy-val/**/*",
+      "node_modules/js-yaml/**/*",
+      "node_modules/lodash.escaperegexp/**/*",
+      "node_modules/lodash.isequal/**/*",
+      "node_modules/tiny-typed-emitter/**/*",
+      "node_modules/debug/**/*",
+      "node_modules/ms/**/*",
+      "node_modules/pdf-parse/**/*",
+      "node_modules/pdfjs-dist/**/*",
+      "node_modules/node-ensure/**/*",
+      "node_modules/sax/**/*",
+      "node_modules/semver/**/*",
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/bindings/**/*",
+      "node_modules/file-uri-to-path/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "app",
+        "to": "app",
+        "filter": [
+          "*.js",
+          "*.py",
+          "plugin_runtime/**/*",
+          "remote/**/*",
+          "python-support/**/*",
+          "software/obsidian-surfing/**/*",
+          "software/sanrenjz-tools-account-manager/**/*",
+          "software/sanrenjz-tools-ai-code-review/**/*",
+          "software/sanrenjz-tools-ai-document/**/*",
+          "software/sanrenjz-tools-ai-git/**/*",
+          "software/sanrenjz-tools-ai-image/**/*",
+          "software/sanrenjz-tools-ai-learning/**/*",
+          "software/sanrenjz-tools-ai-meeting/**/*",
+          "software/sanrenjz-tools-ai-prompt/**/*",
+          "software/sanrenjz-tools-ai-regex/**/*",
+          "software/sanrenjz-tools-ai-sql/**/*",
+          "software/sanrenjz-tools-ai-writing/**/*",
+          "software/sanrenjz-tools-ai_screen_trans/**/*",
+          "software/sanrenjz-tools-archive-studio/**/*",
+          "software/sanrenjz-tools-code-security/**/*",
+          "software/sanrenjz-tools-csv-data/**/*",
+          "software/sanrenjz-tools-cut_image/**/*",
+          "software/sanrenjz-tools-download_plugin/**/*",
+          "software/sanrenjz-tools-file-batch/**/*",
+          "software/sanrenjz-tools-file-inspector/**/*",
+          "software/sanrenjz-tools-focus-worklog/**/*",
+          "software/sanrenjz-tools-hosts-center/**/*",
+          "software/sanrenjz-tools-image-creator/**/*",
+          "software/sanrenjz-tools-image-optimizer/**/*",
+          "software/sanrenjz-tools-image-pinboard/**/*",
+          "software/sanrenjz-tools-lan-transfer/**/*",
+          "software/sanrenjz-tools-launch-center/**/*",
+          "software/sanrenjz-tools-notes-center/**/*",
+          "software/sanrenjz-tools-password/**/*",
+          "software/sanrenjz-tools-pdf-studio/**/*",
+          "software/sanrenjz-tools-qr-barcode/**/*",
+          "software/sanrenjz-tools-speech_input/**/*",
+          "software/sanrenjz-tools-structured-data/**/*",
+          "software/sanrenjz-tools-task-habit/**/*",
+          "software/sanrenjz-tools-text/**/*",
+          "software/sanrenjz-tools-text-engineering/**/*",
+          "software/sanrenjz-tools-time-calculation/**/*",
+          "software/sanrenjz-tools-visual-design/**/*",
+          "software/sanrenjz.tools-ai/**/*",
+          "software/sanrenjz.tools-multi_wechat/**/*",
+          "python-software/cos_downloader/**/*",
+          "python-software/file_downloader/**/*",
+          "python-software/github_downloader/**/*",
+          "python-software/terminal/**/*"
+        ]
+      },
+      {
+        "from": "build",
+        "to": "build",
+        "filter": [
+          "icon.ico",
+          "icon.icns",
+          "icon.png"
+        ]
+      },
+      {
+        "from": "config",
+        "to": "config",
+        "filter": [
+          "python-runtime.json",
+          "public-plugins.json"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "sanrenjz-${version}-win-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "allowElevation": false,
+      "include": "build/installer.nsh",
+      "shortcutName": "三人聚智",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
+      "language": "2052",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "artifactName": "sanrenjz-${version}-${arch}.${ext}",
+      "perMachine": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "icon": "build/icon.icns",
+      "artifactName": "sanrenjz-${version}-mac-${arch}.${ext}",
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "用于连接您配置的局域网服务，执行您主动选择的插件功能。"
+      }
+    },
+    "dmg": {
+      "title": "三人聚智",
+      "icon": "build/icon.icns",
+      "background": "build/dmg-background.png",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "artifactName": "sanrenjz-${version}-linux-${arch}.${ext}",
+      "desktop": {
+        "Name": "三人聚智",
+        "Comment": "效率工具与 Python 程序管理",
+        "Categories": "Utility;Development;"
+      }
+    },
+    "publish": [],
+    "generateUpdatesFilesForAllChannels": false
+  },
+  "homepage": "https://sanrenjz.com"
+}

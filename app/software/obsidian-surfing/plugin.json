@@ -1,0 +1,31 @@
+{
+  "pluginName": "网页浏览",
+  "description": "独立网页浏览，支持书签、访问记录、页内查找和缩放",
+  "version": "1.1.1",
+  "author": "余汉波",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "main-feature",
+      "explain": "网页浏览",
+      "description": "浏览网页并管理书签、访问记录和页面工具",
+      "cmds": ["网页浏览", "浏览器", "surfing"],
+      "icon": "logo.ico",
+      "platform": ["win32", "darwin", "linux"],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 10
+    }
+  ],
+  "pluginSetting": {
+    "width": 1000,
+    "height": 680,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="study-deck">
+<head data-business>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 学习卡片</title>
+<style>
+:root{--a:#16a34a;--a2:#22c55e;--as:rgba(22,163,74,.1);--al:rgba(22,163,74,.3);--bg:#f3faf4;--sf:#fff;--s2:#e8f5ec;--bd:#cde9d3;--ink:#0f2e16;--mt:#5a7560;--ft:#9ab0a0;--ok:#16a34a;--err:#dc2626;--warn:#d97706;--info:#2563eb;--mono:'JetBrains Mono',Consolas,monospace;--sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif}
+*{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.head{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none}
+.icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--a),var(--a2));display:flex;align-items:center;justify-content:center;flex:none}.icon svg{width:18px;height:18px;color:#fff}
+.head h1{margin:0;font-size:17px;font-weight:700}.head p{margin:0;color:var(--mt);font-size:12px}
+.spacer{flex:1}.gear{border:1px solid var(--bd);background:var(--sf);color:var(--a);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}.gear svg{width:14px;height:14px}
+.modes{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none;max-height:112px;overflow:auto}
+.mode{border:1px solid var(--bd);background:var(--sf);color:var(--mt);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:.12s;display:flex;align-items:center;gap:6px}.mode svg{width:14px;height:14px}
+.mode:hover{border-color:var(--al);color:var(--a)}.mode.active{background:var(--a);color:#fff;border-color:transparent}
+.body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 24px;overflow:hidden}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.card-h{padding:10px 16px;border-bottom:1px solid var(--bd);font:600 12px var(--sans);color:var(--mt);flex:none;display:flex;justify-content:space-between;align-items:center}
+.card-h .cnt{font:11px var(--mono);color:var(--ft)}
+.input-area{flex:1;border:0;outline:0;resize:none;padding:14px;font:14px/1.7 var(--sans);background:var(--sf);min-height:0}.input-area::placeholder{color:var(--ft)}
+.result-area{flex:1;overflow:auto;padding:14px}
+.result-area.empty{display:flex;align-items:center;justify-content:center;color:var(--ft);font-style:italic}
+.body.dragging .card:first-child{border:2px dashed var(--a);background:var(--s2)}
+.result-area .prose{white-space:pre-wrap;line-height:1.8;overflow-wrap:anywhere}.result-area .prose p{margin:0 0 12px}.result-area .prose h3{margin:14px 0 6px}
+.result-area .prose ul{margin:4px 0 16px;padding-left:22px}.result-area .prose li{margin:5px 0}
+.flashcard .fc-a{white-space:pre-wrap}.flashcard .fc-q{white-space:pre-wrap}.quiz-feedback{margin-top:8px;color:var(--mt);white-space:pre-wrap}.quiz-opt.wrong{border-color:var(--err);color:var(--err)}
+.history-list{display:grid;gap:8px}.history-item{border:1px solid var(--bd);border-radius:8px;padding:10px}.history-item strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.history-item small{color:var(--mt)}.history-actions{display:flex;gap:6px;margin-top:8px}.history-actions button{padding:4px 8px}
+.review-card{border:1px solid var(--bd);border-radius:10px;padding:16px;background:var(--s2);margin-top:14px;white-space:pre-wrap}.review-card strong{display:block;margin-bottom:10px}.review-answer{margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)}.review-actions{display:flex;gap:8px;margin-top:12px}.review-actions .btn{flex:1;justify-content:center}.review-count{color:var(--mt);font-size:12px}
+.flashcard{background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:.15s}
+.flashcard:hover{border-color:var(--al);box-shadow:0 2px 8px rgba(22,163,74,.1)}
+.flashcard .fc-q{font-weight:700;font-size:14px;color:var(--ink);margin-bottom:6px}
+.flashcard .fc-a{font-size:13px;color:var(--mt);display:none}
+.flashcard.flipped .fc-a{display:block}
+.flashcard .fc-tag{font:10px var(--mono);color:var(--a);background:var(--as);padding:2px 8px;border-radius:999px;display:inline-block;margin-top:6px}
+.quiz-item{background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px}
+.quiz-item .qq{font-weight:700;font-size:14px;margin-bottom:8px}
+.quiz-opt{display:block;padding:8px 12px;margin-bottom:4px;border:1px solid var(--bd);border-radius:6px;cursor:pointer;transition:.12s;font-size:13px}
+.quiz-opt:hover{border-color:var(--al);background:var(--sf)}
+.quiz-opt.correct{background:var(--as);border-color:var(--a);color:var(--a);font-weight:600}
+.glossary-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--s2)}
+.glossary-item .gt{font-weight:700;color:var(--a);min-width:120px;flex:none}
+.glossary-item .gd{font-size:13px;color:var(--ink);line-height:1.6}
+.act-bar{padding:12px 24px;border-top:1px solid var(--bd);background:var(--sf);display:flex;gap:10px;align-items:center;flex:none}
+.btn{border:1px solid var(--bd);background:var(--sf);color:var(--ink);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;transition:.12s;display:inline-flex;align-items:center;gap:6px}.btn:hover{border-color:var(--al)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border-color:transparent}.btn.primary:hover{filter:brightness(1.08)}.btn:disabled{opacity:.5}
+.stat{font:12px var(--mono);color:var(--mt)}
+.drawer{position:fixed;top:32px;right:0;bottom:0;width:min(420px,92vw);background:var(--sf);box-shadow:-12px 0 40px rgba(0,0,0,.1);z-index:50;transform:translateX(100%);transition:.25s;overflow:auto;padding:24px}.drawer.open{transform:translateX(0)}.drawer h2{margin:0 0 16px;font-size:16px}.drawer .close{position:absolute;top:16px;right:16px;border:0;background:transparent;font-size:20px;color:var(--ft);cursor:pointer}
+.field{margin-bottom:16px}.field label{display:block;font-size:12px;color:var(--mt);font-weight:600;margin-bottom:6px}.field input{width:100%;border:1px solid var(--bd);border-radius:8px;padding:9px 12px;font:14px var(--sans);outline:none;background:var(--s2);color:var(--ink)}.field input:focus{border-color:var(--al)}
+.overlay{position:fixed;inset:32px 0 0 0;background:rgba(0,0,0,.3);z-index:40;display:none}.overlay.show{display:block}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#0f2e16;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#bcd8c4;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="head">
+    <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+    <div><h1>AI 学习卡片</h1><p>从文本或文档生成知识点、问答、术语表、测试题和 Anki CSV</p></div>
+    <div class="spacer"></div>
+    <button class="gear" onclick="toggleDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 1-.1 1.2l2 1.5-2 3.4-2.3-1a7 7 0 0 1-2 1.2l-.4 2.5H9l-.4-2.5a7 7 0 0 1-2-1.2l-2.3 1-2-3.4 2-1.5A7 7 0 0 1 4 12a7 7 0 0 1 .1-1.2l-2-1.5 2-3.4 2.3 1a7 7 0 0 1 2-1.2L9 1h4l.4 2.5a7 7 0 0 1 2 1.2l2.3-1 2 3.4-2 1.5A7 7 0 0 1 19 12z"/></svg>供应商设置</button>
+  </div>
+  <div class="modes">
+    <button class="mode active" data-mode="卡片"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>知识卡片</button>
+    <button class="mode" data-mode="测试题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>测试题</button>
+    <button class="mode" data-mode="术语表"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>术语表</button>
+    <button class="mode" data-mode="Anki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>Anki CSV</button>
+    <button class="mode" data-mode="填空">填空卡</button>
+    <button class="mode" data-mode="总结">重点总结</button>
+    <button class="mode" data-mode="复习">复习清单</button>
+    <button class="mode" id="reviewBtn">今日复习</button>
+    <button class="mode" id="historyBtn">历史记录</button>
+  </div>
+  <div class="body">
+    <div class="card"><div class="card-h">学习材料 <span><button class="btn" style="padding:4px 10px;font-size:11px" onclick="loadDocument()">导入文档</button> <span class="cnt" id="inCnt">0 字</span></span></div><textarea class="input-area" id="input" placeholder="粘贴文本，或拖入 TXT、Markdown、PDF 文档；新内容会追加到现有材料…"></textarea></div>
+    <div class="card"><div class="card-h">生成结果 <span class="cnt" id="resStat">等待</span></div><div class="result-area empty" id="result">结果将显示在这里</div></div>
+  </div>
+  <div class="act-bar">
+    <button class="btn primary" id="genBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span id="genLabel">生成卡片</span></button>
+    <button class="btn" id="stopBtn" disabled>取消</button>
+    <button class="btn" id="copyBtn">复制</button>
+    <button class="btn" id="exportBtn">导出</button>
+  </div>
+</main>
+<div class="overlay" id="overlay" onclick="toggleDrawer()"></div>
+<aside class="drawer" id="drawer"><button class="close" onclick="toggleDrawer()">×</button><h2>统一供应商配置</h2>
+  <div class="field"><label>服务名称</label><input id="pName" value="OpenAI 兼容服务"></div>
+  <div class="field"><label>Base URL</label><input id="pUrl" value="https://api.openai.com/v1"></div>
+  <div class="field"><label>模型 ID</label><input id="pModel" value="gpt-4o-mini"></div>
+  <div class="field"><label>API Key</label><input id="pKey" type="password" placeholder="仅保存到系统安全存储"></div>
+  <button class="btn primary" style="width:100%;justify-content:center" onclick="saveProvider()">保存并共享</button>
+</aside>
+<div class="overlay" id="historyOverlay"></div>
+<aside class="drawer" id="historyDrawer"><button class="close" id="closeHistory">×</button><h2>处理历史</h2><p style="color:var(--mt)">生成成功后保存在本插件缓存中，最多 50 条。</p><button class="btn" id="clearHistory">清空历史</button><div class="history-list" id="historyList"></div></aside>
+<div class="overlay" id="reviewOverlay"></div>
+<aside class="drawer" id="reviewDrawer"><button class="close" id="closeReview">×</button><h2>今日复习</h2><p class="review-count" id="reviewCount"></p><div id="reviewContent"></div></aside>
+<div class="toast" id="toast"></div>
+<script src="../../plugin_runtime/ai-provider-manager.js"></script>
+<script src="learning.js"></script>
+
+</body></html>

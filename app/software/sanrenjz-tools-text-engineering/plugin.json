@@ -1,0 +1,130 @@
+{
+  "pluginName": "文本工程实验室",
+  "description": "支持文本文件拖入、正则匹配与替换、对齐差异、行处理和安全编码转换。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-regex-lab",
+      "explain": "正则替换",
+      "description": "正则、差异、行处理与文件编码集中调试。",
+      "cmds": [
+        "正则",
+        "regex",
+        "正则替换",
+        {
+          "type": "over",
+          "label": "用文本工程实验室处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-text-diff",
+      "explain": "文本对比",
+      "description": "正则、差异、行处理与文件编码集中调试。",
+      "cmds": [
+        "文本对比",
+        "diff",
+        "代码对比",
+        {
+          "type": "over",
+          "label": "用文本工程实验室处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-line-processor",
+      "explain": "文本处理",
+      "description": "正则、差异、行处理与文件编码集中调试。",
+      "cmds": [
+        "行处理",
+        "文本去重",
+        "文本排序",
+        {
+          "type": "over",
+          "label": "用文本工程实验室处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-text-encoding",
+      "explain": "文本编码",
+      "description": "正则、差异、行处理与文件编码集中调试。",
+      "cmds": [
+        "编码转换",
+        "gbk",
+        "utf8",
+        "换行符",
+        {
+          "type": "over",
+          "label": "用文本工程实验室处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "pluginName": "图片优化器",
+  "description": "多图批量转换、压缩、缩放和方向调整，支持 PNG、JPEG、WebP、BMP、ICO 输出。",
+  "version": "2.2.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-image-compressor",
+      "explain": "图片压缩",
+      "description": "多图批量压缩与导出，组合设置 JPEG/WebP 质量、尺寸和方向。",
+      "cmds": [
+        "图片压缩",
+        "压缩图片",
+        "image compress",
+        {
+          "type": "over",
+          "label": "用图片优化器处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-image-converter",
+      "explain": "格式转换",
+      "description": "将多张图片转换为 PNG、JPEG、WebP、BMP 或 ICO，可同时缩放。",
+      "cmds": [
+        "图片转换",
+        "webp",
+        "png转jpg",
+        {
+          "type": "over",
+          "label": "用图片优化器处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-image-resizer",
+      "explain": "图片缩放",
+      "description": "按比例、百分比或最长边缩放多张图片，并可旋转和翻转。",
+      "cmds": [
+        "图片尺寸",
+        "缩放图片",
+        "resize",
+        {
+          "type": "over",
+          "label": "用图片优化器处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

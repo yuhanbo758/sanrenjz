@@ -1,0 +1,75 @@
+{
+  "pluginName": "专注与工时",
+  "description": "任务规划、番茄专注与工时记录。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-pomodoro-focus",
+      "explain": "专注计时",
+      "description": "选择任务开始番茄专注，完成后自动记录工时。",
+      "cmds": [
+        "番茄钟",
+        "专注",
+        "pomodoro",
+        {
+          "type": "over",
+          "label": "用专注与工时处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-worklog",
+      "explain": "工时记录",
+      "description": "按任务查看和导出专注工时记录。",
+      "cmds": [
+        "工时",
+        "工作日志",
+        "周报",
+        {
+          "type": "over",
+          "label": "用专注与工时处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

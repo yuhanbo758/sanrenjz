@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "file": "docs/验收报告.md",
+      "rule": "TWL-001",
+      "lineSha256": "c18f3f17b5894f8d8f81d98a7d960e5269b9f5a47ddb8d8b5862f8455304b007",
+      "reason": "公开构建文件的SHA256校验值恰好匹配Twilio SID格式"
+    },
+    {
+      "file": "scripts/privacy/scan_secrets.py",
+      "rule": "PKI-002",
+      "lineSha256": "d242e928d47d7b8b0df225348dd1b8952cf3d509ef33b58667b7f3c12aa16063",
+      "reason": "扫描器自身规则定义，仅匹配凭据格式，不包含凭据值"
+    },
+    {
+      "file": "scripts/privacy/scan_secrets.py",
+      "rule": "CRED-001",
+      "lineSha256": "50b0aa3ddbd7771668ed885c167bf42dd77a81f6bae17213079e8823e842ad12",
+      "reason": "扫描器自身规则定义，仅匹配凭据格式，不包含凭据值"
+    },
+    {
+      "file": "tests/ai-meeting.test.js",
+      "rule": "KEY-002",
+      "lineSha256": "ea895328397123bca8a213b01b311b956e38e24a9e491ea78aaa844d09539785",
+      "reason": "测试中的公开模拟令牌"
+    },
+    {
+      "file": "tests/merged-host.test.js",
+      "rule": "KEY-002",
+      "lineSha256": "54f1b97a356a3f2d8032a772651fa7789829480a9b8858ed72c021b3757cc395",
+      "reason": "隔离配置字段保护的测试数据"
+    },
+    {
+      "file": "tests/merged-run-log-store.test.js",
+      "rule": "CRED-002",
+      "lineSha256": "88f534459318ac9fa04610dd838143182a3ef9a49c9aed059a3908fb03de8f3f",
+      "reason": "日志脱敏测试使用的模拟认证字符串"
+    },
+    {
+      "file": "tests/migration-manager.test.js",
+      "rule": "KEY-002",
+      "lineSha256": "367fb4bd2ddbf537efac474f78078d7e9cc21cfbbfe95714a5e0e608a4968504",
+      "reason": "迁移不复制认证配置的模拟数据"
+    },
+    {
+      "file": "tests/package-scope.test.js",
+      "rule": "KEY-002",
+      "lineSha256": "22dbee64810ac5b461d73925576449b07edf889901f21def2811b412013e60d7",
+      "reason": "验证打包排除秘密文件的模拟内容"
+    },
+    {
+      "file": "tests/plugin-management.test.js",
+      "rule": "KEY-002",
+      "lineSha256": "06ee0e7e1726706f59ec03edf9b864f0a869f2a44162b0bb43fac742ce55f435",
+      "reason": "验证配置字段保留的模拟数据"
+    },
+    {
+      "file": "tests/remote-without-cast.test.js",
+      "rule": "KEY-002",
+      "lineSha256": "b9fadb0b40a8c0a9cb2f4a83d9f5ec0648014871c3724f3eee5a766ad2b20ec8",
+      "reason": "本地认证错误路径的模拟令牌"
+    },
+    {
+      "file": "tests/remote-without-cast.test.js",
+      "rule": "KEY-002",
+      "lineSha256": "f771e8ecebdcfa20d7a603f71b9f40a90b9d8e0161f848eafb0f607a232afb6c",
+      "reason": "本地认证错误路径的模拟令牌"
+    },
+    {
+      "file": "app/software/sanrenjz-tools-ai_screen_trans/index.html",
+      "rule": "QUOTED-CREDENTIAL",
+      "lineSha256": "97ea00f329cbaa206d030164245c5939d71d016701c6abb2510631b4504cb6c1",
+      "reason": "动态请求头仅使用固定认证前缀并拼接用户设置中的API密钥，没有默认凭据"
+    },
+    {
+      "file": "tests/merged-run-log-store.test.js",
+      "rule": "QUOTED-CREDENTIAL",
+      "lineSha256": "88f534459318ac9fa04610dd838143182a3ef9a49c9aed059a3908fb03de8f3f",
+      "reason": "模拟敏感字段以验证日志脱敏，不是真实凭据"
+    },
+    {
+      "file": "tests/opencode-profile.test.js",
+      "rule": "QUOTED-CREDENTIAL",
+      "lineSha256": "eccce0e0b55cbc6b8d5f683a265a360a8733c7da40615be17afa64b8b4b9b860",
+      "reason": "临时合成配置中的明显示例值，用于验证用户字段保留"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "pluginName": "余汉波AI助手",
+  "description": "工具优先的智能总指挥，自动检索本地插件，必要时再调用 AI",
+  "version": "1.8.3",
+  "updateDate": "2026-09-26",
+  "author": "余汉波",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.png",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "ai",
+      "explain": "智能问答",
+      "icon": "logo.ico",
+      "superPanel": true,
+      "cmds": [
+        "AI助手",
+        "GPT",
+        {
+          "type": "over",
+          "label": [ "AI助手", "GPT"],
+          "minLength": 1,
+          "maxLength": 50000
+        }
+      ]
+    }
+  ],
+  "storageFeatures": [
+    {
+      "storageKey": "ai-settings.quickCommands",
+      "itemTitleKey": "title",
+      "codePrefix": "quick-",
+      "description": "AI 助手快捷指令"
+    }
+  ],
+  "pluginSetting": {
+    "width": 1000,
+    "height": 680,
+    "single": true,
+    "autoHideMenuBar": true
+  }
+} 

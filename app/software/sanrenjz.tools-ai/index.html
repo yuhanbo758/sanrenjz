@@ -1,0 +1,2273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>AI 助手</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f4f7fb;
+            --chat-bg: #ffffff;
+            --user-msg-bg: #007AFF;
+            --user-msg-text: #ffffff;
+            --ai-msg-bg: #ffffff;
+            --ai-msg-text: #333333;
+            --border-color: #e5e7eb;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 18px 48px rgba(15, 23, 42, 0.16);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg-color);
+            color: #333;
+            overflow: hidden;
+        }
+
+        /* Header Styles */
+        .header {
+            padding: 12px 18px;
+            background: #fff;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+            z-index: 10;
+        }
+
+        .left-buttons, .right-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .middle-select {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            max-width: 300px;
+        }
+
+        .header-button {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: white;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .header-button:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+            color: #333;
+        }
+
+        .model-select {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            outline: none;
+            background: #fff;
+            font-size: 14px;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .model-select:focus {
+            border-color: var(--primary-color);
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px clamp(16px, 5vw, 64px);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-empty {
+            margin: auto;
+            width: min(100%, 620px);
+            padding: 32px;
+            border: 1px solid #dbe5f3;
+            border-radius: 20px;
+            background: #fff;
+            box-shadow: 0 12px 40px rgba(37, 99, 235, 0.06);
+        }
+        .chat-empty h2 { color: #0f172a; font-size: 23px; margin-bottom: 8px; }
+        .chat-empty p { color: #64748b; line-height: 1.7; margin-bottom: 18px; }
+        .chat-suggestions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .chat-suggestions button {
+            border: 1px solid #bfdbfe; border-radius: 999px; padding: 8px 12px;
+            color: #1d4ed8; background: #eff6ff; cursor: pointer;
+        }
+        .chat-suggestions button:hover { background: #dbeafe; }
+
+        .message {
+            padding: 14px 16px 28px;
+            border-radius: 12px;
+            position: relative;
+            max-width: min(85%, 760px);
+            line-height: 1.6;
+            font-size: 15px;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+        }
+
+        .user-message {
+            background: var(--user-msg-bg);
+            color: var(--user-msg-text);
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+            white-space: pre-wrap !important;
+            word-break: break-word;
+        }
+
+        .ai-message {
+            background: var(--ai-msg-bg);
+            color: var(--ai-msg-text);
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-body { overflow-wrap: anywhere; }
+        .message-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 2px;
+            position: absolute;
+            right: 8px;
+            bottom: 5px;
+        }
+        .message-actions button {
+            width: 23px;
+            height: 23px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px;
+            background: transparent;
+            border: 0;
+            border-radius: 5px;
+            cursor: pointer;
+            color: #64748b;
+            opacity: .78;
+        }
+        .message-actions svg { width: 15px; height: 15px; }
+        .message-actions button:hover, .message-actions button:focus-visible { background: #eff6ff; color: #1d4ed8; opacity: 1; }
+        .user-message .message-actions button { color: #fff; }
+        .user-message .message-actions button:hover, .user-message .message-actions button:focus-visible { background: rgba(255,255,255,.2); color: #fff; }
+        .message-actions .withdraw-button:hover { color: #b91c1c; }
+
+        /* Code Block */
+        .code-block {
+            margin: 1em 0;
+            background: #282c34;
+            border-radius: 8px;
+            overflow: hidden;
+            font-family: 'Fira Code', Consolas, Monaco, 'Courier New', monospace;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #21252b;
+            color: #abb2bf;
+            font-size: 12px;
+        }
+
+        .code-header button {
+            background: transparent;
+            border: 1px solid #4b5563;
+            color: #abb2bf;
+            padding: 2px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .code-header button:hover {
+            background: #3e4451;
+            border-color: #6b7280;
+        }
+
+        .code-content {
+            padding: 16px;
+            overflow-x: auto;
+            color: #abb2bf;
+            font-size: 14px;
+        }
+
+        .code-content pre {
+            margin: 0;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 16px clamp(16px, 5vw, 64px) 20px;
+            background: #fff;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .input-container {
+            position: relative;
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .input-container:focus-within {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+        }
+
+        textarea {
+            flex: 1;
+            height: 72px;
+            min-height: 24px;
+            max-height: 200px;
+            border: none;
+            resize: none;
+            font-size: 15px;
+            line-height: 1.5;
+            font-family: inherit;
+            outline: none;
+            padding: 0;
+            background: transparent;
+        }
+
+        .action-button {
+            padding: 8px;
+            height: 36px;
+            width: 36px;
+            background: transparent;
+            color: #666;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .action-button:hover {
+            background: #f3f4f6;
+            color: #333;
+        }
+
+        .send-button {
+            padding: 8px 20px;
+            height: 36px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .send-button:hover {
+            background: var(--primary-hover);
+        }
+
+        /* File Preview */
+        .file-preview {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            background: #f9fafb;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #374151;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 100%;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .file-preview button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #9ca3af;
+            font-size: 16px;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .file-preview button:hover {
+            color: #ef4444;
+        }
+
+        /* Settings Panel & Modals */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+            display: none;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .overlay.show {
+            display: block;
+            opacity: 1;
+        }
+
+        .settings-panel, .modal-content {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            width: min(600px, calc(100vw - 28px));
+            max-height: min(88vh, 820px);
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: var(--shadow-md);
+            display: none;
+            z-index: 1000;
+            overflow-y: auto;
+            transition: transform 0.3s, opacity 0.3s;
+            opacity: 0;
+        }
+
+        .settings-panel.show, .modal-content.show {
+            display: block;
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+        
+        .modal { display: none; }
+        
+        #addModelModal[style*="display: block"] .modal-content,
+        #historyModal[style*="display: block"] .modal-content,
+        #quickCommandModal[style*="display: block"] .modal-content {
+            display: block;
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1a1a1a;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .settings-item {
+            margin-bottom: 20px;
+        }
+
+        .settings-section {
+            padding: 16px;
+            margin: 14px 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+        }
+        .settings-section h4 { margin-bottom: 12px; color: #0f172a; font-size: 15px; }
+        .settings-help { font-size: 12px; line-height: 1.6; color: #64748b; margin-top: 6px; }
+        .settings-inline { display: flex; align-items: center; gap: 10px; }
+        .settings-inline input[type="checkbox"] { width: auto; flex: 0 0 auto; }
+
+        .settings-item label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #4b5563;
+        }
+
+        .settings-item input, .settings-item select, .settings-item textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        .settings-item input:focus, .settings-item select:focus, .settings-item textarea:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .settings-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .settings-button {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: white;
+            color: #374151;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .settings-button:hover {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+
+        .settings-button.primary {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+        }
+
+        .settings-button.primary:hover {
+            background: var(--primary-hover);
+        }
+
+        /* Prompts Panel */
+        .prompts-panel {
+            position: absolute;
+            bottom: 90px;
+            left: 20px;
+            right: 20px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--shadow-md);
+            padding: 16px;
+            max-height: 300px;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        /* Prompt Popup */
+        .prompt-popup {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 8px;
+            width: 300px;
+            max-height: 400px;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            overflow: hidden;
+        }
+        
+        .prompt-search-container {
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        #promptSearchInput {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .prompts-list {
+            overflow-y: auto;
+            max-height: 300px;
+        }
+
+        .prompt-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .prompt-item:hover, .prompt-item.selected {
+            background: #eef2ff;
+        }
+
+        .prompt-item-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+            color: #1f2937;
+        }
+
+        .prompt-item-preview {
+            font-size: 12px;
+            color: #6b7280;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* System Message */
+        .system-message {
+            background: #f3f4f6;
+            border-left: 4px solid #6b7280;
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        .system-message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            color: #4b5563;
+            font-weight: 500;
+        }
+        
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: #9ca3af;
+        }
+        
+        .close-button:hover {
+            color: #4b5563;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+        
+        /* History Modal */
+        .history-toolbar { display: flex; gap: 10px; margin-bottom: 8px; }
+        .history-toolbar input {
+            flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid var(--border-color);
+            border-radius: 8px; font: inherit;
+        }
+        .history-toolbar input:focus { outline: 2px solid #bfdbfe; border-color: var(--primary-color); }
+        .history-hint { margin: 0 0 10px; color: #64748b; font-size: 12px; line-height: 1.5; }
+        .history-count { margin: 0 0 9px; color: #64748b; font-size: 12px; }
+        .history-list {
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+        .history-empty { padding: 28px; text-align: center; color: #64748b; line-height: 1.6; }
+        
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: background 0.2s;
+        }
+        
+        .history-item:hover {
+            background: #f9fafb;
+        }
+        .history-open { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+        .history-open:focus-visible, .history-delete:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+        .history-delete { flex: none; padding: 6px 10px; border: 1px solid #fecaca; border-radius: 6px; background: #fff; color: #b91c1c; cursor: pointer; }
+        .history-delete:hover { background: #fef2f2; }
+        .history-toolbar button:disabled, .history-delete:disabled { opacity: .5; cursor: not-allowed; }
+        
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .history-item-content {
+            font-size: 14px;
+            color: #374151;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Markdown Content Styling */
+        .ai-message p { margin-bottom: 1em; }
+        .ai-message p:last-child { margin-bottom: 0; }
+        .ai-message h1, .ai-message h2, .ai-message h3 { margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+        .ai-message ul, .ai-message ol { margin-bottom: 1em; padding-left: 1.5em; }
+        .ai-message li { margin-bottom: 0.5em; }
+        .ai-message code { background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+        .ai-message pre code { background: transparent; padding: 0; }
+        .ai-message a { color: var(--primary-color); text-decoration: none; }
+        .ai-message a:hover { text-decoration: underline; }
+        .ai-message .message-body h3 { border: 0; padding: 0; }
+
+        /* 共享供应商目录抽屉（内容由 ai-provider-manager.js 渲染） */
+        .provider-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: min(420px, 92vw);
+            background: #fff;
+            box-shadow: -12px 0 40px rgba(0, 0, 0, 0.15);
+            z-index: 1200;
+            transform: translateX(105%);
+            transition: transform 0.25s ease;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .provider-drawer.open {
+            transform: translateX(0);
+        }
+
+        .provider-drawer .close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            border: 0;
+            background: transparent;
+            font-size: 20px;
+            color: #6b7280;
+            cursor: pointer;
+        }
+
+        #providerOverlay {
+            z-index: 1100;
+        }
+
+        .model-select optgroup {
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        /* 总指挥派发卡片：显示本地工具打开或 AI 任务移交状态 */
+        .delegate-card {
+            max-width: 80%;
+            margin: 8px 0;
+            padding: 12px 14px;
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+            background: #eff6ff;
+            font-size: 13px;
+            color: #1e40af;
+        }
+
+        .delegate-card.error {
+            border-color: #fecaca;
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .delegate-card .delegate-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .delegate-card .delegate-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .delegate-card .delegate-actions button {
+            border: 1px solid #93c5fd;
+            background: #fff;
+            color: #1d4ed8;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 760px) {
+            .header { align-items: stretch; gap: 10px; flex-wrap: wrap; }
+            .middle-select { order: 3; max-width: none; width: 100%; }
+            .chat-container { padding: 14px; }
+            .message, .delegate-card { max-width: 96%; }
+            .settings-panel, .modal-content { padding: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="left-buttons">
+            <button onclick="newChat()" class="header-button">新对话</button>
+            <button onclick="showChatHistory()" class="header-button">历史记录</button>
+        </div>
+        <div class="middle-select">
+            <select id="currentModel" class="model-select">
+                <!-- 由JavaScript动态填充 -->
+            </select>
+        </div>
+        <div class="right-buttons">
+            <button onclick="saveChatToFile()" class="header-button" title="手动导出当前对话为 Markdown，不影响历史缓存">保存对话</button>
+            <button onclick="toggleProviderDrawer(true)" class="header-button">供应商</button>
+            <button onclick="toggleSettings()" class="header-button">设置</button>
+        </div>
+    </div>
+
+    <div class="chat-container" id="chatContainer"></div>
+
+    <div class="input-area">
+        <div class="input-container" ondragover="handleDragOver(event)" ondrop="handleDrop(event)">
+            <button onclick="handleFileUpload()" class="action-button" title="上传文件">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+            </button>
+            <textarea 
+                id="promptInput" 
+                placeholder="输入消息... (输入 @ 搜索提示词，Shift+Enter 换行)"
+                onkeydown="handleKeyPress(event)"
+                oninput="handleInput(event)"
+            ></textarea>
+            <button onclick="sendMessage()" class="send-button">发送</button>
+            
+            <div class="prompt-popup" id="promptPopup" style="display: none;">
+                <div class="prompt-search-container">
+                    <input 
+                        type="text" 
+                        id="promptSearchInput" 
+                        placeholder="搜索提示词..."
+                        onkeydown="handlePromptKeyPress(event)"
+                        oninput="handlePromptSearch(event)"
+                    >
+                </div>
+                <div class="prompts-list" id="promptSearchList"></div>
+            </div>
+            
+            <!-- File Preview (dynamically added) -->
+            <div id="filePreview" class="file-preview" style="display: none;">
+                <span id="fileName">filename.txt</span>
+                <button onclick="clearFile()">×</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <div class="settings-panel" id="settingsPanel">
+        <h3>助手设置</h3>
+        <p class="settings-help">历史记录会自动缓存在插件本地；只有点击「保存对话」才会向设置的导出目录写入 Markdown。模型生成回复与总指挥选择插件分别配置。</p>
+        
+        <div class="settings-item">
+            <label>默认模型</label>
+            <select id="defaultModel"></select>
+        </div>
+
+        <div class="settings-section">
+            <h4>插件总指挥</h4>
+            <div class="settings-inline">
+                <input type="checkbox" id="commanderEnabled" checked>
+                <label for="commanderEnabled" style="margin:0;">启用自动查找已安装插件（选择 Jev 时自动启用）</label>
+            </div>
+            <p class="settings-help">未启用 Jev 时按插件名称、功能和命令词本地匹配；启用后每条提问先由 Jev 在已安装插件和当前 LLM 之间选择。</p>
+            <div class="settings-item" style="margin:12px 0 0;">
+                <label for="jevProvider">每条提问的路由判断</label>
+                <select id="jevProvider" onchange="updateJevSettingsVisibility()">
+                    <option value="off">关闭（只用本地规则）</option>
+                    <option value="openrouter">Jev · OpenRouter</option>
+                    <option value="typesafe">Jev · TypeSafe 官方</option>
+                </select>
+                <p class="settings-help">启用后每条提问都先提交给 Jev。它只看文字和附件名称/类型，不读取附件内容；选中已安装插件就打开，选“回复”或判断不可靠时交给当前 LLM。提问与插件能力摘要会发送给所选供应商。</p>
+            </div>
+            <div class="settings-item" id="jevKeyRow" style="display:none;margin:12px 0 0;">
+                <label for="jevApiKey">判断专用 API Key</label>
+                <input type="password" id="jevApiKey" placeholder="留空则保持已保存密钥">
+                <p class="settings-help" id="jevKeyStatus"></p>
+            </div>
+        </div>
+
+        <div class="settings-item">
+            <label>Markdown 导出目录（可选）</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="savePath" readonly placeholder="请选择保存路径">
+                <button onclick="selectSavePath()" class="settings-button">选择</button>
+            </div>
+        </div>
+
+        <div class="settings-item">
+            <label>提示词文件夹路径</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="promptsPath" readonly placeholder="请选择提示词路径">
+                <button onclick="selectPromptsPath()" class="settings-button">选择</button>
+            </div>
+        </div>
+
+        <h3>模型与供应商</h3>
+        <div class="settings-item">
+            <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
+                共享供应商与模型由统一目录管理（所有 AI 插件共用），点击顶部「供应商」按钮可新增、编辑并测试。
+            </p>
+        </div>
+
+        <h3>旧版直连 API 密钥</h3>
+        <div class="settings-item">
+            <label>OpenRouter API Key</label>
+            <input type="password" id="openrouterKey" placeholder="sk-...">
+        </div>
+        <div class="settings-item">
+            <label>Gemini API Key</label>
+            <input type="password" id="geminiKey" placeholder="AIza...">
+        </div>
+        <div class="settings-item">
+            <label>Deepseek API Key</label>
+            <input type="password" id="deepseekKey" placeholder="sk-...">
+        </div>
+        
+        <h3>自定义模型</h3>
+        <div id="modelList" style="margin-bottom: 10px;"></div>
+        <button onclick="showAddModelModal()" class="settings-button" style="width: 100%;">+ 添加自定义模型</button>
+
+        <h3>超级面板快捷指令</h3>
+        <div id="quickCommandList" style="margin-bottom: 10px;"></div>
+        <button onclick="showQuickCommandModal()" class="settings-button" style="width: 100%;">+ 添加快捷指令</button>
+
+        <div class="settings-buttons">
+            <button onclick="toggleSettings()" class="settings-button">取消</button>
+            <button onclick="saveSettings()" class="settings-button primary">保存设置</button>
+        </div>
+    </div>
+
+    <!-- 共享供应商目录抽屉与遮罩（与所有 AI 插件共用同一配置） -->
+    <div class="overlay" id="providerOverlay" onclick="toggleProviderDrawer(false)"></div>
+    <div class="provider-drawer" id="providerDrawer"></div>
+
+    <!-- Add Model Modal -->
+    <div class="modal" id="addModelModal">
+        <div class="overlay" style="display: block; z-index: 1050;" onclick="closeAddModelModal()"></div>
+        <div class="modal-content show" style="z-index: 1051;">
+            <h3>添加自定义模型</h3>
+            <div class="settings-item">
+                <label>模型标识 (ID)</label>
+                <input type="text" id="modelValue" placeholder="例如: company/model-name">
+            </div>
+            <div class="settings-item">
+                <label>显示名称</label>
+                <input type="text" id="modelLabel" placeholder="例如: My Model">
+            </div>
+            <div class="settings-item">
+                <label>API 提供商</label>
+                <select id="modelProvider">
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="deepseek">Deepseek</option>
+                </select>
+            </div>
+            <div class="settings-buttons">
+                <button onclick="closeAddModelModal()" class="settings-button">取消</button>
+                <button onclick="addCustomModel()" class="settings-button primary">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Quick Command Modal -->
+    <div class="modal" id="quickCommandModal">
+        <div class="overlay" style="display: block; z-index: 1050;" onclick="closeQuickCommandModal()"></div>
+        <div class="modal-content show" style="z-index: 1051;">
+            <h3>添加快捷指令</h3>
+            <div class="settings-item">
+                <label>指令名称</label>
+                <input type="text" id="qcTitle" placeholder="例如: 翻译为中文">
+            </div>
+            <div class="settings-item">
+                <label>使用模型</label>
+                <select id="qcModel"></select>
+            </div>
+            <div class="settings-item">
+                <label>预设提示词</label>
+                <textarea id="qcPrompt" rows="4" placeholder="例如: 请将以下内容翻译为简体中文..."></textarea>
+            </div>
+            <div class="settings-buttons">
+                <button onclick="closeQuickCommandModal()" class="settings-button">取消</button>
+                <button onclick="saveQuickCommand()" class="settings-button primary">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div class="modal" id="historyModal">
+        <div class="overlay" style="display: block; z-index: 1050;" onclick="closeHistoryModal()"></div>
+        <div class="modal-content show" style="z-index: 1051; width: min(680px, calc(100vw - 28px));">
+            <h3>聊天历史</h3>
+            <div class="history-toolbar">
+                <input id="historySearch" type="search" placeholder="搜索标题或对话内容" aria-label="搜索历史记录" oninput="renderHistoryList()">
+                <button id="clearHistoryButton" type="button" class="history-delete" onclick="clearAllHistory()">清空历史</button>
+            </div>
+            <p class="history-hint">这里仅管理插件缓存；“保存对话”会单独导出到设置中的 Markdown 目录，删除缓存不会删除导出文件。</p>
+            <div id="historyCount" class="history-count"></div>
+            <div class="history-list" id="historyList">
+                <!-- 动态填充 -->
+            </div>
+            <div class="settings-buttons">
+                <button onclick="importExportedChat()" class="settings-button">打开导出的 Markdown</button>
+                <button onclick="closeHistoryModal()" class="settings-button">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../plugin_runtime/ai-provider-manager.js"></script>
+    <script src="../../plugin_runtime/commander-router.js"></script>
+    <script>
+        // 聊天历史数组
+        let chatHistory = [];
+        let selectedPromptIndex = -1;
+        let promptsList = [];
+        let lastAtPosition = -1;
+        let currentFile = null; // 当前选择的文件
+        let currentConversationId = `conversation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        let activeResponse = null;
+        let historyRecords = [];
+        let historyBusy = false;
+
+        const DELEGATE_TARGETS = CommanderRouter.DEFAULT_AI_TARGETS;
+
+        // 每次发送前读取当前插件目录；启用 Jev 时每条提问先经过 Jev，不让本地关键词规则短路。
+        async function detectDelegation(message) {
+            const settings = window.services.getSettings();
+            const jevEnabled = ['openrouter', 'typesafe'].includes(settings.jevProvider);
+            if (!jevEnabled && settings.commanderEnabled === false) return { route: null };
+            const installedPlugins = await window.services.listInstalledPluginCapabilities();
+            if (jevEnabled) {
+                try {
+                    const route = await window.services.decideCommanderRoute(message, installedPlugins, DELEGATE_TARGETS, settings.jevProvider);
+                    return { route, notice: !route && /(?:打开|调用|启动).{0,30}插件/.test(message)
+                        ? 'Jev 未选出可打开的已安装插件，本轮交由当前 LLM 回复。' : '' };
+                } catch (error) {
+                    console.warn('Jev 判断不可用：', error);
+                    return { route: null, notice: `Jev 判断失败（${error.message}），本轮未打开插件，改由当前 LLM 回复。` };
+                }
+            }
+            return { route: CommanderRouter.detectCommanderRoute(message, installedPlugins, DELEGATE_TARGETS) };
+        }
+
+        function addRoutingNotice(text) {
+            if (!text) return;
+            document.querySelector('.chat-empty')?.remove();
+            const notice = document.createElement('div');
+            notice.className = 'delegate-card';
+            notice.style.background = '#f8fafc';
+            notice.style.borderColor = '#cbd5e1';
+            notice.style.color = '#475569';
+            notice.textContent = text;
+            document.getElementById('chatContainer').appendChild(notice);
+        }
+
+        // 渲染派发卡片：显示移交目标与状态；失败或需要时可一键改由本助手直接回答
+        function addDispatchCard(target, message) {
+            document.querySelector('.chat-empty')?.remove();
+            const card = document.createElement('div');
+            card.className = 'delegate-card';
+            const title = document.createElement('div');
+            title.className = 'delegate-title';
+            title.textContent = target.kind === 'local'
+                ? '总指挥：正在打开本地插件「' + target.name + '」…'
+                : '总指挥：正在移交给「' + target.name + '」处理…';
+            const status = document.createElement('div');
+            const actions = document.createElement('div');
+            actions.className = 'delegate-actions';
+            const fallbackBtn = document.createElement('button');
+            fallbackBtn.textContent = '改由本助手回答';
+            fallbackBtn.onclick = async () => {
+                card.remove();
+                await sendMessage(true, message, true);
+            };
+            const reopenBtn = document.createElement('button');
+            reopenBtn.textContent = '打开插件';
+            reopenBtn.style.display = 'none';
+            reopenBtn.onclick = async () => {
+                reopenBtn.disabled = true;
+                status.textContent = '正在打开插件窗口…';
+                // 这里只恢复目标窗口并重新填入原内容，不自动执行，防止重复调用模型。
+                const result = await window.services.delegateToPlugin(
+                    target.folder,
+                    target.feature,
+                    message,
+                    { autoRun: false }
+                );
+                reopenBtn.disabled = false;
+                if (result && result.success) {
+                    card.classList.remove('error');
+                    status.textContent = '插件窗口已打开，原内容已重新填入，未重复调用模型。';
+                } else {
+                    card.classList.add('error');
+                    status.textContent = (result && result.error) ? result.error : '打开插件失败。';
+                }
+            };
+            actions.append(fallbackBtn, reopenBtn);
+            card.append(title, status, actions);
+            document.getElementById('chatContainer').appendChild(card);
+            card.scrollIntoView({ behavior: 'smooth' });
+            return {
+                done(result) {
+                    if (result && result.success) {
+                        if (target.kind === 'local') {
+                            title.textContent = '总指挥：已打开本地插件「' + target.name + '」';
+                            status.textContent = '已定位到「' + (target.featureName || '匹配功能') + '」，请在插件窗口中继续操作。';
+                        } else if (target.autoRun === false) {
+                            title.textContent = '总指挥：已打开「' + target.name + '」';
+                            status.textContent = '内容已填入，请在插件窗口中确认后继续。';
+                        } else {
+                            title.textContent = '总指挥：已移交给「' + target.name + '」处理';
+                            status.textContent = '内容已填入并自动开始，请在该插件窗口查看结果。';
+                        }
+                        reopenBtn.style.display = '';
+                    } else {
+                        card.classList.add('error');
+                        title.textContent = '总指挥：打开「' + target.name + '」失败';
+                        status.textContent = (result && result.error) ? result.error : '未知错误，可改由本助手回答。';
+                    }
+                }
+            };
+        }
+
+        // 共享供应商目录管理器：渲染供应商管理抽屉（新增/编辑/测试/密钥）。
+        // before 指向不存在的锚点，跳过组件自带选择器挂载，保留本插件的 #currentModel 下拉。
+        const providerManager = AIProviderManager.create(window.aiAPI, {
+            capability: 'text',
+            notify: message => window.services.showNotification(message),
+            drawer: '#providerDrawer',
+            overlay: '#providerOverlay',
+            before: '#ai-provider-picker-anchor-unused'
+        });
+
+        // 顶部切换模型后，同步共享目录的文本模型选择（与其他 AI 插件行为一致）
+        document.getElementById('currentModel').addEventListener('change', async event => {
+            const option = event.target.options[event.target.selectedIndex];
+            if (!option || !option.dataset.provider) return;
+            const settings = window.services.getSettings();
+            settings.defaultModel = option.value;
+            settings.defaultModelProvider = option.dataset.provider;
+            window.services.saveSettings(settings);
+            if (option.dataset.provider.startsWith('shared:')) {
+                await window.services.saveSharedTextSelection(
+                    option.dataset.provider.slice('shared:'.length),
+                    option.value
+                );
+            }
+        });
+
+        // 初始化
+        window.onload = async () => {
+            // 等待共享目录配置加载完成；即使共享配置读取失败也不阻塞插件初始化
+            await providerManager.ready.catch(() => {});
+            await loadSettings();
+            await updateModelSelectors();
+            showEmptyState();
+            // 聚焦输入框
+            document.getElementById('promptInput').focus();
+            
+            // 检查是否有等待的快捷指令
+            if (window.pendingQuickCommand) {
+                applyQuickCommand(window.pendingQuickCommand);
+                window.pendingQuickCommand = null;
+            }
+        };
+        
+        /**
+         * 将提示词内容插入为系统消息卡片
+         * @param {string} content - 提示词文本内容
+         */
+        window.services.addSystemMessage = (content) => {
+            const container = document.getElementById('chatContainer');
+            document.querySelector('.chat-empty')?.remove();
+            const wrapper = document.createElement('div');
+            wrapper.className = 'system-message';
+
+            const header = document.createElement('div');
+            header.className = 'system-message-header';
+            const titleEl = document.createElement('span');
+            titleEl.textContent = '系统消息';
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'close-button';
+            closeBtn.textContent = '×';
+            closeBtn.onclick = () => wrapper.remove();
+            header.appendChild(titleEl);
+            header.appendChild(closeBtn);
+
+            const contentEl = document.createElement('div');
+            contentEl.className = 'system-message-content';
+            contentEl.textContent = content;
+
+            wrapper.appendChild(header);
+            wrapper.appendChild(contentEl);
+            container.appendChild(wrapper);
+            wrapper.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        // 暴露给 preload.js 调用
+        window.applyQuickCommand = (cmd) => {
+            // 切换模型
+            const modelSelect = document.getElementById('currentModel');
+            // 不同供应商可能存在相同模型 ID，按 value + provider 精确匹配
+            selectModelByPair(modelSelect, cmd.modelValue, cmd.modelProvider);
+            
+            // 添加系统消息
+            if (cmd.prompt) {
+                window.services.addSystemMessage(cmd.prompt);
+            }
+            
+            // 如果有待处理文本（如选中文本），填充到输入框
+            if (window.pendingText) {
+                const input = document.getElementById('promptInput');
+                input.value = window.pendingText;
+                window.pendingText = null;
+                // 可选：自动发送
+                // sendMessage();
+            }
+        };
+
+        // 同步快捷指令到超级面板特性
+        /**
+         * 同步快捷指令为可序列化的特性并注册到主程序
+         * 函数级注释：
+         * - 仅传递 code/explain/cmds，避免把复杂对象（如函数/DOM）通过 IPC 发送
+         * - cmds 包含指令标题与一个通用标签，便于搜索索引
+         */
+        function syncQuickCommandsToFeatures(settings) {
+            const commands = settings.quickCommands || [];
+            const features = commands.map((cmd, index) => {
+                const slug = (cmd.title || `cmd-${index}`).replace(/[^\w\u4e00-\u9fa5]+/g, '-').toLowerCase();
+                return {
+                    code: `quick-${slug}`,
+                    explain: cmd.title,
+                    cmds: [cmd.title, 'AI']
+                };
+            });
+            
+            if (window.services.registerFeatures) {
+                window.services.registerFeatures(features);
+            }
+        }
+
+        // 加载设置
+        async function loadSettings() {
+            const settings = window.services.getSettings();
+            
+            // 同步快捷指令到超级面板
+            syncQuickCommandsToFeatures(settings);
+            
+            // 默认模型选择器由 updateModelSelectors 统一按供应商分组填充
+            
+            // 填充其他设置
+            document.getElementById('openrouterKey').value = settings.openrouterApiKey || '';
+            document.getElementById('geminiKey').value = settings.geminiApiKey || '';
+            document.getElementById('deepseekKey').value = settings.deepseekApiKey || '';
+            document.getElementById('savePath').value = settings.savePath || '';
+            document.getElementById('promptsPath').value = settings.promptsPath || '';
+            document.getElementById('commanderEnabled').checked = settings.commanderEnabled !== false;
+            document.getElementById('jevProvider').value = settings.jevProvider || 'off';
+            await updateJevSettingsVisibility();
+            
+            // 更新UI
+            updateModelList();
+            updateQuickCommandList();
+        }
+
+        // 保存设置
+        async function saveSettings() {
+            const settings = window.services.getSettings();
+            const defaultModelSelect = document.getElementById('defaultModel');
+            const defaultOption = defaultModelSelect.options[defaultModelSelect.selectedIndex];
+            const jevProvider = document.getElementById('jevProvider').value;
+            const jevKey = document.getElementById('jevApiKey').value.trim();
+            try {
+                if (jevProvider !== 'off') {
+                    const existingKey = await window.services.hasDecisionKey(jevProvider);
+                    const legacyOpenRouterKey = jevProvider === 'openrouter' && document.getElementById('openrouterKey').value.trim();
+                    if (!jevKey && !existingKey && !legacyOpenRouterKey) {
+                        window.services.showNotification('请先填写所选 Jev 供应商的 API Key');
+                        return;
+                    }
+                    if (jevKey) await window.services.saveDecisionKey(jevProvider, jevKey);
+                }
+            } catch (error) {
+                window.services.showNotification('保存 Jev 密钥失败: ' + error.message);
+                return;
+            }
+            const newSettings = {
+                ...settings,
+                openrouterApiKey: document.getElementById('openrouterKey').value,
+                geminiApiKey: document.getElementById('geminiKey').value,
+                deepseekApiKey: document.getElementById('deepseekKey').value,
+                savePath: document.getElementById('savePath').value,
+                defaultModel: defaultModelSelect.value,
+                defaultModelProvider: defaultOption ? (defaultOption.dataset.provider || '') : '',
+                promptsPath: document.getElementById('promptsPath').value,
+                commanderEnabled: jevProvider !== 'off' || document.getElementById('commanderEnabled').checked,
+                jevProvider,
+            };
+
+            if (window.services.saveSettings(newSettings)) {
+                document.getElementById('jevApiKey').value = '';
+                window.services.showNotification('设置已保存');
+                toggleSettings();
+                updateModelSelectors();
+            } else {
+                window.services.showNotification('保存设置失败');
+            }
+        }
+
+        async function updateJevSettingsVisibility() {
+            const provider = document.getElementById('jevProvider').value;
+            const commanderToggle = document.getElementById('commanderEnabled');
+            if (provider !== 'off') commanderToggle.checked = true;
+            commanderToggle.disabled = provider !== 'off';
+            document.getElementById('jevKeyRow').style.display = provider === 'off' ? 'none' : 'block';
+            const status = document.getElementById('jevKeyStatus');
+            if (provider === 'off') return;
+            const saved = await window.services.hasDecisionKey(provider).catch(() => false);
+            status.textContent = saved ? '已安全保存当前供应商密钥；留空不会清除。'
+                : provider === 'openrouter' ? '可填写专用密钥；留空时沿用下方旧版 OpenRouter Key。'
+                : '请填写 TypeSafe 官方 API Key；密钥通过应用安全存储保存。';
+        }
+
+        // 路径选择
+        function selectSavePath() {
+            const path = window.services.selectSavePath();
+            if (path) {
+                document.getElementById('savePath').value = path;
+            }
+        }
+
+        function selectPromptsPath() {
+            const path = window.services.selectPromptsPath();
+            if (path) {
+                document.getElementById('promptsPath').value = path;
+            }
+        }
+
+        // 文件上传处理
+        /**
+         * 选择文件并加入为当前附件
+         */
+        function handleFileUpload() {
+            const selected = window.services.selectFile();
+            const filePath = Array.isArray(selected) ? selected[0] : selected;
+            if (filePath) {
+                try {
+                    const fileData = window.services.readFile(filePath);
+                    currentFile = fileData;
+                    // 显示预览
+                    const preview = document.getElementById('filePreview');
+                    const fileName = document.getElementById('fileName');
+                    fileName.textContent = fileData.name + (fileData.type === 'image' ? ' (图片)' : ' (文本)');
+                    preview.style.display = 'flex';
+                } catch (error) {
+                    window.services.showNotification(error.message);
+                }
+            }
+            // 选择完文件后自动恢复焦点到对话框
+            restoreFocus();
+        }
+
+        /**
+         * 清除当前附件并隐藏预览
+         */
+        function clearFile() {
+            currentFile = null;
+            document.getElementById('filePreview').style.display = 'none';
+        }
+
+        // 设置面板开关
+        function toggleSettings() {
+            const settingsPanel = document.getElementById('settingsPanel');
+            const overlay = document.getElementById('overlay');
+            
+            if (settingsPanel.classList.contains('show')) {
+                settingsPanel.classList.remove('show');
+                overlay.classList.remove('show');
+                setTimeout(() => {
+                    settingsPanel.style.display = 'none';
+                    overlay.style.display = 'none';
+                }, 300);
+            } else {
+                settingsPanel.style.display = 'block';
+                overlay.style.display = 'block';
+                settingsPanel.offsetHeight; 
+                settingsPanel.classList.add('show');
+                overlay.classList.add('show');
+                loadSettings();
+            }
+        }
+
+        document.getElementById('overlay').onclick = function() {
+            toggleSettings();
+        };
+
+        // 组装模型分组：共享供应商目录在前（按供应商分组），本插件直连与自定义模型在后
+        async function getModelGroups() {
+            const settings = window.services.getSettings();
+            const groups = [];
+            const sharedGroups = await window.services.getSharedProviderGroups();
+            sharedGroups.forEach(group => groups.push({
+                label: `共享 · ${group.name}`,
+                models: group.models
+            }));
+            const localModels = window.services.getLegacyModels().map(model => ({ ...model }));
+            (settings.customModels || []).forEach(model => localModels.push({
+                value: model.value,
+                label: model.label,
+                provider: model.provider,
+                isCustom: true
+            }));
+            if (localModels.length) groups.push({ label: '本插件直连', models: localModels });
+            return groups;
+        }
+
+        // 按分组填充下拉框
+        function populateModelSelect(select, groups) {
+            select.innerHTML = '';
+            groups.forEach(group => {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = group.label;
+                group.models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.value;
+                    option.text = model.label;
+                    option.dataset.provider = model.provider;
+                    if (model.isCustom) option.dataset.isCustom = 'true';
+                    optgroup.appendChild(option);
+                });
+                select.appendChild(optgroup);
+            });
+        }
+
+        // 不同供应商可能存在相同模型 ID，按 value + provider 精确选中
+        function selectModelByPair(select, value, provider) {
+            if (!value) return;
+            let fallbackIndex = -1;
+            for (let i = 0; i < select.options.length; i++) {
+                const option = select.options[i];
+                if (option.value !== value) continue;
+                if (!provider || option.dataset.provider === provider) {
+                    select.selectedIndex = i;
+                    return;
+                }
+                if (fallbackIndex === -1) fallbackIndex = i;
+            }
+            if (fallbackIndex >= 0) select.selectedIndex = fallbackIndex;
+        }
+
+        // 更新模型选择器（顶部当前模型、快捷指令、设置页默认模型共用同一分组数据）
+        async function updateModelSelectors() {
+            const settings = window.services.getSettings();
+            const groups = await getModelGroups();
+            const currentModelSelect = document.getElementById('currentModel');
+            const qcModelSelect = document.getElementById('qcModel');
+            const defaultModelSelect = document.getElementById('defaultModel');
+            [currentModelSelect, qcModelSelect, defaultModelSelect].forEach(select => {
+                if (select) populateModelSelect(select, groups);
+            });
+
+            // 顶部当前模型优先跟随共享目录的文本模型选择（与其他 AI 插件一致）
+            const sharedSelection = await window.services.getSharedTextSelection();
+            if (sharedSelection && sharedSelection.providerId) {
+                selectModelByPair(
+                    currentModelSelect,
+                    sharedSelection.modelId,
+                    `shared:${sharedSelection.providerId}`
+                );
+            } else {
+                selectModelByPair(currentModelSelect, settings.defaultModel, settings.defaultModelProvider);
+            }
+            if (currentModelSelect.selectedIndex === -1 && currentModelSelect.options.length) {
+                currentModelSelect.selectedIndex = 0;
+            }
+
+            // 快捷指令与默认模型按本插件设置选中
+            [qcModelSelect, defaultModelSelect].forEach(select => {
+                if (!select) return;
+                selectModelByPair(select, settings.defaultModel, settings.defaultModelProvider);
+                if (select.selectedIndex === -1 && select.options.length) select.selectedIndex = 0;
+            });
+        }
+
+        // 打开/关闭共享供应商目录抽屉；关闭后刷新模型下拉以应用供应商变更
+        function toggleProviderDrawer(force) {
+            const drawer = document.getElementById('providerDrawer');
+            const overlay = document.getElementById('providerOverlay');
+            const open = typeof force === 'boolean' ? force : !drawer.classList.contains('open');
+            drawer.classList.toggle('open', open);
+            overlay.classList.toggle('show', open);
+            if (!open) {
+                Promise.resolve(providerManager.refresh())
+                    .then(() => updateModelSelectors())
+                    .catch(() => {});
+            }
+        }
+
+        // 自定义模型管理
+        function updateModelList() {
+            const modelList = document.getElementById('modelList');
+            const settings = window.services.getSettings();
+            modelList.innerHTML = '';
+            if (settings.customModels) {
+                settings.customModels.forEach((model, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'model-item';
+                    div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;border:1px solid var(--border-color);border-radius:6px;margin-bottom:8px;background:#f9fafb;';
+                    div.innerHTML = `
+                        <span style="font-size: 14px;">${model.label} (${model.provider})</span>
+                        <button onclick="removeModel(${index})" class="settings-button" style="padding: 4px 8px; font-size: 12px; color: #dc2626; border-color: #fca5a5;">删除</button>
+                    `;
+                    modelList.appendChild(div);
+                });
+            }
+        }
+
+        function showAddModelModal() {
+            document.getElementById('addModelModal').style.display = 'block';
+            document.getElementById('modelValue').value = '';
+            document.getElementById('modelLabel').value = '';
+        }
+
+        function closeAddModelModal() {
+            document.getElementById('addModelModal').style.display = 'none';
+        }
+
+        function addCustomModel() {
+            const value = document.getElementById('modelValue').value.trim();
+            const label = document.getElementById('modelLabel').value.trim();
+            const provider = document.getElementById('modelProvider').value;
+
+            if (!value || !label) {
+                window.services.showNotification('请填写所有字段');
+                return;
+            }
+
+            const settings = window.services.getSettings();
+            if (!settings.customModels) settings.customModels = [];
+            settings.customModels.push({ value, label, provider, isCustom: true });
+            window.services.saveSettings(settings);
+            updateModelList();
+            updateModelSelectors();
+            closeAddModelModal();
+        }
+
+        function removeModel(index) {
+            const settings = window.services.getSettings();
+            settings.customModels.splice(index, 1);
+            window.services.saveSettings(settings);
+            updateModelList();
+            updateModelSelectors();
+        }
+
+        // 快捷指令管理
+        function updateQuickCommandList() {
+            const list = document.getElementById('quickCommandList');
+            const settings = window.services.getSettings();
+            list.innerHTML = '';
+            if (settings.quickCommands) {
+                settings.quickCommands.forEach((cmd, index) => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;border:1px solid var(--border-color);border-radius:6px;margin-bottom:8px;background:#f9fafb;';
+                    div.innerHTML = `
+                        <div style="display:flex;flex-direction:column;">
+                            <span style="font-weight:500;font-size:14px;">${cmd.title}</span>
+                            <span style="font-size:12px;color:#666;">${cmd.modelLabel}</span>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button onclick="editQuickCommand(${index})" class="settings-button" style="padding: 4px 8px; font-size: 12px;">修改</button>
+                            <button onclick="removeQuickCommand(${index})" class="settings-button" style="padding: 4px 8px; font-size: 12px; color: #dc2626; border-color: #fca5a5;">删除</button>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+        }
+
+        let currentEditingIndex = -1; // 当前编辑的指令索引，-1 表示新增
+
+        function showQuickCommandModal() {
+            currentEditingIndex = -1;
+            document.getElementById('quickCommandModal').style.display = 'block';
+            document.getElementById('qcTitle').value = '';
+            document.getElementById('qcPrompt').value = '';
+            
+            // Default select first model if available
+            const modelSelect = document.getElementById('qcModel');
+            if (modelSelect.options.length > 0 && modelSelect.selectedIndex === -1) {
+                modelSelect.selectedIndex = 0;
+            }
+
+            // 重置按钮文本
+            const confirmBtn = document.querySelector('#quickCommandModal .settings-button:last-child');
+            if (confirmBtn) confirmBtn.textContent = '添加';
+        }
+
+        function editQuickCommand(index) {
+            const settings = window.services.getSettings();
+            const cmd = settings.quickCommands[index];
+            if (!cmd) return;
+
+            currentEditingIndex = index;
+            document.getElementById('quickCommandModal').style.display = 'block';
+            document.getElementById('qcTitle').value = cmd.title;
+            document.getElementById('qcPrompt').value = cmd.prompt;
+            
+            // 设置模型选择
+            const modelSelect = document.getElementById('qcModel');
+            if (cmd.modelValue) {
+                selectModelByPair(modelSelect, cmd.modelValue, cmd.modelProvider);
+            }
+
+            // 更改按钮文本为“保存”
+            const confirmBtn = document.querySelector('#quickCommandModal .settings-button:last-child');
+            if (confirmBtn) confirmBtn.textContent = '保存';
+        }
+
+        function closeQuickCommandModal() {
+            document.getElementById('quickCommandModal').style.display = 'none';
+            currentEditingIndex = -1;
+        }
+
+        function saveQuickCommand() {
+            const title = document.getElementById('qcTitle').value.trim();
+            const prompt = document.getElementById('qcPrompt').value.trim();
+            const modelSelect = document.getElementById('qcModel');
+            
+            if (modelSelect.selectedIndex === -1) {
+                window.services.showNotification('请选择一个模型');
+                return;
+            }
+
+            const modelValue = modelSelect.value;
+            const modelLabel = modelSelect.options[modelSelect.selectedIndex].text;
+            const modelProvider = modelSelect.options[modelSelect.selectedIndex].dataset.provider;
+
+            if (!title) {
+                window.services.showNotification('请输入指令名称');
+                return;
+            }
+
+            const settings = window.services.getSettings();
+            if (!settings.quickCommands) settings.quickCommands = [];
+            
+            const commandData = {
+                title,
+                prompt,
+                modelValue,
+                modelLabel,
+                modelProvider
+            };
+
+            if (currentEditingIndex >= 0) {
+                // 编辑模式：更新现有指令
+                settings.quickCommands[currentEditingIndex] = commandData;
+            } else {
+                // 新增模式：添加到末尾
+                settings.quickCommands.push(commandData);
+            }
+            
+            window.services.saveSettings(settings);
+            syncQuickCommandsToFeatures(settings); // 同步更新
+            updateQuickCommandList();
+            closeQuickCommandModal();
+        }
+
+        function removeQuickCommand(index) {
+            const settings = window.services.getSettings();
+            settings.quickCommands.splice(index, 1);
+            window.services.saveSettings(settings);
+            syncQuickCommandsToFeatures(settings); // 同步更新
+            updateQuickCommandList();
+        }
+
+        // 发送消息逻辑
+        // forceLocal=true 时跳过总指挥路由，直接由本助手回答（派发卡片的回退入口）
+        async function sendMessage(forceLocal = false, presetMessage = null, skipUserBubble = false) {
+            if (activeResponse) {
+                window.services.showNotification('请等待当前回复完成，或撤回当前提问');
+                return;
+            }
+            const input = document.getElementById('promptInput');
+            const message = presetMessage !== null ? String(presetMessage).trim() : input.value.trim();
+            
+            // 检查是否有消息或文件
+            if (!message && !currentFile) return;
+
+            // Jev 对每条提问都作判断；附件只传文件名和类型供路由，不能假装已把文件交给目标插件。
+            let routingNotice = '';
+            if (!forceLocal && !presetMessage) {
+                const routeText = currentFile
+                    ? `${message || '处理这个附件'}\n[附件名称：${currentFile.name}；附件类型：${currentFile.type}]`
+                    : message;
+                const decision = await detectDelegation(routeText);
+                if (decision.notice) {
+                    routingNotice = decision.notice;
+                    addRoutingNotice(routingNotice);
+                }
+                const route = decision.route;
+                if (route && currentFile) {
+                    routingNotice = `Jev 选中了「${route.name}」，但当前插件调用通道不能转交附件；本轮交由当前 LLM 处理，未打开该插件。`;
+                    addRoutingNotice(routingNotice);
+                } else if (route) {
+                    addMessage(message, true);
+                    input.value = '';
+                    input.style.height = 'auto';
+                    const card = addDispatchCard(route, message);
+                    const result = await window.services.delegateToPlugin(
+                        route.folder,
+                        route.feature,
+                        message,
+                        { autoRun: route.autoRun === true }
+                    );
+                    card.done(result);
+                    return;
+                }
+            }
+
+            // 收集系统消息
+            const systemMessages = Array.from(document.getElementsByClassName('system-message'))
+                .map(el => el.querySelector('.system-message-content').textContent);
+            
+            // 更新历史记录中的系统消息
+            if (systemMessages.length > 0) {
+                chatHistory = chatHistory.filter(msg => msg.role !== 'system');
+                systemMessages.forEach(content => {
+                    if (content && content.trim()) {
+                        chatHistory.push({
+                            role: 'system',
+                            content: content.trim(),
+                            timestamp: new Date()
+                        });
+                    }
+                });
+            }
+
+            // 当前提问由 callAPI 单独附加；历史上下文必须在显示本轮用户气泡前截取，避免重复发送。
+            const conversationHistory = chatHistory.filter(msg =>
+                ['user', 'assistant', 'system'].includes(msg.role)
+            ).map(msg => ({ role: msg.role, content: msg.content }));
+            if (routingNotice) conversationHistory.push({ role: 'system', content: routingNotice });
+            if (skipUserBubble && conversationHistory.at(-1)?.role === 'user'
+                && conversationHistory.at(-1).content === message) conversationHistory.pop();
+
+            // 添加用户消息
+            let displayContent = message;
+            if (currentFile) {
+                displayContent += `\n\n[附件: ${document.getElementById('fileName').textContent}]`;
+            }
+            // 回退路径（skipUserBubble）中用户消息已在派发前展示，不再重复
+            const userMessage = skipUserBubble
+                ? chatHistory.findLast(item => item.role === 'user' && item.content === displayContent)
+                : addMessage(displayContent, true);
+            
+            // 清理输入和文件
+            input.value = '';
+            input.style.height = 'auto';
+            const fileToSend = currentFile; // 保存当前文件引用用于发送
+            clearFile();
+
+            // 添加AI思考占位符
+            const aiMessageDiv = document.createElement('div');
+            aiMessageDiv.className = 'message ai-message';
+            const aiBody = document.createElement('div');
+            aiBody.className = 'message-body';
+            aiBody.textContent = '正在思考...';
+            aiMessageDiv.appendChild(aiBody);
+            document.getElementById('chatContainer').appendChild(aiMessageDiv);
+            aiMessageDiv.scrollIntoView({ behavior: 'smooth' });
+            const responseState = { userId: userMessage?.id, reader: null, cancelled: false, element: aiMessageDiv };
+            activeResponse = responseState;
+
+            try {
+                const modelSelect = document.getElementById('currentModel');
+                const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+                
+                const modelConfig = {
+                    value: selectedOption.value,
+                    provider: selectedOption.dataset.provider,
+                    isCustom: selectedOption.dataset.isCustom === 'true'
+                };
+
+                // 发送请求，包含文件
+                const responseStream = await window.services.callAPI(message, modelConfig, conversationHistory, fileToSend);
+                if (responseState.cancelled) return;
+
+                let responseBuffer = '';
+                const reader = responseStream.getReader();
+                responseState.reader = reader;
+
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (responseState.cancelled) return;
+                    if (done) break;
+                    responseBuffer += value;
+                    aiBody.innerHTML = formatResponse(responseBuffer);
+                    const container = document.getElementById('chatContainer');
+                    if (container.scrollHeight - container.scrollTop - container.clientHeight < 100) {
+                         aiMessageDiv.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }
+
+                // 记录助手消息
+                const assistantMessage = {
+                    id: createMessageId(),
+                    role: 'assistant',
+                    content: responseBuffer,
+                    timestamp: new Date().toISOString()
+                };
+                chatHistory.push(assistantMessage);
+                aiMessageDiv.dataset.messageId = assistantMessage.id;
+                addMessageActions(aiMessageDiv, assistantMessage);
+                persistConversation();
+
+            } catch (error) {
+                if (responseState.cancelled) return;
+                console.error(error);
+                aiBody.textContent = `请求失败: ${error.message}`;
+                aiBody.style.color = '#dc2626';
+            } finally {
+                if (activeResponse === responseState) activeResponse = null;
+            }
+        }
+
+        function createMessageId() {
+            return `message-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+
+        function persistConversation() {
+            const firstUser = chatHistory.find(item => item.role === 'user');
+            window.services.saveConversation({
+                id: currentConversationId,
+                title: (firstUser?.content || '新对话').replace(/\s+/g, ' ').slice(0, 54),
+                updatedAt: new Date().toISOString(),
+                messages: chatHistory.map(item => ({ ...item, timestamp: new Date(item.timestamp).toISOString() }))
+            });
+        }
+
+        function addMessage(content, isUser) {
+            const message = {
+                id: createMessageId(),
+                role: isUser ? 'user' : 'assistant',
+                content: content,
+                timestamp: new Date().toISOString()
+            };
+            chatHistory.push(message);
+            renderMessage(message);
+            persistConversation();
+            return message;
+        }
+
+        function renderMessage(message) {
+            document.querySelector('.chat-empty')?.remove();
+            const div = document.createElement('div');
+            div.className = `message ${message.role === 'user' ? 'user-message' : 'ai-message'}`;
+            div.dataset.messageId = message.id;
+            const body = document.createElement('div');
+            body.className = 'message-body';
+            if (message.role === 'user') {
+                body.textContent = message.content;
+            } else {
+                body.innerHTML = formatResponse(message.content);
+            }
+            div.appendChild(body);
+            addMessageActions(div, message);
+            document.getElementById('chatContainer').appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth' });
+            return div;
+        }
+
+        function addMessageActions(container, message) {
+            const actions = document.createElement('div');
+            actions.className = 'message-actions';
+            const copy = document.createElement('button');
+            copy.type = 'button';
+            copy.setAttribute('aria-label', '复制消息');
+            copy.title = '复制';
+            copy.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>';
+            copy.onclick = () => window.services.copyToClipboard(message.content);
+            const withdraw = document.createElement('button');
+            withdraw.type = 'button';
+            withdraw.className = 'withdraw-button';
+            withdraw.setAttribute('aria-label', '撤回消息');
+            withdraw.title = '从本地聊天记录和后续上下文移除；已发送的请求无法撤销';
+            withdraw.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10a6 6 0 0 1 0 12h-2"></path></svg>';
+            withdraw.onclick = () => withdrawMessage(message.id);
+            actions.append(copy, withdraw);
+            container.appendChild(actions);
+        }
+
+        function withdrawMessage(messageId) {
+            const index = chatHistory.findIndex(item => item.id === messageId);
+            if (index < 0) return;
+            if (activeResponse?.userId === messageId) {
+                activeResponse.cancelled = true;
+                activeResponse.reader?.cancel().catch(() => {});
+                activeResponse.element.remove();
+            }
+            chatHistory.splice(index, 1);
+            const bubble = Array.from(document.querySelectorAll('.message[data-message-id]'))
+                .find(item => item.dataset.messageId === messageId);
+            bubble?.remove();
+            persistConversation();
+        }
+
+        // 输入框处理
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+            setTimeout(() => {
+                const textarea = event.target;
+                textarea.style.height = 'auto';
+                textarea.style.height = textarea.scrollHeight + 'px';
+            }, 0);
+        }
+        
+        /**
+         * 输入框内容变化时的处理（@ 搜索提示词、# 添加附件、自动高度）
+         * @param {KeyboardEvent} event
+         */
+        function handleInput(event) {
+            const textarea = event.target;
+            const text = textarea.value;
+            const caretPosition = textarea.selectionStart;
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+
+            if (text[caretPosition - 1] === '@') {
+                lastAtPosition = caretPosition - 1;
+                showPromptPopup();
+            } else if (document.getElementById('promptPopup').style.display === 'block') {
+                const searchText = text.slice(lastAtPosition + 1, caretPosition);
+                const searchInput = document.getElementById('promptSearchInput');
+                searchInput.value = searchText;
+                handlePromptSearch({ target: searchInput });
+            }
+
+            // 使用 # 触发添加附件
+            if (text[caretPosition - 1] === '#') {
+                handleFileUpload();
+            }
+        }
+
+        // 提示词搜索相关
+        function showPromptPopup() {
+            const popup = document.getElementById('promptPopup');
+            popup.style.display = 'flex';
+            const searchInput = document.getElementById('promptSearchInput');
+            searchInput.value = '';
+            searchInput.focus();
+            handlePromptSearch({ target: searchInput });
+        }
+
+        function hidePromptPopup() {
+            document.getElementById('promptPopup').style.display = 'none';
+            lastAtPosition = -1;
+            selectedPromptIndex = -1;
+            document.getElementById('promptInput').focus();
+        }
+
+        async function handlePromptSearch(event) {
+            const searchText = event.target.value;
+            const results = await window.services.searchPrompts(searchText);
+            promptsList = results;
+            displayPrompts(results);
+        }
+
+        function displayPrompts(prompts) {
+            const list = document.getElementById('promptSearchList');
+            list.innerHTML = '';
+            
+            if (!prompts || prompts.length === 0) {
+                list.innerHTML = '<div class="prompt-item"><div class="prompt-item-title">无匹配结果</div></div>';
+                return;
+            }
+            
+            prompts.forEach((prompt, index) => {
+                const div = document.createElement('div');
+                div.className = 'prompt-item' + (index === selectedPromptIndex ? ' selected' : '');
+                div.innerHTML = `
+                    <div class="prompt-item-title">${prompt.title}</div>
+                    <div class="prompt-item-preview">${prompt.preview}</div>
+                `;
+                div.onclick = () => selectPrompt(prompt);
+                list.appendChild(div);
+            });
+        }
+
+        /**
+         * 选择某个提示词并插入为系统消息
+         * @param {{title:string, preview:string, content:string}} prompt
+         */
+        function selectPrompt(prompt) {
+            window.services.addSystemMessage(prompt.content);
+            if (lastAtPosition !== -1) {
+                const textarea = document.getElementById('promptInput');
+                const currentText = textarea.value;
+                const caretPosition = textarea.selectionStart;
+                textarea.value = currentText.substring(0, lastAtPosition) + currentText.substring(caretPosition);
+            }
+            hidePromptPopup();
+        }
+
+        /**
+         * 提示词搜索输入框的键盘处理（上下选择、Enter 插入、Esc 关闭）
+         * @param {KeyboardEvent} event
+         */
+        function handlePromptKeyPress(event) {
+            const items = document.querySelectorAll('.prompt-item');
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                selectedPromptIndex = Math.min(selectedPromptIndex + 1, items.length - 1);
+                updatePromptSelection();
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                selectedPromptIndex = Math.max(selectedPromptIndex - 1, 0);
+                updatePromptSelection();
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                if (selectedPromptIndex < 0 && promptsList.length > 0) {
+                    selectPrompt(promptsList[0]);
+                } else if (selectedPromptIndex >= 0 && promptsList[selectedPromptIndex]) {
+                    selectPrompt(promptsList[selectedPromptIndex]);
+                }
+            } else if (event.key === 'Escape') {
+                hidePromptPopup();
+            }
+        }
+
+        function updatePromptSelection() {
+            const items = document.querySelectorAll('.prompt-item');
+            items.forEach((item, index) => {
+                item.classList.toggle('selected', index === selectedPromptIndex);
+                if (index === selectedPromptIndex) item.scrollIntoView({ block: 'nearest' });
+            });
+        }
+
+        // 格式化响应
+        function formatResponse(text) {
+            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            text = text.replace(/```(\w*)([\s\S]*?)```/g, (match, lang, code) => {
+                return `<div class="code-block">
+                    <div class="code-header">
+                        <span>${lang || 'code'}</span>
+                        <button onclick="window.services.copyToClipboard(this.parentElement.nextElementSibling.innerText)">复制</button>
+                    </div>
+                    <div class="code-content"><pre>${code.trim()}</pre></div>
+                </div>`;
+            });
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+            text = text.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+            text = text.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+            text = text.replace(/^\s*[\-\*]\s+(.*$)/gm, '<li>$1</li>');
+            text = text.replace(/\n/g, '<br>');
+            return text;
+        }
+        
+        function newChat() {
+            if (activeResponse) {
+                activeResponse.cancelled = true;
+                activeResponse.reader?.cancel().catch(() => {});
+                activeResponse = null;
+            }
+            chatHistory = [];
+            currentConversationId = `conversation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            document.getElementById('chatContainer').innerHTML = '';
+            clearFile();
+            showEmptyState();
+        }
+
+        function showEmptyState() {
+            const container = document.getElementById('chatContainer');
+            if (container.children.length) return;
+            const empty = document.createElement('div');
+            empty.className = 'chat-empty';
+            const title = document.createElement('h2');
+            title.textContent = '余汉波 AI 助手';
+            const hint = document.createElement('p');
+            hint.textContent = '说出目标即可。总指挥会先查已安装的本地插件；没有可靠匹配时，再交给 AI 插件或由本助手回复。';
+            const suggestions = document.createElement('div');
+            suggestions.className = 'chat-suggestions';
+            for (const example of ['将图片改成 ICO，调用插件', '会议总结：', '解释插件选择规则']) {
+                const button = document.createElement('button');
+                button.textContent = example;
+                button.onclick = () => {
+                    const input = document.getElementById('promptInput');
+                    input.value = example;
+                    input.focus();
+                };
+                suggestions.appendChild(button);
+            }
+            empty.append(title, hint, suggestions);
+            container.appendChild(empty);
+        }
+
+        /**
+         * 恢复到插件主界面并聚焦输入框
+         */
+        function restoreFocus() {
+            try {
+                if (window.utools && typeof window.utools.showMainWindow === 'function') {
+                    window.utools.showMainWindow();
+                }
+            } catch (e) {}
+            const input = document.getElementById('promptInput');
+            if (input) {
+                input.focus();
+                // 可选：将光标移到末尾
+                const len = input.value.length;
+                input.selectionStart = input.selectionEnd = len;
+            }
+        }
+
+        /**
+         * 拖拽覆盖事件处理，允许拖拽文件进入输入容器
+         * @param {DragEvent} event
+         */
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+        }
+
+        /**
+         * 拖拽放下事件处理，将拖入的文件加入附件并预览
+         * @param {DragEvent} event
+         */
+        function handleDrop(event) {
+            event.preventDefault();
+            const files = event.dataTransfer && event.dataTransfer.files;
+            if (!files || files.length === 0) return;
+            const fileObj = files[0];
+            const filePath = fileObj.path || fileObj.name; // Electron 提供 path；浏览器仅有 name
+            if (!filePath) return;
+            try {
+                const fileData = window.services.readFile(fileObj.path || filePath);
+                currentFile = fileData;
+                const preview = document.getElementById('filePreview');
+                const fileName = document.getElementById('fileName');
+                fileName.textContent = fileData.name + (fileData.type === 'image' ? ' (图片)' : ' (文本)');
+                preview.style.display = 'flex';
+            } catch (error) {
+                window.services.showNotification(error.message);
+            }
+            restoreFocus();
+        }
+        
+        async function showChatHistory() {
+            const modal = document.getElementById('historyModal');
+            const list = document.getElementById('historyList');
+            list.innerHTML = '<div class="history-empty">加载中...</div>';
+            document.getElementById('historySearch').value = '';
+            modal.style.display = 'block';
+            try {
+                // 历史列表只读取插件缓存；Markdown 导出是独立文件，不混入可清理的缓存列表。
+                historyRecords = window.services.getConversations()
+                    .filter(item => item?.id && item.messages?.length)
+                    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+                renderHistoryList();
+            } catch (e) {
+                list.innerHTML = '<div class="history-empty">加载失败，请重试。</div>';
+            }
+        }
+
+        function renderHistoryList() {
+            const list = document.getElementById('historyList');
+            const term = document.getElementById('historySearch').value.trim().normalize('NFKC').toLocaleLowerCase();
+            const entries = historyRecords.filter(item => !term || [item.title,
+                ...(item.messages || []).map(message => message.content)].some(value =>
+                String(value || '').normalize('NFKC').toLocaleLowerCase().includes(term)));
+            document.getElementById('historyCount').textContent = term
+                ? `找到 ${entries.length} 条，共 ${historyRecords.length} 条` : `共 ${historyRecords.length} 条`;
+            document.getElementById('clearHistoryButton').disabled = historyBusy || !historyRecords.length;
+            list.replaceChildren();
+            if (!entries.length) {
+                const empty = document.createElement('div');
+                empty.className = 'history-empty';
+                empty.textContent = historyRecords.length ? '没有匹配的历史记录。'
+                    : '暂无聊天记录。开始对话后会自动保存到插件缓存，无需设置导出目录。';
+                list.appendChild(empty);
+                return;
+            }
+            entries.forEach(entry => {
+                    const row = document.createElement('div');
+                    row.className = 'history-item';
+                    row.dataset.conversationId = entry.id;
+                    const open = document.createElement('button');
+                    open.type = 'button';
+                    open.className = 'history-open';
+                    open.disabled = historyBusy;
+                    const head = document.createElement('div');
+                    head.className = 'history-item-header';
+                    const date = document.createElement('span');
+                    const updatedAt = new Date(entry.updatedAt);
+                    date.textContent = Number.isNaN(updatedAt.getTime()) ? '时间未知' : updatedAt.toLocaleString();
+                    const source = document.createElement('span');
+                    source.textContent = '插件缓存';
+                    head.append(date, source);
+                    const title = document.createElement('div');
+                    title.style.fontWeight = '600';
+                    title.textContent = entry.title || '未命名对话';
+                    const preview = document.createElement('div');
+                    preview.className = 'history-item-content';
+                    preview.textContent = entry.messages.find(message => message.role === 'user')?.content || '';
+                    open.append(head, title, preview);
+                    open.onclick = () => restoreConversation(entry);
+                    const remove = document.createElement('button');
+                    remove.type = 'button';
+                    remove.className = 'history-delete';
+                    remove.textContent = '删除';
+                    remove.title = '仅删除插件缓存，不删除已导出的 Markdown 文件';
+                    remove.setAttribute('aria-label', `删除对话：${title.textContent}`);
+                    remove.disabled = historyBusy;
+                    remove.onclick = () => deleteHistoryConversation(entry);
+                    row.append(open, remove);
+                    list.appendChild(row);
+            });
+        }
+
+        async function deleteHistoryConversation(conversation) {
+            if (historyBusy || !conversation?.id) return;
+            if (activeResponse) return window.services.showNotification('请等待当前回复完成，或先撤回当前提问');
+            if (!window.confirm(`确定删除历史对话“${conversation.title || '未命名对话'}”吗？已导出的 Markdown 文件不会被删除。`)) return;
+            historyBusy = true;
+            renderHistoryList();
+            try {
+                if (!await window.services.deleteConversation(conversation.id)) throw new Error('插件缓存写入失败');
+                if (currentConversationId === conversation.id) newChat();
+                historyRecords = historyRecords.filter(item => item.id !== conversation.id);
+            } catch (error) {
+                window.services.showNotification('删除历史记录失败: ' + error.message);
+            } finally {
+                historyBusy = false;
+                renderHistoryList();
+            }
+        }
+
+        async function clearAllHistory() {
+            if (historyBusy || !historyRecords.length) return;
+            if (activeResponse) return window.services.showNotification('请等待当前回复完成，或先撤回当前提问');
+            if (!window.confirm(`确定清空全部 ${historyRecords.length} 条插件缓存历史吗？已导出的 Markdown 文件不会被删除。`)) return;
+            historyBusy = true;
+            renderHistoryList();
+            try {
+                if (!await window.services.clearConversations()) throw new Error('插件缓存清理失败');
+                newChat();
+                historyRecords = [];
+            } catch (error) {
+                window.services.showNotification('清空历史记录失败: ' + error.message);
+            } finally {
+                historyBusy = false;
+                renderHistoryList();
+            }
+        }
+        
+        function closeHistoryModal() {
+            document.getElementById('historyModal').style.display = 'none';
+        }
+
+        async function importExportedChat() {
+            if (!window.services.getSettings().savePath) {
+                window.services.showNotification('请先在设置中选择 Markdown 导出目录');
+                return;
+            }
+            const filePath = window.services.chooseChatExport();
+            if (filePath) await loadChatHistory(filePath);
+        }
+        
+        async function loadChatHistory(path) {
+            try {
+                const content = await window.services.loadChatFile(path);
+                const messages = [];
+                for (const part of content.split(/^---\s*$/m)) {
+                    const match = part.trim().match(/^### (用户|AI|系统) \(([^)]*)\)\s*\n([\s\S]*)$/);
+                    if (!match) continue;
+                    const parsedTime = new Date(match[2]);
+                    messages.push({ id: createMessageId(), role: match[1] === '用户' ? 'user'
+                        : match[1] === 'AI' ? 'assistant' : 'system',
+                        content: match[3].trim(), timestamp: Number.isNaN(parsedTime.getTime())
+                            ? new Date().toISOString() : parsedTime.toISOString() });
+                }
+                if (!messages.length) throw new Error('文件中没有可识别的聊天消息');
+                restoreConversation({ id: `conversation-${Date.now()}`, messages });
+            } catch (e) {
+                window.services.showNotification('加载失败: ' + e.message);
+            }
+        }
+
+        function restoreConversation(conversation) {
+            newChat();
+            currentConversationId = conversation.id;
+            chatHistory = (conversation.messages || []).map(item => ({ ...item, id: item.id || createMessageId() }));
+            chatHistory.forEach(item => {
+                if (item.role === 'system') window.services.addSystemMessage(item.content);
+                else if (item.role === 'user' || item.role === 'assistant') renderMessage(item);
+            });
+            closeHistoryModal();
+        }
+        
+        async function saveChatToFile() {
+            if (chatHistory.length === 0) {
+                window.services.showNotification('没有内容可保存');
+                return;
+            }
+            const content = chatHistory.map(msg => {
+                const roleName = msg.role === 'user' ? '用户' : (msg.role === 'assistant' ? 'AI' : '系统');
+                return `### ${roleName} (${new Date(msg.timestamp).toLocaleString()})\n\n${msg.content}\n\n---\n`;
+            }).join('\n');
+            await window.services.saveChatHistory(content);
+        }
+    </script>
+</body>
+</html>

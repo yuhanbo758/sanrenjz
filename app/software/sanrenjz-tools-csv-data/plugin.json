@@ -1,0 +1,48 @@
+{
+  "pluginName": "CSV 数据表",
+  "description": "导入或拖入 CSV、TSV、JSON，检查、筛选、排序并导出表格。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-csv-table",
+      "explain": "CSV表格",
+      "description": "导入或拖入 CSV、TSV、JSON，检查、筛选、排序并导出表格。",
+      "cmds": [
+        "csv",
+        "csv转json",
+        "表格工具",
+        {
+          "type": "over",
+          "label": "用CSV 数据表处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

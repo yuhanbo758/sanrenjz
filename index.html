@@ -1,0 +1,2894 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>三人聚智</title>
+    <!-- 说明：已移除外部图标库引用，避免因完整性校验(integrity)或网络问题导致资源阻断。
+         调整按钮样式与结构，使文字在按钮内居中显示。 -->
+    <style>
+        :root {
+            --primary-color: #1890ff;
+            --primary-hover: #40a9ff;
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-color: #262626;
+            --text-secondary: #595959;
+            --border-color: #d9d9d9;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --header-height: 52px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+
+        #header {
+            background-color: var(--card-bg);
+            padding: 0 18px;
+            height: var(--header-height);
+            box-shadow: 0 1px 4px rgba(0,21,41,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            z-index: 10;
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 800px;
+            position: relative;
+        }
+
+        #search-box {
+            width: 100%;
+            padding: 8px 14px;
+            border: 1px solid transparent;
+            border-radius: var(--radius-md);
+            background-color: #f5f5f5;
+            font-size: 14px;
+            transition: all 0.3s;
+            outline: none;
+            box-sizing: border-box;
+            height: 36px;
+        }
+
+        #search-box:focus {
+            background-color: #fff;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .header-button {
+            padding: 0 12px;
+            height: 32px;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            background-color: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+        }
+
+        .header-button:hover {
+            color: var(--primary-color);
+            background-color: #e6f7ff;
+        }
+
+        .account-menu {
+            position: relative;
+        }
+
+        .avatar-button {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 1px solid #d9d9d9;
+            background: linear-gradient(135deg, #1890ff, #52c41a);
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            position: relative;
+            overflow: hidden;
+            padding: 0;
+        }
+
+        .avatar-button img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .avatar-button.member::after {
+            content: 'tools';
+            position: absolute;
+            right: -8px;
+            bottom: -8px;
+            padding: 1px 5px;
+            border-radius: 999px;
+            background: #52c41a;
+            color: #fff;
+            font-size: 10px;
+            line-height: 14px;
+            border: 1px solid #fff;
+        }
+
+        .account-dropdown {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 44px;
+            min-width: 220px;
+            background: #fff;
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+            z-index: 100;
+            overflow: hidden;
+        }
+
+        .account-dropdown.show {
+            display: block;
+        }
+
+        .account-summary {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .account-name {
+            font-weight: 600;
+            color: #262626;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .account-status {
+            font-size: 12px;
+            color: #8c8c8c;
+        }
+
+        .account-dropdown button {
+            width: 100%;
+            padding: 10px 16px;
+            border: 0;
+            background: #fff;
+            color: #262626;
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .account-dropdown button:hover {
+            background: #f5f5f5;
+        }
+
+        .account-dropdown button.danger {
+            color: #ff4d4f;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.45);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal.show {
+            display: flex;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-content img {
+            max-width: 100%;
+            max-height: 80vh;
+            display: block;
+        }
+
+        .settings-modal-content {
+            width: 800px;
+            max-width: 95vw;
+            height: 600px;
+            max-height: 85vh;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .settings-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        .settings-sidebar {
+            width: 200px;
+            background-color: #f5f7fa;
+            border-right: 1px solid #e1e4e8;
+            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-item {
+            padding: 12px 24px;
+            cursor: pointer;
+            color: var(--text-color);
+            transition: all 0.2s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .sidebar-item:hover {
+            background-color: #e6f7ff;
+            color: var(--primary-color);
+        }
+
+        .sidebar-item.active {
+            background-color: #e6f7ff;
+            color: var(--primary-color);
+            border-right: 3px solid var(--primary-color);
+        }
+
+        .settings-main {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+
+        .settings-tab-content {
+            display: none;
+        }
+
+        .settings-tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        .settings-modal-content h2 {
+            margin: 0 0 24px 0;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .plugin-details-content {
+            width: 880px;
+            max-width: 96vw;
+            height: 680px;
+            max-height: 90vh;
+        }
+
+        .plugin-details-content h2 {
+            padding: 24px 28px 16px;
+            margin: 0;
+            font-size: 20px;
+            border-bottom: 1px solid var(--border-color, #eee);
+            flex-shrink: 0;
+        }
+
+        #plugin-details-body {
+            flex: 1;
+            overflow-y: auto;
+            color: var(--text-color);
+            padding: 20px 28px 24px;
+        }
+
+        .plugin-details-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .plugin-details-meta span {
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: #f5f7fa;
+            color: #595959;
+            font-size: 13px;
+        }
+
+        .plugin-details-desc {
+            margin-bottom: 20px;
+            padding: 14px 16px;
+            background: linear-gradient(180deg, #fafcff 0%, #f7faff 100%);
+            border: 1px solid #e6f4ff;
+            border-radius: 12px;
+            line-height: 1.8;
+            color: #262626;
+        }
+
+        .plugin-details-section {
+            margin-top: 22px;
+        }
+
+        .plugin-details-section-title {
+            margin: 0 0 12px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #262626;
+        }
+
+        .plugin-feature-card {
+            padding: 14px 16px;
+            border: 1px solid #edf0f2;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            background: #fafafa;
+        }
+
+        .plugin-feature-title {
+            font-weight: 600;
+            color: #262626;
+            margin-bottom: 6px;
+        }
+
+        .plugin-feature-desc {
+            color: #595959;
+            line-height: 1.7;
+        }
+
+        .plugin-feature-cmds {
+            margin-top: 10px;
+            color: #8c8c8c;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .plugin-doc-content {
+            background: #fcfcfd;
+            border: 1px solid #eef1f4;
+            border-radius: 14px;
+            padding: 20px 22px;
+            line-height: 1.8;
+            font-size: 14px;
+            color: #262626;
+        }
+
+        .plugin-doc-content h1,
+        .plugin-doc-content h2,
+        .plugin-doc-content h3,
+        .plugin-doc-content h4 {
+            margin: 1.2em 0 0.6em;
+            color: #1f1f1f;
+            line-height: 1.35;
+        }
+
+        .plugin-doc-content h1 {
+            font-size: 24px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .plugin-doc-content h2 {
+            font-size: 20px;
+        }
+
+        .plugin-doc-content h3 {
+            font-size: 17px;
+        }
+
+        .plugin-doc-content p {
+            margin: 0.7em 0;
+        }
+
+        .plugin-doc-content ul,
+        .plugin-doc-content ol {
+            margin: 0.7em 0;
+            padding-left: 1.5em;
+        }
+
+        .plugin-doc-content li {
+            margin: 0.3em 0;
+        }
+
+        .plugin-doc-content pre {
+            margin: 1em 0;
+            padding: 14px 16px;
+            background: #0f172a;
+            color: #e2e8f0;
+            border-radius: 12px;
+            overflow-x: auto;
+            line-height: 1.6;
+        }
+
+        .plugin-doc-content code {
+            font-family: Consolas, Monaco, 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .plugin-doc-content :not(pre) > code {
+            padding: 2px 6px;
+            background: #f4f6f8;
+            color: #c7254e;
+            border-radius: 6px;
+        }
+
+        .plugin-doc-content blockquote {
+            margin: 1em 0;
+            padding: 10px 14px;
+            border-left: 4px solid #91caff;
+            background: #f6fbff;
+            color: #595959;
+            border-radius: 8px;
+        }
+
+        .plugin-doc-content strong {
+            color: #1f1f1f;
+        }
+
+        /* Plugin Management Styles */
+        .plugin-management-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .plugin-management-item {
+            background: #fff;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.3s;
+        }
+
+        .plugin-management-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-color: #d9d9d9;
+        }
+
+        .pm-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+        
+        .pm-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            object-fit: cover;
+        }
+
+        .pm-icon-placeholder {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .pm-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pm-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: #262626;
+        }
+
+        .pm-desc {
+            font-size: 12px;
+            color: #8c8c8c;
+            margin-top: 2px;
+            display: -webkit-box;
+            line-clamp: 1;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .pm-details {
+            padding-top: 16px;
+            border-top: 1px solid #f0f0f0;
+            display: none;
+        }
+        
+        .pm-details.expanded {
+            display: block;
+        }
+
+        .pm-toggle-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .pm-toggle-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .pm-toggle-label {
+            font-size: 14px;
+            color: #595959;
+        }
+
+        /* Switch Toggle Style */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #1890ff;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        .pm-keyword-section {
+            margin-bottom: 16px;
+        }
+
+        .pm-keyword-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            margin-top: 8px;
+            font-size: 14px;
+        }
+
+        .pm-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .pm-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid #d9d9d9;
+            background: #fff;
+            color: #595959;
+            transition: all 0.2s;
+        }
+
+        .pm-btn:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+        }
+
+        .pm-btn.danger:hover {
+            border-color: #ff4d4f;
+            color: #ff4d4f;
+        }
+
+        .setting-item {
+            margin-bottom: 24px;
+            padding: 20px;
+            background: #fafafa;
+            border-radius: var(--radius-md);
+            border: 1px solid #f0f0f0;
+            display: flex;
+            gap: 16px;
+            transition: all 0.3s;
+            align-items: flex-start;
+        }
+
+        .setting-item:hover {
+            border-color: #d9d9d9;
+            box-shadow: var(--shadow-sm);
+            background: #fff;
+        }
+
+        .setting-label {
+            width: 140px;
+            flex-shrink: 0;
+            font-weight: 500;
+            padding-top: 6px;
+            color: var(--text-color);
+        }
+
+        .setting-control {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .setting-control-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        input[type="text"] {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            outline: none;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        input[type="range"] {
+            width: 200px;
+            height: 6px;
+            background: #ddd;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .setting-item button {
+            padding: 6px 16px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            color: var(--text-color);
+        }
+
+        .setting-item button:hover {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            transform: translateY(-1px);
+        }
+
+        .setting-item button.danger {
+            border-color: #ff4d4f;
+            color: #ff4d4f;
+        }
+
+        .setting-item button.danger:hover {
+            background: #ff4d4f;
+            color: #fff;
+        }
+
+        .setting-description {
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .delay-value-display {
+            background: #f0f0f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #666;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .path-input-group {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .path-input-group input {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .path-input-group button {
+            flex-shrink: 0;
+        }
+
+        .update-modal-content {
+            width: 480px;
+            max-width: 95vw;
+        }
+
+        .update-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+
+        .update-source-tag {
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #e6f7ff;
+            color: #1890ff;
+            font-size: 12px;
+        }
+
+        .update-source-tag.member-source {
+            background: #f6ffed;
+            color: #52c41a;
+        }
+
+        .update-progress-wrap {
+            margin-top: 18px;
+            height: 8px;
+            border-radius: 999px;
+            background: #f0f0f0;
+            overflow: hidden;
+        }
+
+        .update-progress-bar {
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #1890ff, #52c41a);
+            transition: width 0.2s;
+        }
+
+        .update-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 22px;
+        }
+
+        .update-actions button {
+            padding: 8px 14px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .update-actions button.primary {
+            border-color: #1890ff;
+            background: #1890ff;
+            color: #fff;
+        }
+
+        .update-actions button.success {
+            border-color: #52c41a;
+            background: #52c41a;
+            color: #fff;
+        }
+
+        .update-actions button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .settings-section {
+            margin-top: 30px;
+            padding-top: 25px;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        .settings-section h3 {
+            margin-bottom: 20px;
+            color: #262626;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .settings-section-description {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .settings-footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            padding-bottom: 20px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .settings-footer button {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .settings-footer button:hover {
+            background: #096dd9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+        }
+
+        .close-button {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: transparent;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.3s;
+            z-index: 10;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .close-button:hover {
+            color: var(--text-color);
+            background-color: rgba(0,0,0,0.05);
+        }
+
+        /* Plugins Container */
+        #plugins-container {
+            flex: 1;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+            align-content: start;
+        }
+
+        .plugin-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            border: 1px solid #f0f0f0;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.3s;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .plugin-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+            border-color: #e6f7ff;
+        }
+
+        .plugin-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .plugin-logo {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            flex-shrink: 0;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(102, 126, 234, 0.25);
+        }
+        
+        .plugin-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .plugin-title-section {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .plugin-card h3 {
+            margin: 0 0 6px 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-color);
+            line-height: 1.3;
+        }
+
+        .plugin-card p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: -webkit-box;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.6;
+            height: 3.2em;
+        }
+
+        .plugin-actions {
+            margin-top: 12px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .details-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-color);
+            transition: all 0.2s ease;
+        }
+
+        .details-btn:hover {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            background: #e6f7ff;
+        }
+
+        .plugin-info {
+            margin-top: 16px;
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: #8c8c8c;
+            border-top: 1px solid #f0f0f0;
+            padding-top: 12px;
+        }
+        
+        .plugin-info span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #fff;
+            padding: 16px 24px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            z-index: 2000;
+            animation: slideInRight 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            border-left: 4px solid var(--primary-color);
+            min-width: 320px;
+            max-width: 450px;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .notification.success { border-color: #52c41a; }
+        .notification.error { border-color: #ff4d4f; }
+        .notification.warning { border-color: #faad14; }
+
+        .notification-icon { font-size: 20px; margin-top: 2px; }
+        .notification.success .notification-icon { color: #52c41a; }
+        .notification.error .notification-icon { color: #ff4d4f; }
+        .notification.warning .notification-icon { color: #faad14; }
+        .notification.info .notification-icon { color: #1890ff; }
+
+        .notification-content { flex: 1; }
+        .notification-title { font-weight: 600; font-size: 16px; margin-bottom: 4px; color: var(--text-color); }
+        .notification-message { color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+
+        #output-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1e1e1e;
+            color: #fff;
+            padding: 10px;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 900;
+        }
+        
+        #output-container.show {
+            display: block;
+        }
+        
+        .output-line {
+            margin: 0;
+            padding: 2px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .error-line { color: #ff4d4f; }
+        
+        .hotkey-display {
+            background: #f5f5f5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+            border: 1px solid #e8e8e8;
+        }
+
+        .pm-lifecycle { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-left: auto; }
+        .pm-lifecycle label { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; white-space: nowrap; cursor: pointer; }
+        .pm-lifecycle input { accent-color: var(--primary-color); }
+        @media (max-width: 800px) {
+            .pm-header { flex-wrap: wrap; }
+            .pm-lifecycle { width: 100%; margin: 8px 0 0 44px; }
+        }
+
+        /* 插件搜索设置样式 */
+        .plugin-search-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 12px;
+            padding: 16px 20px;
+            border: 1px solid #f0f0f0;
+            border-radius: 8px;
+            background: #fafafa;
+            transition: all 0.3s ease;
+        }
+
+        .plugin-search-item:hover {
+            background: #fff;
+            border-color: #d9d9d9;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .plugin-search-item .plugin-name {
+            font-weight: 600;
+            color: #262626;
+            font-size: 16px;
+            line-height: 1.3;
+            min-width: 120px;
+            flex-shrink: 0;
+        }
+
+        .plugin-search-item .keyword-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .plugin-search-item .keyword-input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .plugin-search-item .enable-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: #262626;
+            cursor: pointer;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .plugin-search-item .enable-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .plugin-search-item .enable-checkbox:hover {
+            color: #1890ff;
+        }
+    </style>
+    <link rel="stylesheet" href="merged-ui.css">
+</head>
+<body>
+    <div id="header">
+        <div class="search-container">
+            <input type="text" id="search-box" placeholder="搜索插件...">
+        </div>
+        <div class="header-buttons">
+            <!-- 函数级注释：已移除按钮图标，确保在无图标库的情况下文字居中显示 -->
+            <button class="header-button" id="local-file-btn">打开插件</button>
+            <button class="header-button" id="store-btn">插件商店</button>
+            <!-- 函数级注释：新增“H5工具”按钮，位于“插件商店”右侧，打开 https://h5.sanrenjz.com/ -->
+            <button class="header-button" id="h5-btn">H5工具</button>
+            <!-- 函数级注释：根据需求，调整按钮顺序，将“文档”与“联系我们”位置对调 -->
+            <button class="header-button" id="docs-btn">文档</button>
+            <button class="header-button" id="contact-btn">联系我们</button>
+            <button class="header-button" id="settings-btn">设置</button>
+            <div class="account-menu" id="account-menu">
+                <button class="avatar-button" id="avatar-btn" title="账号">
+                    <img src="build/icon.png" alt="账号头像">
+                </button>
+                <div class="account-dropdown" id="account-dropdown">
+                    <div class="account-summary">
+                        <div class="account-name" id="account-name">未登录</div>
+                        <div class="account-status" id="account-status">登录后分别查看两类会员状态</div>
+                    </div>
+                    <button id="account-login-btn">登录程序小店</button>
+                    <button id="account-refresh-btn">刷新会员状态</button>
+                    <button id="check-update-btn">检查更新</button>
+                    <button id="open-tools-store-btn">打开效率插件商店</button>
+                    <button id="account-logout-btn" class="danger">退出登录</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <nav class="engine-nav" aria-label="工具类型">
+        <button type="button" data-engine="tools" class="engine-tab active" aria-pressed="true">效率工具</button>
+        <button type="button" data-engine="python" class="engine-tab" aria-pressed="false">py程序</button>
+        <span id="engine-status">双击打开工具</span>
+        <button type="button" id="python-quick-logs" title="查看效率插件和 Python 程序运行日志">日志</button>
+        <button type="button" id="python-quick-settings" hidden>Python 环境</button>
+    </nav>
+    <div id="plugins-container"></div>
+
+    <div id="output-container">
+        <div id="output-content"></div>
+    </div>
+
+    <!-- 联系我们弹窗 -->
+    <div id="contact-modal" class="modal">
+        <div class="modal-content">
+            <button class="close-button">&times;</button>
+            <img src="https://gdsx.sanrenjz.com/PicGo/%E5%85%A8%E7%A0%81%E5%90%88%E4%B8%80.png" alt="联系我们">
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content settings-modal-content" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title">
+            <div class="settings-dialog-header">
+                <div><h1 id="settings-dialog-title">设置</h1><p>管理应用偏好、插件与 Python 环境</p></div>
+                <button type="button" class="close-button" aria-label="关闭设置">&times;</button>
+            </div>
+            <div class="settings-container">
+                <div class="settings-sidebar" role="tablist" aria-label="设置分类" aria-orientation="vertical">
+                    <button type="button" role="tab" aria-selected="true" aria-controls="general" class="sidebar-item active" data-target="general">常规设置</button>
+                    <button type="button" role="tab" aria-selected="false" aria-controls="shortcuts" class="sidebar-item" data-target="shortcuts">快捷键</button>
+                    <button type="button" role="tab" aria-selected="false" aria-controls="super-panel" class="sidebar-item" data-target="super-panel">超级面板</button>
+                    <button type="button" role="tab" aria-selected="false" aria-controls="plugins" class="sidebar-item" data-target="plugins">插件管理</button>
+                </div>
+                
+                <div class="settings-main">
+                    <!-- 常规设置 -->
+                    <div id="general" class="settings-tab-content active">
+                        <h2>常规设置</h2>
+                        <div class="setting-item">
+                            <div class="setting-label">开机自启动：</div>
+                            <div class="setting-control">
+                                <div class="setting-control-row">
+                                    <input type="checkbox" id="auto-start-checkbox">
+                                    <span>开机时自动启动应用</span>
+                                </div>
+                                <div class="setting-description">启用后将在系统启动时自动运行该应用</div>
+                            </div>
+                        </div>
+
+                        <div class="setting-item" style="flex-direction: column; align-items: stretch;">
+                            <div class="setting-label" style="width: 100%; margin-bottom: 12px;">插件数据存储位置：</div>
+                            <div class="setting-control">
+                                <div class="path-input-group">
+                                    <input type="text" id="plugin-data-path-input" placeholder="正在获取..." readonly>
+                                    <button id="change-plugin-data-path-btn" style="white-space: nowrap;">修改位置</button>
+                                    <button id="open-plugin-data-folder-btn" style="white-space: nowrap;">打开文件夹</button>
+                                    <button id="reset-plugin-data-path-btn" class="danger" style="white-space: nowrap;">重置默认</button>
+                                </div>
+                                <div class="setting-description">插件设置和缓存数据存储在此位置，每个插件的设置会保存为独立的JSON文件</div>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-label">插件存放位置：</div>
+                            <div class="setting-control">
+                                <div class="path-input-group">
+                                    <button id="open-plugin-install-folder-btn">打开本地插件文件夹</button>
+                                </div>
+                                <div class="setting-description">开发环境为 app/software，安装版为程序安装目录下的 plugins 文件夹</div>
+                            </div>
+                        </div>
+
+                        <div class="setting-item settings-directory-card">
+                            <div class="setting-label">Python 插件配置</div>
+                            <div class="setting-control">
+                                <label class="visually-hidden" for="python-config-path">Python 插件配置目录</label>
+                                <input id="python-config-path" class="settings-path-input" readonly placeholder="正在读取配置目录…">
+                                <div class="setting-control-row">
+                                    <button id="python-config-choose" type="button">更改目录</button>
+                                    <button id="python-config-open" type="button">打开目录</button>
+                                    <button id="python-config-reset" type="button">恢复默认</button>
+                                </div>
+                                <p class="setting-description">更改后立即保存，只复制缺少的配置，保留目标已有内容。无需配置 Python。</p>
+                                <span id="python-config-feedback" class="setting-description" role="status" aria-live="polite"></span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-label">插件刷新：</div>
+                            <div class="setting-control">
+                                <div class="setting-control-row">
+                                    <button id="refresh-plugins-btn" type="button">手动刷新</button>
+                                    <span id="plugin-refresh-status" role="status" aria-live="polite"></span>
+                                </div>
+                                <div class="setting-description">直接向本地插件文件夹添加、更新或移除插件后，点击刷新即可同步插件列表、快捷搜索和超级面板，无需重新打开主程序</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 快捷键 -->
+                    <div id="shortcuts" class="settings-tab-content">
+                        <h2>快捷键</h2>
+                        <div class="setting-item">
+                            <div class="setting-label">全局快捷键：</div>
+                            <div class="setting-control">
+                                <div class="setting-control-row">
+                                    <input type="text" id="global-hotkey-input" placeholder="按下组合键..." style="width: 180px;" readonly>
+                                    <button id="change-hotkey-btn">修改</button>
+                                    <button type="button" id="use-alt-space-btn" title="直接选择 Alt+空格，保存时检查占用">Alt+Space</button>
+                                </div>
+                                <div class="setting-description">用于唤起全局搜索窗口；Alt+Space 即 Alt+空格</div>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <div class="setting-label">钉住快捷键：</div>
+                            <div class="setting-control">
+                                <div class="setting-control-row">
+                                    <input type="text" id="pin-hotkey-input" placeholder="按下组合键..." style="width: 180px;" readonly>
+                                    <button id="change-pin-hotkey-btn">修改</button>
+                                </div>
+                                <div class="setting-description">用于钉住/取消钉住窗口的快捷键</div>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-label">超级面板快捷键：</div>
+                            <div class="setting-control">
+                                <div class="setting-control-row">
+                                    <input type="text" id="super-panel-hotkey-input" placeholder="按下组合键..." style="width: 180px;" readonly>
+                                    <button id="change-super-panel-hotkey-btn">修改</button>
+                                    <button type="button" id="clear-super-panel-hotkey-btn">清除</button>
+                                </div>
+                                <div class="setting-description">设置快捷键以唤出超级面板</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 超级面板 -->
+                    <div id="super-panel" class="settings-tab-content">
+                        <h2>超级面板</h2>
+                        <div class="setting-item">
+                            <div class="setting-label">右键长按超级面板：</div>
+                            <div class="setting-control">
+                                <div class="setting-control-row">
+                                    <input type="checkbox" id="right-click-panel-checkbox">
+                                    <span>启用右键长按功能</span>
+                                </div>
+                                <div class="setting-description">启用后可以长按右键打开超级面板，智能推荐相关功能（仅Windows）</div>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <div class="setting-label">右键长按延迟：</div>
+                            <div class="setting-control">
+                                <div class="setting-control-row">
+                                        <input type="range" id="right-click-delay-slider" min="100" max="1000" step="10">
+                                        <span id="delay-value-label" class="delay-value-display">500ms</span>
+                                    </div>
+                                    <div class="setting-description">调整需要长按多久才触发超级面板</div>
+                                </div>
+                            </div>
+                        
+                    </div>
+
+                    <!-- 插件管理 -->
+                    <div id="plugins" class="settings-tab-content">
+                        <h2>插件管理</h2>
+                        <p class="setting-description">效率工具与 py程序统一管理，选项勾选后立即保存。默认全部显示、不自动启动；自启动在下次启动主程序时生效。隐藏的插件仍可在此恢复，也可通过快捷搜索打开。</p>
+                        <div id="plugin-management-status" class="setting-description" role="status" aria-live="polite"></div>
+                        <div class="plugin-manager-filters">
+                            <select id="plugin-manager-engine" aria-label="插件类型">
+                                <option value="all">全部插件</option>
+                                <option value="tools">效率工具</option>
+                                <option value="python">py程序</option>
+                            </select>
+                            <input type="search" id="plugin-manager-search" aria-label="搜索插件" placeholder="搜索插件名称、描述...">
+                        </div>
+                        <div class="plugin-management-list" id="plugin-management-list">
+                            <!-- Plugin items will be generated here -->
+                        </div>
+                        <p id="plugin-management-empty" class="setting-description" hidden>没有符合条件的插件。</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="settings-footer">
+                <span id="settings-save-hint" role="status" aria-live="polite">修改后点击保存设置生效</span>
+                <div class="settings-footer-actions"><button id="settings-close-btn" type="button">关闭</button><button id="save-settings-btn" type="button">保存设置</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 插件详情弹窗 -->
+    <div id="plugin-details-modal" class="modal">
+        <div class="modal-content settings-modal-content plugin-details-content">
+            <button class="close-button">&times;</button>
+            <h2 id="plugin-details-title">插件详情</h2>
+            <div id="plugin-details-body"></div>
+        </div>
+    </div>
+
+    <!-- 更新弹窗 -->
+    <div id="update-modal" class="modal">
+        <div class="modal-content update-modal-content">
+            <button class="close-button">&times;</button>
+            <h2>应用更新</h2>
+            <div class="update-row">
+                <span>当前版本</span>
+                <span id="current-version">-</span>
+            </div>
+            <div class="update-row">
+                <span>更新源</span>
+                <span class="update-source-tag" id="update-source">GitHub Releases</span>
+            </div>
+            <div class="update-row">
+                <span>状态</span>
+                <span id="update-message">尚未检查</span>
+            </div>
+            <div class="update-progress-wrap">
+                <div class="update-progress-bar" id="update-progress-bar"></div>
+            </div>
+            <div class="update-actions">
+                <button id="update-check-btn">检查更新</button>
+                <button id="update-download-btn" class="primary" disabled>下载</button>
+                <button id="update-install-btn" class="success" disabled>安装重启</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer, shell } = require('electron');
+        const fs = require('fs');
+        const path = require('path');
+        
+        // 安全加载remote模块
+        let remote;
+        try {
+            remote = require('@electron/remote');
+        } catch (error) {
+            console.warn('无法加载@electron/remote模块:', error);
+            // 创建一个模拟的remote对象，避免代码报错
+            remote = {
+                dialog: {
+                    showMessageBox: async (options) => {
+                        // 使用IPC作为备选方案
+                        return await ipcRenderer.invoke('show-message-box', options);
+                    }
+                }
+            };
+        }
+
+        const accountState = {
+            authenticated: false,
+            canDownloadUpdates: false,
+            user: null
+        };
+
+        const updateState = {
+            source: 'github',
+            available: false,
+            downloaded: false,
+            progress: 0,
+            message: '尚未检查'
+        };
+
+        function getDisplayUserName(user) {
+            user = user || {};
+            return user.nickname || user.name || user.username || user.email || '已登录用户';
+        }
+
+        function updateAccountUI(account) {
+            Object.assign(accountState, account || { authenticated: false, canDownloadUpdates: false, user: null });
+            const avatarBtn = document.getElementById('avatar-btn');
+            const accountName = document.getElementById('account-name');
+            const accountStatus = document.getElementById('account-status');
+            const loginBtn = document.getElementById('account-login-btn');
+            const logoutBtn = document.getElementById('account-logout-btn');
+            const refreshBtn = document.getElementById('account-refresh-btn');
+
+            avatarBtn.classList.toggle('member', Boolean(accountState.canDownloadUpdates));
+            accountName.textContent = accountState.authenticated ? getDisplayUserName(accountState.user) : '未登录';
+            accountStatus.textContent = accountState.authenticated
+                ? ['tools', 'python'].map((k, i) => `${['效率工具', 'Python'][i]}：${!accountState.access?.[k]?.available ? '查询失败' : accountState.access[k].member ? '会员' : '普通用户'}`).join(' · ')
+                : '登录后分别查看两类会员状态';
+            loginBtn.style.display = accountState.authenticated ? 'none' : 'block';
+            logoutBtn.style.display = accountState.authenticated ? 'block' : 'none';
+            refreshBtn.style.display = accountState.authenticated ? 'block' : 'none';
+        }
+
+        async function loadAccount() {
+            try {
+                const account = await ipcRenderer.invoke('account:me');
+                updateAccountUI(account);
+            } catch (error) {
+                console.error('加载账号状态失败:', error);
+                updateAccountUI({ authenticated: false, canDownloadUpdates: false, user: null });
+            }
+        }
+
+        function setUpdateButtons() {
+            document.getElementById('update-download-btn').disabled = !updateState.available;
+            document.getElementById('update-install-btn').disabled = !updateState.downloaded;
+        }
+
+        function updateUpdateUI() {
+            const sourceEl = document.getElementById('update-source');
+            sourceEl.textContent = updateState.source === 'object-storage' ? '会员对象存储' : 'GitHub Releases';
+            sourceEl.classList.toggle('member-source', updateState.source === 'object-storage');
+            document.getElementById('update-message').textContent = updateState.message || '尚未检查';
+            document.getElementById('update-progress-bar').style.width = `${Math.max(0, Math.min(100, updateState.progress || 0))}%`;
+            setUpdateButtons();
+        }
+
+        function handleUpdateStatus(payload) {
+            if (!payload) return;
+            updateState.source = payload.source || updateState.source;
+            if (payload.type === 'checking') {
+                updateState.available = false;
+                updateState.downloaded = false;
+                updateState.progress = 0;
+                updateState.message = '正在检查更新...';
+            } else if (payload.type === 'available') {
+                updateState.available = true;
+                updateState.downloaded = false;
+                updateState.progress = 0;
+                updateState.message = `发现新版本 ${payload.info?.version || ''}`.trim();
+            } else if (payload.type === 'not-available') {
+                updateState.available = false;
+                updateState.downloaded = false;
+                updateState.progress = 0;
+                updateState.message = '当前已是最新版本';
+            } else if (payload.type === 'download-progress') {
+                updateState.progress = Number(payload.progress?.percent || 0);
+                updateState.message = '正在下载更新...';
+            } else if (payload.type === 'downloaded') {
+                updateState.downloaded = true;
+                updateState.progress = 100;
+                updateState.message = payload.message || '更新已下载，重启后安装';
+            } else if (payload.type === 'error') {
+                updateState.message = payload.message || '更新失败';
+                showNotification('更新失败', updateState.message, 'error');
+            }
+            updateUpdateUI();
+        }
+
+        async function showUpdateModal(checkNow = false) {
+            const updateModal = document.getElementById('update-modal');
+            updateModal.classList.add('show');
+            try {
+                document.getElementById('current-version').textContent = await ipcRenderer.invoke('get-version');
+            } catch (_) { }
+            updateUpdateUI();
+            if (checkNow) await checkUpdate();
+        }
+
+        async function checkUpdate() {
+            const button = document.getElementById('update-check-btn');
+            button.disabled = true;
+            updateState.message = '正在检查更新...';
+            updateUpdateUI();
+            try {
+                const result = await ipcRenderer.invoke('update:check');
+                updateState.source = result?.source || 'github';
+            } catch (error) {
+                updateState.message = error.message || '检查更新失败';
+                showNotification('检查更新失败', updateState.message, 'error');
+            } finally {
+                button.disabled = false;
+                updateUpdateUI();
+            }
+        }
+
+        async function downloadUpdate() {
+            const button = document.getElementById('update-download-btn');
+            button.disabled = true;
+            try {
+                await ipcRenderer.invoke('update:download');
+            } catch (error) {
+                showNotification('下载更新失败', error.message || '下载更新失败', 'error');
+                updateUpdateUI();
+            }
+        }
+
+        async function installUpdate() {
+            try {
+                await ipcRenderer.invoke('update:install');
+            } catch (error) {
+                showNotification('安装更新失败', error.message || '安装更新失败', 'error');
+            }
+        }
+        
+        // 加载Font Awesome图标（改为本地加载）
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = './assets/css/all.min.css';  // 使用本地文件
+        document.head.appendChild(link);
+
+        let currentEngine = 'tools';
+        let currentSearchText = ''; // 保存当前搜索文本
+
+        // 应用搜索过滤
+        function applySearch() {
+            const cards = document.querySelectorAll('.plugin-card');
+            cards.forEach(card => {
+                const title = card.querySelector('h3').textContent.toLowerCase();
+                const text = `${title} ${card.dataset.description || ''}`;
+                card.style.display = (card.dataset.engine === currentEngine && text.includes(currentSearchText)) ? 'flex' : 'none';
+            });
+        }
+
+        // 加载插件列表（添加缓存）
+        let cachedPlugins = null;
+        let lastLoadTime = 0;
+        const CACHE_DURATION = 5000; // 5秒缓存
+        let pluginsLoadVersion = 0;
+
+        function escapeMarkup(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+        }
+
+        async function loadPlugins(force = false) {
+            try {
+                const now = Date.now();
+                // 如果有缓存且未过期，直接使用缓存
+                if (!force && cachedPlugins && (now - lastLoadTime < CACHE_DURATION)) {
+                    return cachedPlugins;
+                }
+
+                const requestVersion = ++pluginsLoadVersion;
+                const plugins = await ipcRenderer.invoke('get-main-plugin-list');
+                if (requestVersion !== pluginsLoadVersion) return cachedPlugins;
+                lastLoadTime = now;
+                
+                // 比较新旧数据，如果相同则不更新UI
+                if (!force && cachedPlugins && JSON.stringify(plugins) === JSON.stringify(cachedPlugins)) {
+                    return cachedPlugins;
+                }
+                
+                cachedPlugins = plugins;
+                const container = document.getElementById('plugins-container');
+                container.innerHTML = '';
+
+                plugins.forEach(plugin => {
+                    const card = document.createElement('div');
+                    card.className = 'plugin-card';
+                    card.dataset.engine = plugin.engine || 'tools';
+                    card.dataset.pluginId = plugin.id || '';
+                    card.dataset.description = `${plugin.description || ''} ${plugin.id || ''}`.toLowerCase();
+                    
+                    const logoPath = plugin.iconPath;
+                    const hasLogo = Boolean(logoPath);
+
+                    card.innerHTML = `
+                        <div class="plugin-header">
+                            <div class="plugin-logo">
+                                ${hasLogo ? 
+                                    `<img src="${escapeMarkup(require('url').pathToFileURL(logoPath).href)}" alt="${escapeMarkup(plugin.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">`
+                                     + `<span style="display: none;">${escapeMarkup(plugin.name.charAt(0).toUpperCase())}</span>` :
+                                    `<span>${escapeMarkup(plugin.name.charAt(0).toUpperCase())}</span>`
+                                }
+                            </div>
+                            <div class="plugin-title-section">
+                                <h3>${escapeMarkup(plugin.name)}</h3>
+                                ${plugin.engine === 'python' ? `<span class="python-state">${plugin.isRunning ? '运行中' : 'Python'}</span>` : ''}
+                            </div>
+                        </div>
+                        <p>${escapeMarkup(plugin.description)}</p>
+                        ${plugin.version || plugin.author || plugin.category ? `
+                        <div class="plugin-info">
+                            ${plugin.version ? `<span>版本: ${escapeMarkup(plugin.version)}</span>` : ''}
+                            ${plugin.author ? `<span>作者: ${escapeMarkup(plugin.author)}</span>` : ''}
+                            ${plugin.category ? `<span>分类: ${escapeMarkup(plugin.category)}</span>` : ''}
+                        </div>
+                        ` : ''}
+                        <div class="plugin-actions">
+                            <button class="details-btn" type="button">详情</button>
+                            ${plugin.engine === 'python' ? `<button class="py-run" type="button">运行</button><button class="py-stop" type="button" ${plugin.isRunning ? '' : 'disabled'}>停止</button><button class="py-logs" type="button">日志</button>` : ''}
+                        </div>
+                    `;
+
+                    // 使用事件委托优化事件监听
+                    container.appendChild(card);
+                });
+
+                // 重新应用搜索过滤
+                applySearch();
+                return plugins;
+            } catch (error) {
+                console.error('加载插件列表失败:', error);
+            }
+        }
+
+        // 使用事件委托处理双击事件
+        document.getElementById('plugins-container').addEventListener('dblclick', async (e) => {
+            const card = e.target.closest('.plugin-card');
+            if (!card) return;
+            
+            const pluginIndex = Array.from(card.parentElement.children).indexOf(card);
+            const plugin = cachedPlugins[pluginIndex];
+            
+            if (plugin) {
+                try {
+                    console.log('正在执行插件:', plugin.path);
+                    console.log('插件信息:', plugin);
+                    // 只传递可序列化的features数据
+                    const serializableFeatures = plugin.features ? plugin.features.map(f => ({
+                        code: f.code,
+                        explain: f.explain,
+                        cmds: f.cmds || []
+                    })) : [];
+                    if (window.runUnifiedPlugin) await window.runUnifiedPlugin(plugin);
+                    else await ipcRenderer.invoke('run-plugin', plugin.path, serializableFeatures);
+                } catch (error) {
+                    console.error('执行失败:', error);
+                    alert(`执行失败: ${error.message}`);
+                }
+            }
+        });
+
+        // 使用事件委托处理“详情”按钮点击
+        document.getElementById('plugins-container').addEventListener('click', (e) => {
+            const btn = e.target.closest('.details-btn');
+            if (!btn) return;
+            const card = btn.closest('.plugin-card');
+            if (!card) return;
+            const pluginIndex = Array.from(card.parentElement.children).indexOf(card);
+            const plugin = cachedPlugins[pluginIndex];
+            if (plugin?.engine === 'python') window.showPythonDetails(plugin);
+            else if (plugin) openPluginDetails(plugin);
+        });
+
+        // 搜索功能
+        document.getElementById('search-box').addEventListener('input', (e) => {
+            currentSearchText = e.target.value.toLowerCase();
+            applySearch();
+        });
+
+        // 三类导入由 merged-ui 的同一弹窗管理。
+        async function updatePluginViews(plugins) {
+            await loadPlugins(true);
+            if (settingsModal.classList.contains('show') && document.getElementById('plugins').classList.contains('active')) await loadPluginManagementList();
+        }
+
+        document.getElementById('store-btn').addEventListener('click', () => window.showUnifiedStore());
+
+
+        const accountDropdown = document.getElementById('account-dropdown');
+        document.getElementById('avatar-btn').addEventListener('click', (event) => {
+            event.stopPropagation();
+            accountDropdown.classList.toggle('show');
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('#account-menu')) {
+                accountDropdown.classList.remove('show');
+            }
+        });
+
+        document.getElementById('account-login-btn').addEventListener('click', async () => {
+            accountDropdown.classList.remove('show');
+            try {
+                await ipcRenderer.invoke('account:login');
+                showNotification('登录', '已打开程序小店登录页，完成登录后会自动同步账号状态', 'info');
+            } catch (error) {
+                showNotification('登录失败', error.message || '无法打开登录页', 'error');
+            }
+        });
+
+        document.getElementById('account-refresh-btn').addEventListener('click', async () => {
+            accountDropdown.classList.remove('show');
+            await loadAccount();
+            showNotification('刷新完成', '会员状态已刷新', 'success');
+        });
+
+        document.getElementById('account-logout-btn').addEventListener('click', async () => {
+            accountDropdown.classList.remove('show');
+            try {
+                const account = await ipcRenderer.invoke('account:logout');
+                updateAccountUI(account);
+                showNotification('已退出', '账号已退出登录', 'success');
+            } catch (error) {
+                showNotification('退出失败', error.message || '退出登录失败', 'error');
+            }
+        });
+
+        document.getElementById('check-update-btn').addEventListener('click', async () => {
+            accountDropdown.classList.remove('show');
+            await showUpdateModal(true);
+        });
+
+        document.getElementById('open-tools-store-btn').addEventListener('click', async () => {
+            accountDropdown.classList.remove('show');
+            try {
+                await ipcRenderer.invoke('shop:open-tools-store');
+            } catch (error) {
+                shell.openExternal('https://shop.sanrenjz.com/tools');
+            }
+        });
+
+        document.getElementById('update-check-btn').addEventListener('click', checkUpdate);
+        document.getElementById('update-download-btn').addEventListener('click', downloadUpdate);
+        document.getElementById('update-install-btn').addEventListener('click', installUpdate);
+
+        ipcRenderer.on('account:changed', (_event, payload) => {
+            updateAccountUI(payload);
+        });
+
+        ipcRenderer.on('update:status', (_event, payload) => {
+            handleUpdateStatus(payload);
+        });
+
+        ipcRenderer.on('plugins:download', (_event, payload) => {
+            if (payload?.type === 'started') {
+                showNotification('插件下载', `${payload.fileName || '插件包'} 开始下载`, 'info');
+            } else if (payload?.type === 'completed') {
+                const names = Array.isArray(payload.installed)
+                    ? payload.installed.map(item => item.name).join('、')
+                    : '插件';
+                showNotification('插件已安装', `${names} 已解压到本地插件文件夹`, 'success');
+            } else if (payload?.type === 'error') {
+                showNotification('插件安装失败', payload.message || '下载或安装插件失败', 'error');
+            }
+        });
+
+        ipcRenderer.on('plugin-preferences-changed', () => loadPlugins(true));
+
+        ipcRenderer.on('plugins:changed', (_event, payload) => {
+            updatePluginViews(payload?.plugins);
+        });
+
+        // H5工具按钮点击事件
+        // 函数级注释：
+        // - 点击顶部“H5工具”按钮时，打开 https://h5.sanrenjz.com/
+        // - 使用 Electron 的 shell.openExternal 在系统默认浏览器中打开
+        document.getElementById('h5-btn').addEventListener('click', () => {
+            shell.openExternal('https://h5.sanrenjz.com/');
+        });
+
+        // 联系我们按钮点击事件
+        const contactModal = document.getElementById('contact-modal');
+        document.getElementById('contact-btn').addEventListener('click', () => {
+            contactModal.classList.add('show');
+        });
+
+        // 设置按钮点击事件
+        const settingsModal = document.getElementById('settings-modal');
+        const deferredSettingIds = ['auto-start-checkbox', 'global-hotkey-input', 'pin-hotkey-input', 'super-panel-hotkey-input', 'right-click-panel-checkbox', 'right-click-delay-slider'];
+        let settingsSavedSnapshot = '';
+        let settingsLoading = false, settingsReady = false, settingsSaving = false;
+        let settingsLoadVersion = 0, settingsLoadPromise;
+        const deferredControlLocks = new Map();
+        const pluginKeywordDrafts = new Map(), pluginKeywordSaves = new Map(), pluginKeywordSavedValues = new Map();
+        function lockDeferredSettings(locked) {
+            const ids = [...deferredSettingIds, 'change-hotkey-btn', 'change-pin-hotkey-btn', 'change-super-panel-hotkey-btn', 'use-alt-space-btn', 'clear-super-panel-hotkey-btn'];
+            for (const id of ids) {
+                const control = document.getElementById(id);
+                if (locked) {
+                    if (!deferredControlLocks.has(id)) deferredControlLocks.set(id, control.disabled);
+                    control.disabled = true;
+                } else if (deferredControlLocks.has(id)) {
+                    control.disabled = deferredControlLocks.get(id); deferredControlLocks.delete(id);
+                }
+            }
+        }
+        function settingsSnapshot() {
+            return JSON.stringify(deferredSettingIds.map(id => {
+                const input = document.getElementById(id);
+                if (input.type === 'checkbox') return input.checked;
+                return isCapturingHotkey && currentCapturingInput === input ? captureOriginalValue : input.value;
+            }));
+        }
+        function hasUnsavedSettings() { return pluginKeywordDrafts.size > 0 || Boolean(settingsSavedSnapshot && settingsSnapshot() !== settingsSavedSnapshot); }
+        window.syncSettingsFooter = () => {
+            const pending = hasUnsavedSettings();
+            const immediatePage = ['plugins', 'merge-python'].includes(document.querySelector('.settings-tab-content.active')?.id);
+            const busy = settingsLoading || settingsSaving || !settingsReady;
+            lockDeferredSettings(busy);
+            document.getElementById('save-settings-btn').disabled = busy;
+            document.getElementById('settings-close-btn').disabled = settingsSaving;
+            document.getElementById('save-settings-btn').textContent = settingsSaving ? '保存中…' : immediatePage && !pending ? '完成' : '保存设置';
+            document.getElementById('settings-save-hint').textContent = settingsLoading ? '正在读取设置，请稍候…' : !settingsReady ? '设置尚未读取成功，请关闭后重试' : settingsSaving ? '正在保存设置…' : pending ? '有尚未保存的设置，保存后生效' : immediatePage ? '本页操作即时生效，无需再次保存' : '应用偏好修改后点击保存生效；目录操作立即保存';
+        };
+        window.activateSettingsTab = targetId => {
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                const active = item.dataset.target === targetId;
+                item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active));
+            });
+            document.querySelectorAll('.settings-tab-content').forEach(item => item.classList.toggle('active', item.id === targetId));
+            document.querySelector('.settings-main').scrollTop = 0;
+            window.syncSettingsFooter();
+        };
+        function closeSettings() {
+            if (settingsSaving) return false;
+            stopCapturingHotkey();
+            if (hasUnsavedSettings() && !confirm('还有未保存的设置，关闭会放弃这些修改。是否关闭？')) return false;
+            pluginKeywordDrafts.clear();
+            // 已关闭窗口的旧读取结果不能覆盖下一次打开后的输入。
+            settingsLoadVersion++; settingsLoadPromise = undefined; settingsLoading = false; settingsReady = false;
+            settingsModal.classList.remove('show'); return true;
+        }
+        document.getElementById('settings-close-btn').onclick = closeSettings;
+        document.querySelector('.settings-sidebar').addEventListener('keydown', event => {
+            const tabs = [...document.querySelectorAll('.sidebar-item')];
+            const current = tabs.indexOf(event.target);
+            if (current < 0) return;
+            let next;
+            if (['ArrowDown', 'ArrowRight'].includes(event.key)) next = (current + 1) % tabs.length;
+            else if (['ArrowUp', 'ArrowLeft'].includes(event.key)) next = (current + tabs.length - 1) % tabs.length;
+            else if (event.key === 'Home') next = 0;
+            else if (event.key === 'End') next = tabs.length - 1;
+            if (next !== undefined) { event.preventDefault(); tabs[next].focus(); tabs[next].click(); }
+        });
+        for (const eventName of ['input', 'change', 'click']) settingsModal.addEventListener(eventName, () => queueMicrotask(window.syncSettingsFooter));
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && settingsModal.classList.contains('show') && !isCapturingHotkey && !document.querySelector('dialog[open]')) {
+                event.preventDefault(); closeSettings();
+            }
+        });
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            if (!settingsModal.classList.contains('show')) loadSettings();
+            settingsModal.classList.add('show');
+        });
+
+        // 关闭按钮点击事件
+        document.querySelectorAll('.close-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const modal = e.target.closest('.modal');
+                if (modal === settingsModal) closeSettings(); else modal.classList.remove('show');
+            });
+        });
+
+        // 点击模态框外部关闭
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    if (modal === settingsModal) closeSettings(); else modal.classList.remove('show');
+                }
+            });
+        });
+
+        // 文档按钮点击事件
+        // 函数级注释：
+        // - 点击顶部“文档”按钮时，打开新的在线文档地址 https://docs.sanrenjz.com/
+        // - 使用 Electron 的 shell.openExternal 在系统默认浏览器中打开
+        document.getElementById('docs-btn').addEventListener('click', () => {
+            shell.openExternal('https://docs.sanrenjz.com/');
+        });
+
+
+
+        // 侧边栏切换功能
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const targetId = item.dataset.target;
+                window.activateSettingsTab(targetId);
+                if (targetId === 'plugins') loadPluginManagementList();
+            });
+        });
+
+        // 加载插件管理列表
+        let pluginManagementLoadVersion = 0;
+        window.openPluginManagement = async (engine = 'all') => {
+            const wasOpen = settingsModal.classList.contains('show');
+            settingsModal.classList.add('show');
+            if (!wasOpen && await loadSettings() !== true) return;
+            window.activateSettingsTab('plugins');
+            document.getElementById('plugin-manager-engine').value = engine;
+            document.getElementById('plugin-manager-search').value = '';
+            return loadPluginManagementList();
+        };
+        function savePluginKeywordDraft(pluginName) {
+            if (pluginKeywordSaves.has(pluginName)) return pluginKeywordSaves.get(pluginName);
+            if (!pluginKeywordDrafts.has(pluginName)) return Promise.resolve();
+            const keywords = [...pluginKeywordDrafts.get(pluginName)];
+            const inputs = [...document.querySelectorAll('.pm-keyword-input')].filter(input => input.dataset.pluginName === pluginName);
+            inputs.forEach(input => { input.disabled = true; input.removeAttribute('aria-invalid'); });
+            const task = (async () => {
+                try {
+                    const result = await ipcRenderer.invoke('set-plugin-search-keywords', pluginName, keywords);
+                    if (result?.success === false) throw new Error(result.error || '关键词未能保存');
+                    pluginKeywordSavedValues.set(pluginName, result?.keywords || keywords);
+                    if (JSON.stringify(pluginKeywordDrafts.get(pluginName)) === JSON.stringify(keywords)) pluginKeywordDrafts.delete(pluginName);
+                } catch (error) {
+                    inputs.forEach(input => input.setAttribute('aria-invalid', 'true'));
+                    throw error;
+                } finally {
+                    inputs.forEach(input => input.disabled = false);
+                    pluginKeywordSaves.delete(pluginName);
+                    window.syncSettingsFooter();
+                }
+            })();
+            pluginKeywordSaves.set(pluginName, task);
+            return task;
+        }
+        function recordPluginKeywordDraft(pluginName, value) {
+            const keywords = [...new Set(value.split(',').map(keyword => keyword.trim()).filter(Boolean))];
+            if (!pluginKeywordSaves.has(pluginName) && JSON.stringify(keywords) === JSON.stringify(pluginKeywordSavedValues.get(pluginName))) pluginKeywordDrafts.delete(pluginName);
+            else pluginKeywordDrafts.set(pluginName, keywords);
+            window.syncSettingsFooter();
+        }
+        async function loadPluginManagementList() {
+            try {
+                const requestVersion = ++pluginManagementLoadVersion;
+                const [plugins, settings] = await Promise.all([
+                    ipcRenderer.invoke('get-plugin-management-list'),
+                    ipcRenderer.invoke('get-settings')
+                ]);
+                if (requestVersion !== pluginManagementLoadVersion) return;
+                const container = document.getElementById('plugin-management-list');
+                const expandedIds = new Set([...container.querySelectorAll('.plugin-management-item')]
+                    .filter(row => row.querySelector('.pm-details.expanded')).map(row => row.dataset.pluginId));
+                container.innerHTML = '';
+                const searchSettings = settings.pluginSearchSettings || {};
+
+                for (const plugin of plugins) {
+                    const isPython = plugin.engine === 'python';
+                    const pluginSettings = { enabled: true, keywords: [], ...searchSettings[plugin.name] };
+                    if (!Array.isArray(pluginSettings.keywords)) pluginSettings.keywords = [];
+
+                    const { autoSeparate, exitOnBackground, autoStartWithMain, pushToSearch, showInMainUI } = plugin.pluginSettings;
+                    const logoPath = plugin.iconPath;
+                    const hasLogo = Boolean(logoPath);
+
+                    const item = document.createElement('div');
+                    item.className = 'plugin-management-item';
+                    item.dataset.engine = plugin.engine;
+                    item.dataset.pluginId = plugin.id;
+                    item.dataset.searchContent = `${plugin.name} ${plugin.description || ''} ${plugin.id} ${isPython ? 'py程序 Python' : '效率工具'}`.toLowerCase();
+                    
+                    item.innerHTML = `
+                        <div class="pm-header">
+                            ${hasLogo ? 
+                                `<img class="pm-icon" src="${escapeMarkup(require('url').pathToFileURL(logoPath).href)}" alt="${escapeMarkup(plugin.name)}">` :
+                                `<div class="pm-icon-placeholder">${escapeMarkup(plugin.name.charAt(0).toUpperCase())}</div>`
+                            }
+                            <div class="pm-info">
+                                <div class="pm-name">${escapeMarkup(plugin.name)}</div>
+                                <span class="pm-engine-label">${isPython ? 'py程序' : '效率工具'}</span>
+                                <div class="pm-desc">${escapeMarkup(plugin.description)}</div>
+                            </div>
+                            <div class="pm-lifecycle">
+                                <label><input type="checkbox" class="plugin-setting-toggle" data-plugin-name="${escapeMarkup(plugin.name)}" data-setting="autoStartWithMain" ${autoStartWithMain ? 'checked' : ''}> 随主程序启动</label>
+                                <label><input type="checkbox" class="plugin-setting-toggle" data-plugin-name="${escapeMarkup(plugin.name)}" data-setting="showInMainUI" ${showInMainUI ? 'checked' : ''}> 在主界面显示</label>
+                            </div>
+                            <i class="fas fa-chevron-down" style="color: #ccc; transition: transform 0.3s;"></i>
+                        </div>
+                        
+                        <div class="pm-details">
+                            ${isPython ? `
+                            <p class="pm-python-path">入口：${escapeMarkup(plugin.path)}</p>
+                            <p class="setting-description">${plugin.isRunning ? '运行中，请先停止程序再移除。' : '未运行'}；用户配置由插件自行管理，移除程序时保留。</p>
+                            <div class="pm-actions">
+                                <button type="button" class="pm-btn" data-action="python-details">程序详情</button>
+                                <button type="button" class="pm-btn" data-action="python-logs">运行日志</button>
+                                <button type="button" class="pm-btn danger" data-action="uninstall" ${plugin.isRunning ? 'disabled' : ''}>移除插件</button>
+                            </div>` : `
+                            <div class="pm-keyword-section">
+                                <div class="pm-toggle-label">自定义搜索关键词</div>
+                                <input type="text" 
+                                       class="pm-keyword-input" 
+                                       placeholder="用逗号分隔，例如: tool, gj"
+                                       value="${escapeMarkup((pluginKeywordDrafts.get(plugin.name) || pluginSettings.keywords).join(', '))}"
+                                       data-plugin-name="${escapeMarkup(plugin.name)}">
+                            </div>
+
+                            <div class="pm-toggle-group">
+                                <div class="pm-toggle-item">
+                                    <span class="pm-toggle-label">自动分离为独立窗口</span>
+                                    <label class="switch">
+                                        <input type="checkbox" class="plugin-setting-toggle" 
+                                               data-plugin-name="${escapeMarkup(plugin.name)}"
+                                               data-setting="autoSeparate"
+                                               ${autoSeparate ? 'checked' : ''}>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                
+                                <div class="pm-toggle-item">
+                                    <span class="pm-toggle-label">退出到后台立即结束运行</span>
+                                    <label class="switch">
+                                        <input type="checkbox" class="plugin-setting-toggle" 
+                                               data-plugin-name="${escapeMarkup(plugin.name)}"
+                                               data-setting="exitOnBackground"
+                                               ${exitOnBackground ? 'checked' : ''}>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="pm-toggle-item">
+                                    <span class="pm-toggle-label">允许推送内容到搜索框</span>
+                                    <label class="switch">
+                                        <input type="checkbox" class="plugin-setting-toggle" 
+                                               data-plugin-name="${escapeMarkup(plugin.name)}"
+                                               data-setting="pushToSearch"
+                                               ${pushToSearch ? 'checked' : ''}>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="pm-actions">
+                                <button class="pm-btn" data-action="super-panel">增加到超级面板</button>
+                                <button class="pm-btn danger" data-action="uninstall">卸载删除插件</button>
+                            </div>`}
+                        </div>
+                    `;
+
+                    // 展开/收起逻辑
+                    const header = item.querySelector('.pm-header');
+                    const details = item.querySelector('.pm-details');
+                    const icon = item.querySelector('.fa-chevron-down');
+                    if (expandedIds.has(plugin.id)) {
+                        details.classList.add('expanded');
+                        icon.style.transform = 'rotate(180deg)';
+                    }
+                    
+                    header.addEventListener('click', (event) => {
+                        if (event.target.closest('label, input, button')) return;
+                        const isExpanded = details.classList.contains('expanded');
+                        if (isExpanded) {
+                            details.classList.remove('expanded');
+                            icon.style.transform = 'rotate(0deg)';
+                        } else {
+                            details.classList.add('expanded');
+                            icon.style.transform = 'rotate(180deg)';
+                        }
+                    });
+
+                    // 关键词输入监听
+                    const keywordInput = item.querySelector('.pm-keyword-input');
+                    pluginKeywordSavedValues.set(plugin.name, pluginSettings.keywords);
+                    keywordInput?.addEventListener('input', e => recordPluginKeywordDraft(plugin.name, e.target.value));
+                    keywordInput?.addEventListener('change', async (e) => {
+                        if (!settingsModal.classList.contains('show')) return;
+                        recordPluginKeywordDraft(plugin.name, e.target.value);
+                        try { await savePluginKeywordDraft(plugin.name); }
+                        catch (error) { showNotification('关键词保存失败', `${error.message}；修改已保留，可点击“保存设置”重试。`, 'error'); }
+                    });
+
+                    // Toggle 监听
+                    item.querySelectorAll('.plugin-setting-toggle').forEach(toggle => {
+                        toggle.addEventListener('change', async (e) => {
+                            const setting = e.target.dataset.setting;
+                            const value = e.target.checked;
+                            const pName = e.target.dataset.pluginName;
+                            
+                            e.target.disabled = true;
+                            try {
+                                const hostPreference = setting === 'autoStartWithMain' || setting === 'showInMainUI';
+                                const saved = hostPreference
+                                    ? await ipcRenderer.invoke('unified:preference', plugin.id, setting, value)
+                                    : await ipcRenderer.invoke('plugin-storage-set-async', pName, setting, value);
+                                if (hostPreference ? !saved?.success : !saved) throw new Error(saved?.error || '设置未能写入磁盘');
+                                if (setting === 'autoSeparate') {
+                                    ipcRenderer.send('plugin-auto-separate-changed', { pluginName: pName, value });
+                                }
+                                if (saved.warning) showNotification('插件选项已保存', saved.warning, 'warning');
+                                filterPluginManagementList();
+                            } catch (error) {
+                                e.target.checked = !value;
+                                showNotification('插件设置保存失败', error.message, 'error');
+                            } finally {
+                                e.target.disabled = false;
+                            }
+                        });
+                    });
+
+                    item.querySelector('[data-action="super-panel"]')?.addEventListener('click', () => addToSuperPanel(plugin.name));
+                    item.querySelector('[data-action="python-details"]')?.addEventListener('click', () => window.showPythonDetails(plugin));
+                    item.querySelector('[data-action="python-logs"]')?.addEventListener('click', () => window.showPythonLogs(plugin.id));
+                    item.querySelector('[data-action="uninstall"]').addEventListener('click', async (event) => {
+                        if (!isPython) return uninstallPlugin(plugin.name);
+                        if (!confirm(`移除“${plugin.name}”？程序文件会移除，已有用户配置保留。`)) return;
+                        const button = event.currentTarget;
+                        button.disabled = true;
+                        try {
+                            const result = await ipcRenderer.invoke('unified:remove', plugin.id);
+                            if (!result?.success) throw new Error(result?.error || '移除失败');
+                            await updatePluginViews();
+                        } catch (error) { showNotification('移除失败', error.message, 'error'); }
+                        finally { button.disabled = false; }
+                    });
+                    container.appendChild(item);
+                }
+                
+                // 应用当前的搜索过滤
+                filterPluginManagementList();
+                
+            } catch (error) {
+                console.error('加载插件管理列表失败:', error);
+                document.getElementById('plugin-management-status').textContent = '插件列表加载失败，请重新打开插件管理。';
+            }
+        }
+
+        // 插件管理搜索功能
+        const pmSearchInput = document.getElementById('plugin-manager-search');
+        if (pmSearchInput) {
+            pmSearchInput.addEventListener('input', (e) => {
+                filterPluginManagementList(e.target.value);
+            });
+        }
+        document.getElementById('plugin-manager-engine').addEventListener('change', () => filterPluginManagementList());
+
+        function filterPluginManagementList(keyword) {
+            const input = document.getElementById('plugin-manager-search');
+            // 如果未提供关键词，则使用输入框的值
+            const term = (keyword !== undefined ? keyword : (input ? input.value : '')).toLowerCase().trim();
+            const engine = document.getElementById('plugin-manager-engine').value;
+            
+            const items = [...document.querySelectorAll('.plugin-management-item')];
+            let matched = 0;
+            items.forEach(item => {
+                const content = item.dataset.searchContent || '';
+                if ((engine === 'all' || engine === item.dataset.engine) && (!term || content.includes(term))) {
+                    item.style.display = 'block';
+                    matched++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            const toolsCount = items.filter(row => row.dataset.engine === 'tools').length;
+            const shown = items.filter(row => row.querySelector('[data-setting="showInMainUI"]').checked).length;
+            const auto = items.filter(row => row.querySelector('[data-setting="autoStartWithMain"]').checked).length;
+            document.getElementById('plugin-management-status').textContent =
+                `共 ${items.length} 个插件（效率工具 ${toolsCount} · py程序 ${items.length - toolsCount}）· 主界面显示 ${shown} 个 · 自启动 ${auto} 个 · 当前筛选 ${matched} 个`;
+            document.getElementById('plugin-management-empty').hidden = matched !== 0;
+        }
+
+        // 增加到超级面板
+        window.addToSuperPanel = async (pluginName) => {
+            try {
+                const result = await ipcRenderer.invoke('add-plugin-to-super-panel', pluginName);
+                if (result.success) {
+                    showNotification('成功', result.message || `已将 ${pluginName} 添加到超级面板`, 'success');
+                } else {
+                    showNotification('失败', result.error || '添加失败', 'error');
+                }
+            } catch (error) {
+                console.error('添加插件到超级面板失败:', error);
+                showNotification('错误', error.message, 'error');
+            }
+        };
+
+        // 卸载插件
+        window.uninstallPlugin = async (pluginName) => {
+            if (confirm(`确定要卸载 ${pluginName} 吗？此操作无法撤销。`)) {
+                try {
+                    const result = await ipcRenderer.invoke('uninstall-plugin', pluginName);
+                    if (result.success) {
+                        showNotification('成功', result.message || `插件 ${pluginName} 已卸载`, 'success');
+                        // 重新加载插件列表
+                        loadPlugins(true);
+                        // 如果在插件管理界面，也刷新管理列表
+                        loadPluginManagementList();
+                    } else {
+                        showNotification('失败', result.error || '卸载失败', 'error');
+                    }
+                } catch (error) {
+                    console.error('卸载插件失败:', error);
+                    showNotification('错误', error.message, 'error');
+                }
+            }
+        };
+
+        async function loadPythonConfigLocation(result) {
+            const location = result || await ipcRenderer.invoke('python:config-location');
+            if (location?.success === false) throw new Error(location.error || '无法读取配置目录');
+            const input = document.getElementById('python-config-path');
+            input.value = location.path; input.title = location.path;
+            document.getElementById('python-config-feedback').textContent = location.warning || `${location.custom ? '自定义目录' : '默认目录'} · 目录操作立即保存`;
+        }
+        for (const [id, channel] of [['python-config-choose', 'python:config-directory'], ['python-config-open', 'python:config-open'], ['python-config-reset', 'python:config-reset']]) {
+            document.getElementById(id).addEventListener('click', async () => {
+                const buttons = [...document.querySelectorAll('.settings-directory-card button')];
+                buttons.forEach(button => button.disabled = true);
+                const feedback = document.getElementById('python-config-feedback');
+                feedback.textContent = '正在处理…';
+                try {
+                    const result = await ipcRenderer.invoke(channel);
+                    if (result?.success === false) throw new Error(result.error || '目录操作失败');
+                    if (result?.canceled) { await loadPythonConfigLocation(); return; }
+                    await loadPythonConfigLocation(channel === 'python:config-open' ? undefined : result);
+                    if (result?.warning) feedback.textContent = result.warning;
+                    else if (channel === 'python:config-open') feedback.textContent = '配置目录已打开';
+                    else feedback.textContent = '配置目录已保存，已有配置保持不变';
+                } catch (error) { feedback.textContent = error.message; showNotification('配置目录操作失败', error.message, 'error'); }
+                finally { buttons.forEach(button => button.disabled = false); }
+            });
+        }
+
+        // 设置相关功能
+        async function loadSettings() {
+            if (settingsLoadPromise) return settingsLoadPromise;
+            const requestVersion = ++settingsLoadVersion;
+            settingsLoading = true; settingsReady = false; settingsSavedSnapshot = '';
+            window.syncSettingsFooter();
+            const task = (async () => {
+            try {
+                const settings = await ipcRenderer.invoke('get-settings');
+                if (requestVersion !== settingsLoadVersion) return false;
+                // 函数级注释：设置页面初始化时的全局快捷键默认值展示（改为 Alt+Space）
+                document.getElementById('global-hotkey-input').value = settings.globalHotkey || 'Alt+Space';
+                document.getElementById('auto-start-checkbox').checked = settings.autoStart || false;
+                
+                // 加载钉住快捷键设置
+                document.getElementById('pin-hotkey-input').value = settings.pinHotkey || 'Ctrl+D';
+                
+                // 加载超级面板快捷键设置
+                document.getElementById('super-panel-hotkey-input').value = settings.superPanelHotkey || '';
+                
+                // 加载右键长按设置
+                document.getElementById('right-click-panel-checkbox').checked = settings.enableRightClickPanel !== false;
+                const initialDelay = typeof settings.rightClickDelay === 'number' ? settings.rightClickDelay : 350;
+                document.getElementById('right-click-delay-slider').value = initialDelay;
+                document.getElementById('delay-value-label').textContent = initialDelay + 'ms';
+                settingsSavedSnapshot = settingsSnapshot();
+                
+                // 添加延迟滑块的事件监听
+                const delaySlider = document.getElementById('right-click-delay-slider');
+                const delayLabel = document.getElementById('delay-value-label');
+                delaySlider.oninput = (e) => {
+                    delayLabel.textContent = e.target.value + 'ms';
+                };
+
+                // 加载插件数据存储位置
+                try {
+                    const pluginDataDir = await ipcRenderer.invoke('get-plugin-data-directory');
+                    if (requestVersion !== settingsLoadVersion) return false;
+                    document.getElementById('plugin-data-path-input').value = pluginDataDir || '未知位置';
+                } catch (error) {
+                    console.error('获取插件数据目录失败:', error);
+                    document.getElementById('plugin-data-path-input').value = '获取失败';
+                }
+                if (requestVersion !== settingsLoadVersion) return false;
+                try { await loadPythonConfigLocation(); }
+                catch (error) {
+                    document.getElementById('python-config-path').placeholder = '无法读取配置目录';
+                    document.getElementById('python-config-feedback').textContent = error.message;
+                }
+                if (requestVersion !== settingsLoadVersion) return false;
+                if (document.getElementById('plugins').classList.contains('active')) await loadPluginManagementList();
+                if (requestVersion === settingsLoadVersion) settingsReady = true;
+                return requestVersion === settingsLoadVersion && settingsReady;
+            } catch (error) {
+                console.error('加载设置失败:', error);
+                if (requestVersion === settingsLoadVersion) showNotification('读取设置失败', `${error.message}；原设置未修改，请关闭后重试。`, 'error');
+                return false;
+            } finally {
+                if (requestVersion === settingsLoadVersion) {
+                    settingsLoading = false; settingsLoadPromise = undefined;
+                    window.syncSettingsFooter();
+                }
+            }
+            })();
+            settingsLoadPromise = task;
+            return task;
+        }
+
+
+        // 主进程先进入录入态，防止已注册全局组合键抢先执行其原功能。
+        let isCapturingHotkey = false;
+        let currentCapturingInput = null;
+        let currentCapturingButton = null;
+        let captureOriginalValue = '';
+        let captureSessionId = '';
+        let captureSerial = 0;
+
+        async function captureHotkey(inputElement, buttonElement) {
+            if (isCapturingHotkey) { stopCapturingHotkey(); return; }
+            isCapturingHotkey = true;
+            currentCapturingInput = inputElement;
+            currentCapturingButton = buttonElement;
+            captureOriginalValue = inputElement.value;
+            captureSessionId = `${inputElement.id}:${++captureSerial}`;
+            const session = captureSessionId;
+            buttonElement.disabled = true;
+            try {
+                const result = await ipcRenderer.invoke('hotkey:begin-capture', session);
+                if (session !== captureSessionId) return;
+                inputElement.value = '';
+                inputElement.placeholder = '按组合键，Esc 取消';
+                buttonElement.textContent = '取消录入';
+                inputElement.focus();
+                if (!result.altSpaceAvailable) showNotification('Alt+Space 已被占用', '请先停用其他程序的同名快捷键；也可以点击“Alt+Space”预设后保存检查。', 'warning');
+            } catch (error) {
+                if (session === captureSessionId) stopCapturingHotkey();
+                showNotification('无法开始录入', error.message, 'error');
+            } finally { buttonElement.disabled = false; }
+        }
+
+        function stopCapturingHotkey(accelerator) {
+            if (!isCapturingHotkey) return;
+            currentCapturingInput.value = accelerator || captureOriginalValue;
+            currentCapturingInput.placeholder = '按下组合键...';
+            currentCapturingButton.textContent = '修改';
+            currentCapturingButton.disabled = false;
+            isCapturingHotkey = false;
+            currentCapturingInput = null;
+            currentCapturingButton = null;
+            captureSessionId = '';
+            // 成功录入的主进程会话自行等按键释放；取消则立即清理。
+            if (!accelerator) ipcRenderer.invoke('hotkey:end-capture').catch(() => {});
+            window.syncSettingsFooter();
+        }
+
+        ipcRenderer.on('hotkey:captured', (_event, result) => {
+            if (result.sessionId !== captureSessionId) return;
+            stopCapturingHotkey(result.cancelled ? undefined : result.accelerator);
+        });
+        for (const prefix of ['global', 'pin', 'super-panel']) {
+            document.getElementById(`change-${prefix === 'global' ? '' : prefix + '-'}hotkey-btn`).addEventListener('click', () => {
+                captureHotkey(document.getElementById(`${prefix}-hotkey-input`), document.getElementById(`change-${prefix === 'global' ? '' : prefix + '-'}hotkey-btn`));
+            });
+        }
+        document.getElementById('use-alt-space-btn').addEventListener('click', () => {
+            stopCapturingHotkey();
+            document.getElementById('global-hotkey-input').value = 'Alt+Space';
+        });
+        document.getElementById('clear-super-panel-hotkey-btn').addEventListener('click', () => {
+            stopCapturingHotkey();
+            document.getElementById('super-panel-hotkey-input').value = '';
+        });
+        document.addEventListener('click', event => {
+            if (isCapturingHotkey && event.target !== currentCapturingButton && event.target !== currentCapturingInput) stopCapturingHotkey();
+        });
+        window.addEventListener('beforeunload', () => { if (isCapturingHotkey) ipcRenderer.send('hotkey:cancel-capture'); });
+
+        // 修改插件数据存储路径
+        document.getElementById('change-plugin-data-path-btn').addEventListener('click', async () => {
+            try {
+                const button = document.getElementById('change-plugin-data-path-btn');
+                const originalText = button.textContent;
+                button.textContent = '选择中...';
+                button.disabled = true;
+
+                const result = await ipcRenderer.invoke('set-custom-plugin-data-directory');
+                
+                if (result.success) {
+                    document.getElementById('plugin-data-path-input').value = result.path;
+                    showNotification('成功', '插件数据存储路径已更新', 'success');
+                } else {
+                    showNotification('失败', result.message, 'error');
+                }
+            } catch (error) {
+                console.error('修改插件数据路径失败:', error);
+                showNotification('错误', '修改路径时发生错误: ' + error.message, 'error');
+            } finally {
+                const button = document.getElementById('change-plugin-data-path-btn');
+                button.textContent = '修改位置';
+                button.disabled = false;
+            }
+        });
+
+        // 打开插件数据文件夹
+        document.getElementById('open-plugin-data-folder-btn').addEventListener('click', async () => {
+            try {
+                const dataDir = await ipcRenderer.invoke('get-plugin-data-directory');
+                if (dataDir) {
+                    await shell.openPath(dataDir);
+                } else {
+                    showNotification('错误', '无法获取插件数据目录', 'error');
+                }
+            } catch (error) {
+                console.error('打开插件数据文件夹失败:', error);
+                showNotification('错误', '打开文件夹时发生错误: ' + error.message, 'error');
+            }
+        });
+
+        // 打开本地插件文件夹
+        document.getElementById('open-plugin-install-folder-btn').addEventListener('click', async () => {
+            try {
+                const result = await ipcRenderer.invoke('open-plugin-install-directory');
+                if (result?.success) {
+                    showNotification('成功', '已打开本地插件文件夹', 'success');
+                }
+            } catch (error) {
+                console.error('打开本地插件文件夹失败:', error);
+                showNotification('错误', '打开本地插件文件夹失败: ' + error.message, 'error');
+            }
+        });
+
+        document.getElementById('refresh-plugins-btn').addEventListener('click', async () => {
+            const button = document.getElementById('refresh-plugins-btn');
+            const status = document.getElementById('plugin-refresh-status');
+            if (button.disabled) return;
+            button.disabled = true;
+            button.textContent = '刷新中…';
+            status.textContent = '正在扫描本地插件…';
+            try {
+                const result = await ipcRenderer.invoke('refresh-plugins');
+                if (!result?.success) throw new Error(result?.error || '刷新失败');
+                await updatePluginViews(result.plugins);
+                status.textContent = `刷新完成，共 ${result.count} 个插件`;
+            } catch (error) {
+                status.textContent = `刷新失败：${error.message}`;
+                showNotification('插件刷新失败', error.message, 'error');
+            } finally {
+                button.disabled = false;
+                button.textContent = '手动刷新';
+            }
+        });
+
+        // 重置插件数据存储路径
+        document.getElementById('reset-plugin-data-path-btn').addEventListener('click', async () => {
+            try {
+                const confirmed = await remote.dialog.showMessageBox({
+                    type: 'question',
+                    buttons: ['确定', '取消'],
+                    defaultId: 1,
+                    title: '确认重置',
+                    message: '确定要重置插件数据存储路径为默认位置吗？',
+                    detail: '这将把插件数据存储路径恢复为默认位置，不会删除现有数据。'
+                });
+
+                if (confirmed.response === 0) { // 用户点击确定
+                    const result = await ipcRenderer.invoke('reset-plugin-data-directory');
+                    
+                    if (result.success) {
+                        document.getElementById('plugin-data-path-input').value = result.path;
+                        showNotification('成功', '插件数据存储路径已重置为默认位置', 'success');
+                    } else {
+                        showNotification('失败', result.message, 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('重置插件数据路径失败:', error);
+                showNotification('错误', '重置路径时发生错误: ' + error.message, 'error');
+            }
+        });
+
+        // 保存设置
+        document.getElementById('save-settings-btn').addEventListener('click', async () => {
+            const button = document.getElementById('save-settings-btn');
+            if (settingsLoading || settingsSaving || !settingsReady) return;
+            try {
+                stopCapturingHotkey();
+                const immediatePage = ['plugins', 'merge-python'].includes(document.querySelector('.settings-tab-content.active')?.id);
+                if (immediatePage && !hasUnsavedSettings()) { closeSettings(); return; }
+                settingsSaving = true; window.syncSettingsFooter();
+                await Promise.all([...pluginKeywordDrafts.keys()].map(savePluginKeywordDraft));
+                if (pluginKeywordDrafts.size) throw new Error('还有未保存的关键词，请重试');
+                const submittedSnapshot = settingsSnapshot();
+                if (immediatePage && submittedSnapshot === settingsSavedSnapshot) {
+                    settingsSaving = false; closeSettings(); return;
+                }
+                // 通用偏好只提交自身字段，避免覆盖其他即时操作刚保存的插件选项。
+                const settings = {
+                    globalHotkey: document.getElementById('global-hotkey-input').value,
+                    autoStart: document.getElementById('auto-start-checkbox').checked,
+                    pinHotkey: document.getElementById('pin-hotkey-input').value,
+                    superPanelHotkey: document.getElementById('super-panel-hotkey-input').value,
+                    enableRightClickPanel: document.getElementById('right-click-panel-checkbox').checked,
+                    rightClickDelay: parseInt(document.getElementById('right-click-delay-slider').value)
+                };
+                
+                const result = await ipcRenderer.invoke('save-settings', settings);
+                if (result?.success === false) throw new Error(result.error || '设置保存失败');
+                // 只确认本次提交的快照，保存期间出现的新输入仍应保留并允许继续保存。
+                settingsSavedSnapshot = submittedSnapshot;
+                const pending = hasUnsavedSettings();
+                showNotification('设置已保存', pending ? '本次提交已保存；仍有新的修改，请继续保存。' : '应用偏好已更新。', 'success');
+                if (!pending) settingsModal.classList.remove('show');
+            } catch (error) {
+                console.error('保存设置失败:', error);
+                showNotification('保存设置失败', error.message, 'error');
+            } finally { settingsSaving = false; button.disabled = false; window.syncSettingsFooter(); }
+        });
+
+        // 初始加载
+        loadPlugins(true);
+        loadAccount();
+
+        // 导入/卸载/设置变化使用事件刷新，回到主窗口时补查外部变化，空闲时不轮询磁盘。
+        window.addEventListener('focus', () => loadPlugins());
+
+        // 显示通知函数
+        function showNotification(title, message, type = 'info') {
+            // 移除现有通知
+            const existingNotification = document.querySelector('.notification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+
+            // 创建通知元素
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            const iconMap = {
+                success: '✓',
+                error: '✕',
+                info: 'ℹ',
+                warning: '!'
+            };
+            
+            notification.innerHTML = `
+                <span class="notification-icon">${iconMap[type] || iconMap.info}</span>
+                <div class="notification-content">
+                    <div class="notification-title"></div>
+                    <div class="notification-message"></div>
+                </div>
+            `;
+            notification.querySelector('.notification-title').textContent = title;
+            notification.querySelector('.notification-message').textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // 自动移除通知
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 5000);
+        }
+
+        // IPC处理器：接收通知
+        ipcRenderer.on('notify', (event, data) => {
+            showNotification(data.title, data.message, data.type || 'info');
+        });
+
+        /**
+         * 打开插件详情弹窗
+         * 函数级注释：
+         * - 展示完整简介、版本作者分类、功能列表（features）及相关文档（README/FEATURES/安装说明/需求）
+         * - 内容从插件对象与插件目录下常见说明文件读取
+         */
+        function openPluginDetails(plugin) {
+            try {
+                const modal = document.getElementById('plugin-details-modal');
+                const titleEl = document.getElementById('plugin-details-title');
+                const bodyEl = document.getElementById('plugin-details-body');
+
+                const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[char]));
+
+                const renderInlineMarkdown = (text) => escapeHtml(text)
+                    .replace(/`([^`]+)`/g, '<code>$1</code>')
+                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+                const renderMarkdown = (markdown) => {
+                    const normalized = String(markdown || '').replace(/\r\n/g, '\n');
+                    const lines = normalized.split('\n');
+                    const blocks = [];
+                    let paragraph = [];
+                    let listBuffer = [];
+                    let listType = null;
+                    let inCodeBlock = false;
+                    let codeBuffer = [];
+
+                    const flushParagraph = () => {
+                        if (!paragraph.length) return;
+                        blocks.push(`<p>${renderInlineMarkdown(paragraph.join(' '))}</p>`);
+                        paragraph = [];
+                    };
+
+                    const flushList = () => {
+                        if (!listBuffer.length) return;
+                        const items = listBuffer.map((item) => `<li>${renderInlineMarkdown(item)}</li>`).join('');
+                        blocks.push(`<${listType}>${items}</${listType}>`);
+                        listBuffer = [];
+                        listType = null;
+                    };
+
+                    const flushCodeBlock = () => {
+                        if (!codeBuffer.length) return;
+                        blocks.push(`<pre><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>`);
+                        codeBuffer = [];
+                    };
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+
+                        if (trimmed.startsWith('```')) {
+                            flushParagraph();
+                            flushList();
+                            if (inCodeBlock) {
+                                flushCodeBlock();
+                                inCodeBlock = false;
+                            } else {
+                                inCodeBlock = true;
+                            }
+                            continue;
+                        }
+
+                        if (inCodeBlock) {
+                            codeBuffer.push(line);
+                            continue;
+                        }
+
+                        if (!trimmed) {
+                            flushParagraph();
+                            flushList();
+                            continue;
+                        }
+
+                        const headingMatch = trimmed.match(/^(#{1,4})\s+(.*)$/);
+                        if (headingMatch) {
+                            flushParagraph();
+                            flushList();
+                            const level = Math.min(4, headingMatch[1].length);
+                            blocks.push(`<h${level}>${renderInlineMarkdown(headingMatch[2])}</h${level}>`);
+                            continue;
+                        }
+
+                        const blockquoteMatch = trimmed.match(/^>\s?(.*)$/);
+                        if (blockquoteMatch) {
+                            flushParagraph();
+                            flushList();
+                            blocks.push(`<blockquote>${renderInlineMarkdown(blockquoteMatch[1])}</blockquote>`);
+                            continue;
+                        }
+
+                        const unorderedMatch = trimmed.match(/^[-*+]\s+(.*)$/);
+                        if (unorderedMatch) {
+                            flushParagraph();
+                            if (listType && listType !== 'ul') flushList();
+                            listType = 'ul';
+                            listBuffer.push(unorderedMatch[1]);
+                            continue;
+                        }
+
+                        const orderedMatch = trimmed.match(/^\d+\.\s+(.*)$/);
+                        if (orderedMatch) {
+                            flushParagraph();
+                            if (listType && listType !== 'ol') flushList();
+                            listType = 'ol';
+                            listBuffer.push(orderedMatch[1]);
+                            continue;
+                        }
+
+                        paragraph.push(trimmed);
+                    }
+
+                    flushParagraph();
+                    flushList();
+                    flushCodeBlock();
+
+                    return blocks.join('');
+                };
+
+                titleEl.textContent = plugin.name || '插件详情';
+
+                const baseInfoHtml = `
+                    <div class="plugin-details-meta">
+                        ${plugin.version ? `<span>版本：${escapeHtml(plugin.version)}</span>` : ''}
+                        ${plugin.author ? `<span>作者：${escapeHtml(plugin.author)}</span>` : ''}
+                        ${plugin.category ? `<span>分类：${escapeHtml(plugin.category)}</span>` : ''}
+                    </div>
+                    <div class="plugin-details-desc">${escapeHtml(plugin.description || '暂无简介')}</div>
+                `;
+
+                // 构建功能列表
+                let featuresHtml = '';
+                const features = Array.isArray(plugin.features) ? plugin.features : [];
+                if (features.length > 0) {
+                    const items = features.map(f => {
+                        const cmds = Array.isArray(f.cmds) && f.cmds.length
+                            ? `<div class='plugin-feature-cmds'>命令：${escapeHtml(f.cmds.join('，'))}</div>`
+                            : '';
+                        return `
+                            <div class='plugin-feature-card'>
+                                <div class='plugin-feature-title'>${escapeHtml(f.explain || f.code || '未命名功能')}</div>
+                                <div class='plugin-feature-desc'>${escapeHtml(f.description || '')}</div>
+                                ${cmds}
+                            </div>
+                        `;
+                    }).join('');
+                    featuresHtml = `
+                        <section class='plugin-details-section'>
+                        <h3 class='plugin-details-section-title'>功能列表</h3>
+                        ${items}
+                        </section>
+                    `;
+                }
+
+                // 读取常见说明文件
+                let docsHtml = '';
+                try {
+                    const candidates = ['README.md', 'FEATURES.md', '安装说明.md', '需求.md'];
+                    const found = candidates.map(name => {
+                        const p = path.join(plugin.path, name);
+                        return fs.existsSync(p) ? p : null;
+                    }).filter(Boolean);
+                    if (found.length) {
+                        const content = fs.readFileSync(found[0], 'utf8');
+                        docsHtml = `
+                            <section class='plugin-details-section'>
+                            <h3 class='plugin-details-section-title'>文档</h3>
+                            <div class='plugin-doc-content'>${renderMarkdown(content)}</div>
+                            </section>
+                        `;
+                    }
+                } catch {}
+
+                bodyEl.innerHTML = baseInfoHtml + featuresHtml + docsHtml;
+                modal.classList.add('show');
+            } catch (error) {
+                console.error('打开插件详情失败:', error);
+            }
+        }
+
+        /**
+         * 关闭插件详情弹窗（绑定现有 close-button）
+         * 函数级注释：
+         * - 复用统一关闭逻辑，用户点击关闭按钮或遮罩时隐藏弹窗
+         */
+        (function bindDetailsModalClose(){
+            const detailsModal = document.getElementById('plugin-details-modal');
+            const closeBtn = detailsModal.querySelector('.close-button');
+            closeBtn.addEventListener('click', () => detailsModal.classList.remove('show'));
+            detailsModal.addEventListener('click', (e) => { if (e.target === detailsModal) detailsModal.classList.remove('show'); });
+        })();
+
+        // IPC处理器：接收快捷键回退通知
+        ipcRenderer.on('hotkey-fallback', (event, data) => {
+            showNotification(
+                '快捷键已更改', 
+                `快捷键 ${data.original} 无法注册，已自动切换到 ${data.fallback}。您可以在设置中修改。`, 
+                'warning'
+            );
+        });
+    </script>
+    <script src="merged-ui.js"></script>
+</body>
+</html>

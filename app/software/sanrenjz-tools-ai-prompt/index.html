@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="prompt-layers">
+<head data-business>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 提示词工坊</title>
+<style>
+:root{--a:#4f46e5;--a2:#6366f1;--as:rgba(79,70,229,.1);--al:rgba(79,70,229,.3);--bg:#f5f6fe;--sf:#fff;--s2:#e8eafc;--bd:#d4d8f5;--ink:#1a1a3a;--mt:#5a5b80;--ft:#9a9bc0;--ok:#16a34a;--err:#dc2626;--mono:'JetBrains Mono',Consolas,monospace;--sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif}
+*{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.head{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--sf);border-bottom:1px solid var(--bd);flex:none}
+.icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--a),var(--a2));display:flex;align-items:center;justify-content:center;flex:none}.icon svg{width:18px;height:18px;color:#fff}
+.head h1{margin:0;font-size:17px;font-weight:700}.head p{margin:0;color:var(--mt);font-size:12px}
+.spacer{flex:1}.gear{border:1px solid var(--bd);background:var(--sf);color:var(--a);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}.gear svg{width:14px;height:14px}
+.body{flex:1;min-height:0;display:grid;grid-template-columns:240px 1fr 1fr;gap:0;overflow:hidden}
+.lib{background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;min-height:0}
+.lib-h{padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex:none}
+.lib-h h2{margin:0;font-size:14px}.lib-h button{border:0;background:var(--a);color:#fff;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer}
+.lib-list{flex:1;overflow:auto;padding:6px}
+.lib-search{margin:10px 8px 4px;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;width:calc(100% - 16px)}.lib-section{padding:8px 12px 3px;color:var(--mt);font-size:11px;font-weight:700}
+.lib-item{display:block;width:100%;text-align:left;background:transparent;color:var(--ink);font:inherit;padding:10px 12px;border-radius:8px;cursor:pointer;transition:.12s;margin-bottom:4px;border:1px solid transparent}
+.lib-item:hover{background:var(--s2)}.lib-item.active{background:var(--as);border-color:var(--al)}
+.lib-item .lt{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lib-item .lm{font:11px var(--mono);color:var(--ft);margin-top:3px}
+.editor{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--bd);background:var(--sf)}
+.ed-h{padding:12px 16px;border-bottom:1px solid var(--bd);flex:none}
+.ed-h input{width:100%;border:1px solid var(--bd);border-radius:8px;padding:8px 12px;font:600 14px var(--sans);outline:none}.ed-h input:focus{border-color:var(--al)}
+.ed-body{flex:1;min-height:0;border:0;outline:0;resize:none;padding:16px;font:14px/1.7 var(--mono);background:var(--sf)}.ed-body::placeholder{color:var(--ft)}
+.ed-foot{padding:10px 16px;border-top:1px solid var(--bd);display:flex;gap:8px;flex:none;align-items:center;flex-wrap:wrap}
+.vars{max-height:220px;overflow:auto;border-top:1px solid var(--bd);padding:8px 16px}.vars:empty{display:none}.var-row{display:flex;align-items:flex-start;gap:8px;margin:6px 0}.var-row label{width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px/32px var(--mono)}.var-control{flex:1;min-width:0}.var-row input,.var-row select,.var-row textarea{width:100%;padding:6px 8px;border:1px solid var(--bd);border-radius:6px;background:#fff;color:var(--ink);font:13px var(--sans)}.var-row textarea{min-height:70px;resize:vertical;font-family:var(--mono)}.var-hint{display:block;margin-top:3px;color:var(--mt);font-size:11px}.mention{position:absolute;left:12px;right:12px;bottom:55px;z-index:20;background:#fff;border:1px solid var(--bd);box-shadow:0 8px 24px #1a1a3a22;border-radius:8px;max-height:220px;overflow:auto}.mention[hidden]{display:none}.mention button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:8px 12px;cursor:pointer}.mention button:hover,.mention button.active{background:var(--as)}.mention small{display:block;color:var(--mt)}.path-row{display:flex;gap:8px}.path-row input{flex:1;min-width:0}.hint{color:var(--mt);font-size:12px;margin:4px 0 16px}
+.var-tag{display:inline-flex;align-items:center;gap:4px;background:var(--as);color:var(--a);border-radius:6px;padding:3px 8px;font:12px var(--mono)}
+.preview{display:flex;flex-direction:column;min-height:0;overflow:hidden;background:var(--sf)}
+.pv-h{padding:12px 16px;border-bottom:1px solid var(--bd);font:600 14px var(--sans);flex:none;display:flex;justify-content:space-between;align-items:center}
+.pv-out{flex:1;overflow:auto;padding:16px;font:14px/1.7 var(--sans);white-space:pre-wrap;word-break:break-word}
+.pv-out.empty{display:flex;align-items:center;justify-content:center;color:var(--ft);font-style:italic}
+.act-bar{padding:12px 24px;border-top:1px solid var(--bd);background:var(--sf);display:flex;gap:10px;align-items:center;flex:none}
+.btn{border:1px solid var(--bd);background:var(--sf);color:var(--ink);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;transition:.12s;display:inline-flex;align-items:center;gap:6px}.btn:hover{border-color:var(--al)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border-color:transparent}.btn.primary:hover{filter:brightness(1.08)}.btn:disabled{opacity:.5}
+.stat{font:12px var(--mono);color:var(--mt)}
+.drawer{position:fixed;top:32px;right:0;bottom:0;width:min(420px,92vw);background:var(--sf);box-shadow:-12px 0 40px rgba(0,0,0,.1);z-index:50;transform:translateX(100%);transition:.25s;overflow:auto;padding:24px}.drawer.open{transform:translateX(0)}.drawer h2{margin:0 0 16px;font-size:16px}.drawer .close{position:absolute;top:16px;right:16px;border:0;background:transparent;font-size:20px;color:var(--ft);cursor:pointer}
+.field{margin-bottom:16px}.field label{display:block;font-size:12px;color:var(--mt);font-weight:600;margin-bottom:6px}.field input{width:100%;border:1px solid var(--bd);border-radius:8px;padding:9px 12px;font:14px var(--sans);outline:none;background:var(--s2);color:var(--ink)}.field input:focus{border-color:var(--al)}
+.overlay{position:fixed;inset:32px 0 0 0;background:rgba(0,0,0,.3);z-index:40;display:none}.overlay.show{display:block}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a1a3a;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#c8ccf0;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="head">
+    <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h7"/><circle cx="18" cy="16" r="3"/><path d="M18 13V8M18 19v3"/></svg></div>
+    <div><h1>AI 提示词工坊</h1><p>管理模板、@ 插入提示词、填充变量并优化</p></div>
+    <div class="spacer"></div>
+    <button class="gear" id="promptSettingsBtn">提示词设置</button>
+    <button class="gear" onclick="toggleDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 1-.1 1.2l2 1.5-2 3.4-2.3-1a7 7 0 0 1-2 1.2l-.4 2.5H9l-.4-2.5a7 7 0 0 1-2-1.2l-2.3 1-2-3.4 2-1.5A7 7 0 0 1 4 12a7 7 0 0 1 .1-1.2l-2-1.5 2-3.4 2.3 1a7 7 0 0 1 2-1.2L9 1h4l.4 2.5a7 7 0 0 1 2 1.2l2.3-1 2 3.4-2 1.5A7 7 0 0 1 19 12z"/></svg>供应商设置</button>
+  </div>
+  <div class="body">
+    <aside class="lib">
+      <div class="lib-h"><h2>提示词库</h2><button onclick="newPrompt()">+</button></div>
+      <input class="lib-search" id="libSearch" placeholder="搜索标题或内容" aria-label="搜索提示词">
+      <div class="lib-list" id="libList"></div>
+    </aside>
+    <div class="editor" style="position:relative">
+      <div class="ed-h"><input id="pTitle" placeholder="提示词标题"></div>
+      <textarea class="ed-body" id="pBody" spellcheck="false" placeholder="输入 @ 插入提示词；用 {{变量}} 标记可替换内容"></textarea>
+      <div class="mention" id="mention" hidden></div>
+      <div class="vars" id="varInputs"></div>
+      <div class="ed-foot" id="varList"><span style="color:var(--ft);font-size:12px">变量将自动识别</span></div>
+    </div>
+    <div class="preview">
+      <div class="pv-h">优化预览 <span class="stat" id="pvStat">等待</span></div>
+      <div class="pv-out empty" id="pvOut">编辑提示词后点击「优化」</div>
+    </div>
+  </div>
+  <div class="act-bar">
+    <button class="btn primary" id="optBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>优化提示词</button>
+    <button class="btn" id="stopBtn" disabled>取消</button>
+    <button class="btn" id="copyBtn">复制</button>
+    <button class="btn" id="copyRenderedBtn">复制填充结果</button>
+    <button class="btn" id="saveAsBtn" disabled>优化结果另存</button>
+    <button class="btn" id="duplicateBtn">复制模板</button>
+    <button class="btn" id="deleteBtn">删除模板</button>
+    <div class="spacer"></div>
+    <span class="stat" id="saveStat"></span>
+  </div>
+</main>
+<div class="overlay" id="overlay" onclick="toggleDrawer()"></div>
+<aside class="drawer" id="drawer"></aside>
+<div class="overlay" id="promptOverlay"></div>
+<aside class="drawer" id="promptDrawer"><button class="close" id="closePromptDrawer">×</button><h2>提示词设置</h2>
+  <div class="field"><label>提示词文件夹（Markdown / TXT，只读）</label><div class="path-row"><input id="promptPath" readonly placeholder="选择文件夹，可与 AI 助手使用同一目录"><button class="btn" id="choosePath">选择</button></div></div>
+  <button class="btn" id="refreshFiles">刷新文件夹</button> <button class="btn" id="clearPath">清除路径</button>
+  <p class="hint" id="folderStat">文件夹内容可在列表中查看，也可输入 @ 插入编辑器。</p>
+</aside>
+<div class="toast" id="toast"></div>
+<script src="../../plugin_runtime/ai-provider-manager.js"></script>
+<script src="prompt-language.js"></script>
+<script src="workshop.js"></script>
+</body></html>

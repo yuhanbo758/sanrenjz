@@ -1,0 +1,51 @@
+{
+  "pluginName": "AI 会议纪要",
+  "description": "录音转写、导入会议资料，整理议题、决策、待办与风险。",
+  "version": "1.1.0",
+  "author": "三人聚智",
+  "category": "AI 工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-ai-meeting",
+      "explain": "会议纪要",
+      "description": "录音转写、拖拽导入办公资料，生成会议纪要与行动项。",
+      "cmds": [
+        "AI 会议纪要",
+        "整理纪要",
+        "提取决策",
+        "提取待办",
+        "录音转写",
+        "上传会议资料",
+        {
+          "type": "over",
+          "label": "用AI 会议纪要处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "AI 工具",
+      "priority": 22,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "pluginName": "AI语音输入法",
+  "description": "多供应商语音输入，支持共享 GPT 等模型处理转写文字、直连音频模型、结果检查、场景快捷键与局域网同步",
+  "version": "1.4.2",
+  "author": "余汉波",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "speech-config",
+      "explain": "语音设置",
+      "description": "配置模型API Key和提示词",
+      "cmds": ["语音输入", "Voice Input", "Speech", "AI语音"],
+      "icon": "logo.ico",
+      "platform": ["win32", "darwin", "linux"],
+      "mode": "none",
+      "superPanel": true,
+      "priority": 10
+    }
+  ],
+  "pluginSetting": {
+    "width": 800,
+    "height": 720,
+    "single": true,
+    "autoHideMenuBar": true,
+    "keepAlive": true,
+    "background": true,
+    "autoClose": false
+  }
+}

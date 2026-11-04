@@ -1,0 +1,48 @@
+{
+  "pluginName": "Hosts 配置中心",
+  "description": "Hosts 编辑、复制与清空、查找、格式检查、差异预览和安全备份。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-hosts-manager",
+      "explain": "域名映射",
+      "description": "编辑 Hosts 并检查格式与差异，写入前自动备份。",
+      "cmds": [
+        "hosts",
+        "hosts切换",
+        "域名解析",
+        {
+          "type": "over",
+          "label": "用Hosts 配置中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "pluginName": "视觉设计实验室",
+  "description": "拖入图片提取色板，检查文字对比度，并编辑预览 SVG。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-palette-extractor",
+      "explain": "色板提取",
+      "description": "从拖入、选择或粘贴的图片提取色板，复制颜色并导出 CSS 或 JSON。",
+      "cmds": [
+        "提取颜色",
+        "色板",
+        "主色",
+        "色板导出",
+        {
+          "type": "over",
+          "label": "用视觉设计实验室处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-color-workbench",
+      "explain": "颜色对比",
+      "description": "检查前景色与背景色的文字对比度，并查看搭配参考色。",
+      "cmds": [
+        "颜色转换",
+        "对比度",
+        "颜色搭配",
+        "hex",
+        "rgb",
+        {
+          "type": "over",
+          "label": "用视觉设计实验室处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-svg-workbench",
+      "explain": "SVG编辑",
+      "description": "导入 SVG，格式化或压缩源码，静态预览并保存。",
+      "cmds": [
+        "svg",
+        "svg压缩",
+        "SVG预览",
+        {
+          "type": "over",
+          "label": "用视觉设计实验室处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

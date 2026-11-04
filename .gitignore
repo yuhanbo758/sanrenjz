@@ -1,0 +1,192 @@
+# 依赖包
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 打包输出
+dist/
+build-output/
+*.exe
+*.dmg
+*.AppImage
+
+# 环境配置
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 临时文件
+.tmp/
+temp/
+*.tmp
+*.temp
+
+# 系统文件
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 编辑器文件
+.vscode/
+.idea/
+.trae/
+*.swp
+*.swo
+*~
+
+# 用户数据和缓存
+*.cache
+.cache/
+/settings.json
+plugin-data/
+user-data/
+
+# 备份文件
+*.bak
+*.backup
+*.old
+
+# 调试文件
+*.pdb
+*.map
+
+# 测试覆盖率
+coverage/
+.nyc_output/
+
+# 锁定文件（可选，根据团队需要）
+# package-lock.json
+# yarn.lock 
+security-review.md
+/PROJECT_MEMORY.md
+/scripts/mobile-deploy/
+
+# 私有视频插件在 app/software 本地开发，Program_Shop 仅放交付包；禁止纳入公开提交
+/app/software/sanrenjz-tools-video-parser/
+/tests/video-parser*.js
+/scripts/render-video-parser-icon.js
+
+# 仅在本地维护的插件及其专用开发文件，不进入公开提交
+/app/software/sanrenjz-tools-reading-learning/
+/app/software/sanrenjz-tools-cast-receiver/
+/tests/reading-learning*
+/tests/cast-*
+/scripts/*reading-learning*
+/scripts/*cast*
+/tests/remote-mirror.test.js
+/tests/remote-package-check.js
+
+# Mac远程桌面为本地自用插件，源码及专用开发文件不进入公开提交
+/app/software/sanrenjz-tools-vnc/
+/tests/vnc-*
+/scripts/package-vnc-plugin.ps1
+/scripts/render-vnc-icon.js
+
+# AI video studio is private: keep source and dedicated development files local
+/app/software/sanrenjz-tools-ai-video-studio/
+/tests/ai-video*
+/scripts/*ai-video*
+
+# 合并应用：真实数据与可下载运行时
+/runtime/
+/python/
+/python-plugins/
+/plugins/
+/plugin-configs/
+/python-plugin-configs/
+/migration-backups/
+**/__pycache__/
+*.pyc
+*.db
+*.sqlite*
+**/.downloads/
+/app/python-software/big_qmt_app/
+/app/python-software/small_qmt_app/
+/app/python-software/sanrenjz-python-loc_cos_backup/
+/scripts/private-python/
+/docs/legacy/
+/docs/merge-baseline.json
+
+# 新插件必须显式分类，只有公开清单允许进入 Git
+/app/software/*
+!/app/software/obsidian-surfing/
+!/app/software/sanrenjz-tools-account-manager/
+!/app/software/sanrenjz-tools-ai-code-review/
+!/app/software/sanrenjz-tools-ai-document/
+!/app/software/sanrenjz-tools-ai-git/
+!/app/software/sanrenjz-tools-ai-image/
+!/app/software/sanrenjz-tools-ai-learning/
+!/app/software/sanrenjz-tools-ai-meeting/
+!/app/software/sanrenjz-tools-ai-prompt/
+!/app/software/sanrenjz-tools-ai-regex/
+!/app/software/sanrenjz-tools-ai-sql/
+!/app/software/sanrenjz-tools-ai-writing/
+!/app/software/sanrenjz-tools-ai_screen_trans/
+!/app/software/sanrenjz-tools-archive-studio/
+!/app/software/sanrenjz-tools-code-security/
+!/app/software/sanrenjz-tools-csv-data/
+!/app/software/sanrenjz-tools-cut_image/
+!/app/software/sanrenjz-tools-download_plugin/
+!/app/software/sanrenjz-tools-file-batch/
+!/app/software/sanrenjz-tools-file-inspector/
+!/app/software/sanrenjz-tools-focus-worklog/
+!/app/software/sanrenjz-tools-hosts-center/
+!/app/software/sanrenjz-tools-image-creator/
+!/app/software/sanrenjz-tools-image-optimizer/
+!/app/software/sanrenjz-tools-image-pinboard/
+!/app/software/sanrenjz-tools-lan-transfer/
+!/app/software/sanrenjz-tools-launch-center/
+!/app/software/sanrenjz-tools-notes-center/
+!/app/software/sanrenjz-tools-password/
+!/app/software/sanrenjz-tools-pdf-studio/
+!/app/software/sanrenjz-tools-qr-barcode/
+!/app/software/sanrenjz-tools-speech_input/
+!/app/software/sanrenjz-tools-structured-data/
+!/app/software/sanrenjz-tools-task-habit/
+!/app/software/sanrenjz-tools-text/
+!/app/software/sanrenjz-tools-text-engineering/
+!/app/software/sanrenjz-tools-time-calculation/
+!/app/software/sanrenjz-tools-visual-design/
+!/app/software/sanrenjz.tools-ai/
+!/app/software/sanrenjz.tools-multi_wechat/
+/app/python-software/*
+!/app/python-software/cos_downloader/
+!/app/python-software/file_downloader/
+!/app/python-software/github_downloader/
+!/app/python-software/terminal/
+
+# 私有移动端开发资料和个人真机验证脚本仅在本地保留
+/docs/android-project.md
+/docs/mobile-remote-control.md
+/docs/mobile-compatibility.md
+/scripts/build-mobile-preview.js
+/scripts/generate-mobile-compatibility.js
+/tests/remote-main-live.js
+/tests/remote-debug-phone.js
+/tests/remote-lan-auth-live.js
+/tests/remote-live-inspect.js
+/tests/remote-phone-acceptance.js
+/tests/remote-phone-screen.js
+/tests/remote-worker-live.js
+
+# 凭据、签名及完整扫描结果不得公开；示例环境文件可以提交
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.keystore
+*.jks
+/privacy-reports/

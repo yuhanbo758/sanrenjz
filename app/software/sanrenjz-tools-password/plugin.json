@@ -1,0 +1,27 @@
+{
+  "pluginName": "密码管理器",
+  "description": "安全的密码存储和管理工具，支持完全自定义分类管理、数据导入导出、密码生成、搜索和锁屏保护功能。侧边栏底部按钮已优化布局。",
+  "version": "1.6.4",
+  "author": "余汉波",
+  "category": "网络安全",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "password-manager",
+      "explain": "密码管理器主功能",
+      "cmds": ["密码管理", "密码管理器", "password", "密码"],
+      "icon": "logo.ico",
+      "platform": ["win32", "darwin", "linux"],
+      "mode": "none"
+    }
+  ],
+  "pluginSetting": {
+    "width": 1000,
+    "height": 720,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

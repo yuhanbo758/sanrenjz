@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>微信多开</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: #f5f7fb;
+      color: #1f2328;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      flex: 0 0 auto;
+      padding: 18px 18px 12px;
+      background: linear-gradient(135deg, #0ea5e9 0%, #22c55e 100%);
+      color: #ffffff;
+      box-shadow: 0 8px 30px rgba(2, 6, 23, 0.12);
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .title {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .title h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .title .subtitle {
+      font-size: 13px;
+      opacity: 0.92;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ghost-btn {
+      height: 34px;
+      padding: 0 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+      cursor: pointer;
+      transition: transform 0.15s, background 0.15s, border-color 0.15s;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      user-select: none;
+    }
+
+    .ghost-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .ghost-btn:active {
+      transform: translateY(0);
+    }
+
+    .content {
+      flex: 1 1 auto;
+      padding: 16px 18px 18px;
+      overflow: auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid rgba(2, 6, 23, 0.06);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.06);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid rgba(2, 6, 23, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .card-header h2 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .card-body {
+      padding: 14px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .row:last-child {
+      margin-bottom: 0;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .label {
+      font-size: 12px;
+      color: #475569;
+    }
+
+    .input {
+      height: 38px;
+      padding: 0 12px;
+      border: 1px solid rgba(2, 6, 23, 0.12);
+      border-radius: 10px;
+      outline: none;
+      font-size: 13px;
+      background: #ffffff;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      width: 100%;
+    }
+
+    .input:focus {
+      border-color: rgba(14, 165, 233, 0.7);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18);
+    }
+
+    .input[readonly] {
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .btn {
+      height: 38px;
+      padding: 0 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(2, 6, 23, 0.12);
+      background: #ffffff;
+      color: #0f172a;
+      cursor: pointer;
+      transition: transform 0.15s, background 0.15s, border-color 0.15s;
+      font-size: 13px;
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: #f8fafc;
+      border-color: rgba(2, 6, 23, 0.18);
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn.primary {
+      background: #0ea5e9;
+      border-color: #0ea5e9;
+      color: #ffffff;
+    }
+
+    .btn.primary:hover {
+      background: #0284c7;
+      border-color: #0284c7;
+    }
+
+    .btn.danger {
+      background: #ffffff;
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #b91c1c;
+    }
+
+    .btn.danger:hover {
+      background: rgba(239, 68, 68, 0.06);
+      border-color: rgba(239, 68, 68, 0.55);
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(2, 6, 23, 0.04);
+      color: #334155;
+      border: 1px solid rgba(2, 6, 23, 0.06);
+    }
+
+    .pill.ok {
+      background: rgba(34, 197, 94, 0.12);
+      color: #166534;
+      border-color: rgba(34, 197, 94, 0.22);
+    }
+
+    .pill.bad {
+      background: rgba(239, 68, 68, 0.12);
+      color: #991b1b;
+      border-color: rgba(239, 68, 68, 0.22);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .actions .btn {
+      width: 100%;
+    }
+
+    .log {
+      height: 290px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(2, 6, 23, 0.06);
+      background: #0b1220;
+      color: #e2e8f0;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .log .line {
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      padding: 2px 0;
+    }
+
+    .log .line.dim {
+      color: rgba(226, 232, 240, 0.75);
+    }
+
+    .footer-tip {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="header-top">
+        <div class="title">
+          <h1>微信多开</h1>
+          <div class="subtitle">设置微信程序路径 → 一键启动多个实例</div>
+        </div>
+        <div class="header-actions">
+          <button id="btnClose" class="ghost-btn" type="button">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <h2>路径设置</h2>
+            <div id="exeStatus" class="pill">未检测</div>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="field">
+                <div class="label">微信程序 (.exe)</div>
+                <input id="inputExe" class="input" placeholder="请选择 WeChat.exe / Weixin.exe" readonly />
+              </div>
+              <button id="btnPickExe" class="btn" type="button">选择程序</button>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <div class="label">微信目录 (自动从 exe 推导)</div>
+                <input id="inputDir" class="input" placeholder="-" readonly />
+              </div>
+              <button id="btnOpenDir" class="btn" type="button">打开目录</button>
+            </div>
+
+            <div class="hint">提示：脚本多开原理通常依赖在短时间内重复启动。若你的版本无法多开，可尝试调整“启动方式/间隔”。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>多开设置</h2>
+            <div class="pill">Win32</div>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="field">
+                <div class="label">开启数量 (1-50)</div>
+                <input id="inputCount" class="input" type="number" min="1" max="50" step="1" />
+              </div>
+              <button id="btnTestOne" class="btn" type="button">测试 1 个</button>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <div class="label">启动方式</div>
+                <select id="selectMethod" class="input">
+                  <option value="cmdStart">cmd start (推荐)</option>
+                  <option value="direct">直接启动</option>
+                </select>
+              </div>
+              <button id="btnSave" class="btn" type="button">保存设置</button>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <div class="label">启动间隔 (0-3000ms)</div>
+                <input id="inputDelay" class="input" type="number" min="0" max="3000" step="10" />
+              </div>
+              <button id="btnClear" class="btn danger" type="button">清空设置</button>
+            </div>
+
+            <div class="row" style="grid-template-columns: 1fr;">
+              <label class="hint" style="display:flex;align-items:center;gap:10px;user-select:none;">
+                <input id="checkAutoClose" type="checkbox" />
+                启动后自动关闭窗口
+              </label>
+            </div>
+
+            <div class="actions" style="margin-top: 12px;">
+              <button id="btnLaunch" class="btn primary" type="button">一键多开</button>
+              <button id="btnValidate" class="btn" type="button">检测路径</button>
+            </div>
+
+            <div class="footer-tip">建议先“测试 1 个”，确认路径无误后再多开。</div>
+          </div>
+        </div>
+
+        <div class="card" style="grid-column: 1 / -1;">
+          <div class="card-header">
+            <h2>运行日志</h2>
+            <button id="btnLogClear" class="btn" type="button">清空日志</button>
+          </div>
+          <div class="card-body">
+            <div id="log" class="log"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function nowText() {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function appendLog(text, dim = false) {
+      const log = $('log');
+      const p = document.createElement('p');
+      p.className = `line${dim ? ' dim' : ''}`;
+      p.textContent = `[${nowText()}] ${text}`;
+      log.appendChild(p);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function setExeStatus(ok, text) {
+      const el = $('exeStatus');
+      el.classList.remove('ok', 'bad');
+      if (ok === true) el.classList.add('ok');
+      if (ok === false) el.classList.add('bad');
+      el.textContent = text;
+    }
+
+    function clampInt(value, min, max, fallback) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      const i = Math.trunc(n);
+      return Math.min(max, Math.max(min, i));
+    }
+
+    function getSettingsFromUI() {
+      return {
+        wechatExePath: $('inputExe').value || '',
+        instanceCount: clampInt($('inputCount').value, 1, 50, 2),
+        launchMethod: $('selectMethod').value === 'direct' ? 'direct' : 'cmdStart',
+        delayMs: clampInt($('inputDelay').value, 0, 3000, 120),
+        autoClose: Boolean($('checkAutoClose').checked)
+      };
+    }
+
+    function renderDerivedDir(exePath) {
+      if (!exePath) {
+        $('inputDir').value = '';
+        return;
+      }
+      const v = window.services.validateExePath(exePath);
+      if (v.ok) {
+        $('inputDir').value = v.dir;
+      } else {
+        $('inputDir').value = '';
+      }
+    }
+
+    async function validateAndShow() {
+      const exePath = $('inputExe').value;
+      const v = window.services.validateExePath(exePath);
+      if (v.ok) {
+        setExeStatus(true, '路径有效');
+        appendLog(`路径有效：${v.exePath}`, true);
+      } else {
+        setExeStatus(false, v.reason);
+        appendLog(`路径无效：${v.reason}`);
+      }
+      renderDerivedDir(exePath);
+      return v;
+    }
+
+    async function saveSettings() {
+      const ui = getSettingsFromUI();
+      const saved = window.services.saveSettings(ui);
+      appendLog('设置已保存', true);
+      renderDerivedDir(saved.wechatExePath);
+      await validateAndShow();
+      return saved;
+    }
+
+    async function doLaunch(countOverride) {
+      const v = await validateAndShow();
+      if (!v.ok) return;
+      const ui = await saveSettings();
+
+      const count = typeof countOverride === 'number' ? countOverride : ui.instanceCount;
+      appendLog(`开始启动：数量=${count}，方式=${ui.launchMethod}，间隔=${ui.delayMs}ms`);
+
+      const result = await window.services.launchWeChatInstances({
+        exePath: ui.wechatExePath,
+        count,
+        method: ui.launchMethod,
+        delayMs: ui.delayMs
+      });
+
+      if (result.success) {
+        appendLog(`已发起启动：${result.startedCount} 个`);
+      } else {
+        appendLog(`启动完成：成功 ${result.startedCount} 个，失败 ${result.errors.length} 个`);
+        result.errors.forEach((e) => appendLog(`失败 #${e.index}: ${e.message}`));
+      }
+
+      if (ui.autoClose) {
+        await window.services.closeWindow();
+      }
+    }
+
+    async function init() {
+      if (!window.services) {
+        document.body.innerHTML = '<div style="padding:24px;font-family:Segoe UI">插件初始化失败：未找到 services。</div>';
+        return;
+      }
+
+      const s = window.services.getSettings();
+      $('inputExe').value = s.wechatExePath || '';
+      $('inputCount').value = String(clampInt(s.instanceCount, 1, 50, 2));
+      $('selectMethod').value = s.launchMethod === 'direct' ? 'direct' : 'cmdStart';
+      $('inputDelay').value = String(clampInt(s.delayMs, 0, 3000, 120));
+      $('checkAutoClose').checked = Boolean(s.autoClose);
+      renderDerivedDir(s.wechatExePath);
+      appendLog('插件已就绪', true);
+      await validateAndShow();
+
+      $('btnPickExe').addEventListener('click', async () => {
+        const r = window.services.pickWeChatExe();
+        if (r && !r.canceled && r.filePath) {
+          $('inputExe').value = r.filePath;
+          renderDerivedDir(r.filePath);
+          appendLog(`已选择程序：${r.filePath}`, true);
+          await saveSettings();
+        }
+      });
+
+      $('btnOpenDir').addEventListener('click', async () => {
+        const v = window.services.validateExePath($('inputExe').value);
+        if (!v.ok) {
+          appendLog(`无法打开目录：${v.reason}`);
+          return;
+        }
+        window.services.openPath(v.dir);
+      });
+
+      $('btnValidate').addEventListener('click', async () => {
+        await validateAndShow();
+      });
+
+      $('btnSave').addEventListener('click', async () => {
+        await saveSettings();
+      });
+
+      $('btnClear').addEventListener('click', async () => {
+        $('inputExe').value = '';
+        $('inputDir').value = '';
+        $('inputCount').value = '2';
+        $('selectMethod').value = 'cmdStart';
+        $('inputDelay').value = '120';
+        $('checkAutoClose').checked = false;
+        window.services.saveSettings({
+          wechatExePath: '',
+          instanceCount: 2,
+          launchMethod: 'cmdStart',
+          delayMs: 120,
+          autoClose: false
+        });
+        setExeStatus(null, '未检测');
+        appendLog('设置已清空', true);
+      });
+
+      $('btnTestOne').addEventListener('click', async () => {
+        await doLaunch(1);
+      });
+
+      $('btnLaunch').addEventListener('click', async () => {
+        await doLaunch();
+      });
+
+      $('btnLogClear').addEventListener('click', () => {
+        $('log').innerHTML = '';
+        appendLog('日志已清空', true);
+      });
+
+      $('btnClose').addEventListener('click', async () => {
+        await window.services.closeWindow();
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+
+</html>
+

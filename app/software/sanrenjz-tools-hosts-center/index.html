@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="host-map">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hosts 配置中心</title>
+<style>
+:root{
+  --accent:#455a64;--accent-2:#607d8b;--accent-soft:rgba(69,90,100,.1);--accent-line:rgba(69,90,100,.3);
+  --bg:#f4f6f7;--surface:#fff;--surface-2:#eaeef0;--border:#d4dde1;
+  --ink:#1a2326;--muted:#5a6b70;--faint:#9aa8ac;
+  --ok:#16a34a;--err:#dc2626;--warn:#d97706;--info:#2563eb;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.toolbar{display:flex;gap:8px;align-items:center;padding:9px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex:none;flex-wrap:wrap;-webkit-app-region:no-drag}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent-line)}
+.btn:disabled{opacity:.48;cursor:not-allowed}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--err);border-color:var(--err)}
+.path-info{font:12px var(--mono);color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search{border:1px solid var(--border);border-radius:8px;padding:8px 10px;width:155px;min-width:90px;font:13px var(--sans);outline:none}
+.search:focus{border-color:var(--accent-2)}
+.body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:0;overflow:hidden}
+.editor-card{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--border)}
+.card-h{padding:10px 18px;border-bottom:1px solid var(--border);font:600 12px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;flex:none;display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
+.editor-card textarea{flex:1;border:0;outline:0;resize:none;padding:18px;font:14px/1.8 var(--mono);background:var(--surface);color:var(--ink);min-height:0;tab-size:4}
+.editor-card textarea::placeholder{color:var(--faint)}
+.diff-card{display:flex;flex-direction:column;min-height:0;background:var(--surface)}
+.diff-out{flex:1;overflow:auto;padding:18px;font:14px/1.8 var(--mono);white-space:pre-wrap;word-break:break-word;background:#1a2326;color:#c8d4d8}
+.diff-line{display:block;padding:1px 0}
+.diff-add{color:#4ade80}
+.diff-del{color:#fb7185}
+.diff-same{color:#7a8a90}
+.empty-diff{color:#5a6b70;text-align:center;padding:40px}
+.issues{display:none;max-height:110px;overflow:auto;border-bottom:1px solid var(--border);padding:7px 14px;background:#fff8ed;font:12px/1.7 var(--sans)}
+.issues.show{display:block}.issue-error{color:var(--err)}.issue-warn{color:#9a5b08}
+.issue{display:block;cursor:pointer;border:0;background:none;text-align:left;padding:2px 0;font:inherit}
+.statusbar{flex:none;padding:10px 24px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);display:flex;align-items:center;gap:8px;background:var(--surface)}
+.statusbar .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.statusbar.ok .dot{background:var(--ok)}.statusbar.err .dot{background:var(--err)}.statusbar.warn .dot{background:var(--warn)}
+.backup-info{font:12px var(--mono);color:var(--info);cursor:pointer;text-decoration:underline}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2326;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#bcd0d6;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="toolbar">
+    <button class="btn primary" id="loadBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>读取当前 Hosts</button>
+    <button class="btn" id="diffBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 8l3-3 3 3M3 16l3 3 3-3M21 8l-3-3-3 3M21 16l-3 3-3-3"/></svg>预览差异</button>
+    <button class="btn danger" id="writeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>写入 Hosts</button>
+    <button class="btn" id="copyBtn">复制内容</button>
+    <button class="btn" id="clearBtn">清空编辑区</button>
+    <button class="btn" id="resetBtn">恢复已读取</button>
+    <input class="search" id="search" placeholder="查找域名 / IP" aria-label="查找域名或 IP">
+    <button class="btn" id="nextBtn">下一个</button>
+    <span class="path-info" id="pathInfo">未读取</span>
+  </div>
+  <div class="body">
+    <div class="editor-card">
+      <div class="card-h">编辑器 <span style="font-size:10px;color:var(--faint)" id="editStat">0 行</span></div>
+      <textarea id="editor" spellcheck="false" placeholder="点击「读取当前 Hosts」加载内容&#10;&#10;# 示例：&#10;127.0.0.1 localhost&#10;192.168.1.100 myserver.local"></textarea>
+    </div>
+    <div class="diff-card">
+      <div class="card-h">差异预览 <span style="font-size:10px;color:var(--faint)">绿色=新增 红色=删除</span></div>
+      <div class="issues" id="issues"></div>
+      <div class="diff-out" id="diffOut"><div class="empty-diff">编辑后点击「预览差异」查看变更</div></div>
+    </div>
+  </div>
+  <div class="statusbar" id="statusbar"><span class="dot"></span><span id="statusText">等待操作</span><span id="backupLink" style="display:none;margin-left:auto" class="backup-info"></span></div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="renderer.js"></script>
+</body></html>

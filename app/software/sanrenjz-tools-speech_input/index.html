@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AI 语音输入法</title>
+    <style>
+        :root {
+            --primary-color: #0078d4;
+            --bg-color: #ffffff;
+            --card-bg: #ffffff;
+            --text-color: #18283b;
+        }
+        body {
+            font-family: "Segoe UI", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        body.view-indicator {
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+        }
+        .container {
+            background: var(--card-bg);
+            border-radius: 0;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        body.view-indicator .container {
+            display: none;
+        }
+        .header {
+            padding: 14px 20px;
+            border-bottom: 1px solid #e6ebf1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h2 { margin: 0; font-size: 18px; }
+        .header { gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+        .header > div { display: flex; gap: 8px; flex-wrap: wrap; }
+        .workspace-card { padding: 18px; border: 1px solid #dce6ef; border-radius: 12px; background: #fff; margin-bottom: 16px; }
+        .workspace-card.drag-over { border-color: var(--primary-color); box-shadow: 0 0 0 3px #d9edff; }
+        .workspace-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .workspace-actions button { min-width: 92px; }
+        .workspace-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin: 12px 0 8px; font-size: 13px; color: #53677d; }
+        .workspace-status { color: #174a70; }
+        .workspace-status[data-kind="error"] { color: #b42318; }
+        .workspace-result { min-height: 110px; width: 100%; line-height: 1.6; }
+        .workspace-hint { margin: 8px 0 0; color: #66788d; font-size: 12px; }
+        .workspace-option { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #40566d; }
+        .workspace-option input { margin: 0; }
+        .workspace-card button:disabled { opacity: .45; cursor: not-allowed; }
+        .workspace-card button:focus-visible, .settings-nav button:focus-visible, textarea:focus-visible { outline: 2px solid #0078d4; outline-offset: 2px; }
+        @media (max-width: 620px) { body { padding: 8px; } #settings { padding: 12px !important; } .settings-nav { margin: -12px -12px 16px; } .row { flex-wrap: wrap; } }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 77, 77, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input[type="text"], input[type="password"], textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .input-actions input {
+            flex: 1;
+        }
+        .icon-btn {
+            flex: 0 0 auto;
+            width: 38px;
+            height: 34px;
+            padding: 0;
+            border-radius: 6px;
+            background: #f2f2f2;
+            color: #222;
+            border: 1px solid #ddd;
+        }
+        .icon-btn:hover {
+            opacity: 0.9;
+        }
+        .icon-btn:active {
+            transform: translateY(1px);
+        }
+        textarea { resize: vertical; min-height: 80px; }
+        .container button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .container button:hover { opacity: 0.9; }
+        .container .icon-btn {
+            width: 38px;
+            height: 34px;
+            padding: 0;
+            border-radius: 6px;
+            background: #f2f2f2;
+            color: #222;
+            border: 1px solid #ddd;
+        }
+        .container .icon-btn:hover { opacity: 0.9; }
+        .container .btn-secondary { background: #eef3f8; color: #27445e; border: 1px solid #d6e1eb; }
+        .container .btn-secondary:hover { background: #e2edf6; }
+
+        /* 不影响应用层注入的自定义标题栏按钮 */
+        .custom-title-bar button {
+            color: #222;
+        }
+        
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .row > * {
+            flex: 1;
+        }
+        .row .btn {
+            flex: 0 0 auto;
+        }
+
+        .hotkey-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .hotkey-item {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .hotkey-key {
+            flex: 0 0 auto;
+            width: 70px;
+            font-size: 12px;
+            color: #444;
+        }
+        .hotkey-shortcut {
+            min-width: 120px;
+            cursor: pointer;
+            background: #f8fbff;
+        }
+        .hotkey-record-btn {
+            flex: 0 0 auto;
+            width: auto;
+            white-space: nowrap;
+        }
+        .settings-section {
+            padding: 14px;
+            margin: 14px 0;
+            border: 1px solid #dce6ef;
+            border-radius: 10px;
+            background: #fff;
+        }
+        .section-title {
+            margin-bottom: 10px;
+            font-size: 16px;
+            font-weight: 650;
+            color: #17324d;
+        }
+        .settings-nav {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 10px;
+            margin: -20px -20px 18px;
+            background: rgba(255,255,255,0.96);
+            border-bottom: 1px solid #dce6ef;
+            backdrop-filter: blur(8px);
+        }
+        .settings-nav button { padding: 8px 10px; background: #edf5fb; color: #174a70; }
+        .feature-heading {
+            margin: 18px 0 12px;
+            padding: 10px 12px;
+            border-left: 4px solid var(--primary-color);
+            border-radius: 6px;
+            background: #f1f7fc;
+            color: #17324d;
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        #indicator-container {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+            -webkit-app-region: drag;
+        }
+        body.view-indicator #indicator-container {
+            display: flex;
+        }
+        #indicator-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            color: #fff;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+            background: rgba(120, 120, 120, 0.92);
+            user-select: none;
+            cursor: move;
+            -webkit-app-region: drag;
+        }
+        #indicator-icon.state-recording {
+            background: rgba(255, 77, 77, 0.95);
+            animation: pulse 1.5s infinite;
+        }
+        #indicator-icon.state-processing {
+            background: rgba(0, 120, 212, 0.95);
+        }
+    </style>
+</head>
+<body>
+    <div id="indicator-container" aria-hidden="true">
+        <div id="indicator-icon" class="state-ready">🎙️</div>
+    </div>
+    <div class="container">
+        <div class="header">
+            <div>
+                <button id="hide-btn" class="btn-secondary" style="padding: 5px 10px;">隐藏后台运行</button>
+                <button id="close-btn" class="btn-secondary" style="padding: 5px 10px; margin-left:6px;">关闭并退出</button>
+            </div>
+        </div>
+        <div id="settings" style="flex: 1; padding: 20px; overflow-y: auto;">
+            <section class="workspace-card" aria-label="语音工作台">
+                <div class="section-title">语音工作台</div>
+                <div class="workspace-actions">
+                    <button id="record-toggle-btn" type="button">开始录音</button>
+                    <button id="record-cancel-btn" type="button" class="btn-secondary" disabled>取消录音</button>
+                    <button id="audio-file-btn" type="button" class="btn-secondary">导入音频</button>
+                    <input id="audio-file-input" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm" hidden>
+                    <button id="result-copy-btn" type="button" class="btn-secondary" disabled>复制结果</button>
+                    <button id="result-insert-btn" type="button" class="btn-secondary" disabled>插入结果</button>
+                    <button id="result-clear-btn" type="button" class="btn-secondary" disabled>清空结果</button>
+                </div>
+                <div class="workspace-meta">
+                    <span id="workspace-status" class="workspace-status" role="status" aria-live="polite">就绪。可点击录音，也可按住右 Ctrl 说话。</span>
+                    <span id="record-duration" aria-label="录音时长">00:00</span>
+                    <span id="result-count">0 字</span>
+                    <label class="workspace-option"><input id="workspace-auto-insert" type="checkbox"> 完成后自动插入</label>
+                </div>
+                <textarea id="workspace-result" class="workspace-result" placeholder="本次识别结果会显示在这里，可检查后复制或插入。" aria-label="本次识别结果"></textarea>
+                <p class="workspace-hint">可拖入音频文件；结果可在此修改。右 Ctrl 快捷录音保持自动插入行为。</p>
+            </section>
+            <div class="settings-nav">
+                <button type="button" data-scroll-target="section-asr">语音识别</button>
+                <button type="button" data-scroll-target="section-text">文本处理与场景</button>
+                <button type="button" data-scroll-target="section-lan">局域网与文件</button>
+            </div>
+            <div id="section-asr" class="feature-heading">1. 语音识别</div>
+            <div class="form-group">
+                <label>AI 模型</label>
+                <select id="model-select">
+                    <option value="gemini">Google Gemini</option>
+                    <option value="qwen">阿里通义千问 (Qwen)</option>
+                    <option value="siliconflow">硅基流动 (TeleSpeechASR)</option>
+                    <option value="openai-compatible">OpenAI 兼容 / 自定义多模态</option>
+                    <option value="shared-model">共享 AI 模型处理语音</option>
+                    <option value="shared-audio">共享目录中的音频模型</option>
+                </select>
+                <div class="help-text">选择“共享 AI 模型处理语音”可使用余汉波AI助手的 GPT-6 等模型：先由现有语音服务转写，再交给所选共享模型处理文字。</div>
+            </div>
+
+            <div id="shared-model-config" class="settings-section" style="display:none;">
+                <div class="section-title">共享 AI 模型处理语音</div>
+                <label for="shared-speech-model">处理模型</label>
+                <select id="shared-speech-model"></select>
+                <label for="shared-asr-source" style="margin-top:12px;">语音识别来源</label>
+                <select id="shared-asr-source">
+                    <option value="openai-compatible">现有 OpenAI 兼容语音配置</option>
+                    <option value="gemini">现有 Gemini 语音配置</option>
+                    <option value="qwen">现有 Qwen 语音配置</option>
+                    <option value="siliconflow">现有硅基流动语音配置</option>
+                </select>
+                <div class="help-text">GPT-6 当前只声明文字和图片输入。录音先使用上方选择的已配置服务转写，再把文字交给 GPT-6；语音不会直接发送给 GPT-6。所需密钥请在对应语音配置中保存。</div>
+                <button type="button" id="shared-model-refresh" class="btn-secondary" style="margin-top:8px;">刷新共享模型</button>
+            </div>
+
+            <div id="shared-audio-config" class="settings-section" style="display:none;">
+                <div class="section-title">共享音频模型</div>
+                <select id="shared-audio-model"></select>
+                <div class="help-text">仅显示共享目录中声明 audio 能力、采用 OpenAI 兼容接口的直连模型。OpenCode 模型的音频附件目前不会进入模型请求，因此不列入语音识别。</div>
+                <button type="button" id="shared-audio-refresh" class="btn-secondary" style="margin-top:8px;">刷新共享模型</button>
+            </div>
+
+            <div id="gemini-config">
+                <div class="form-group">
+                    <label>Gemini API Key</label>
+                    <div class="input-actions">
+                        <input type="password" id="gemini-key" placeholder="输入 Gemini API Key">
+                        <button type="button" class="icon-btn" id="gemini-key-toggle" title="显示/隐藏">👁</button>
+                        <button type="button" class="icon-btn" id="gemini-key-copy" title="复制">📋</button>
+                    </div>
+                    <div class="help-text"><a href="#" onclick="window.electronAPI.utils.openExternal('https://aistudio.google.com/app/apikey')">获取 Gemini API Key</a></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Gemini 模型</label>
+                    <div class="row">
+                        <input type="text" id="gemini-model" list="gemini-model-list" placeholder="例如: gemini-3-flash-preview" />
+                        <button type="button" class="btn" id="gemini-model-add">添加</button>
+                    </div>
+                    <datalist id="gemini-model-list"></datalist>
+                    <div class="row" style="margin-top: 8px;">
+                        <select id="gemini-model-saved"></select>
+                        <button type="button" class="btn btn-secondary" id="gemini-model-delete">删除</button>
+                    </div>
+                    <div class="help-text">不同账号/区域可用模型可能不同；可输入新模型并添加到本地列表。</div>
+                </div>
+            </div>
+
+            <div id="qwen-config" style="display: none;">
+                <div class="form-group">
+                    <label>阿里百炼 API Key</label>
+                    <div class="input-actions">
+                        <input type="password" id="qwen-key" placeholder="输入 DashScope API Key">
+                        <button type="button" class="icon-btn" id="qwen-key-toggle" title="显示/隐藏">👁</button>
+                        <button type="button" class="icon-btn" id="qwen-key-copy" title="复制">📋</button>
+                    </div>
+                    <div class="help-text"><a href="#" onclick="window.electronAPI.utils.openExternal('https://help.aliyun.com/zh/model-studio/get-api-key')">获取 API Key</a></div>
+                </div>
+                <div class="form-group">
+                    <label>模型版本</label>
+                    <div class="row">
+                        <input type="text" id="qwen-model-version" list="qwen-model-list" placeholder="例如: qwen3-asr-flash" />
+                        <button type="button" class="btn" id="qwen-model-add">添加</button>
+                    </div>
+                    <datalist id="qwen-model-list"></datalist>
+                    <div class="row" style="margin-top: 8px;">
+                        <select id="qwen-model-saved"></select>
+                        <button type="button" class="btn btn-secondary" id="qwen-model-delete">删除</button>
+                    </div>
+                </div>
+                <div class="form-group" style="display:none;">
+                    <label style="display: flex; gap: 8px; align-items: center; font-weight: 400;">
+                        <input type="checkbox" id="qwen-enable-postprocess" /> 启用文本处理（润色/翻译/改写）
+                    </label>
+                    <div class="help-text">默认关闭：仅输出语音转文字结果；开启后会按“系统提示词+文本模型”处理识别文本。</div>
+                </div>
+                <div class="form-group" style="display:none;">
+                    <label>文本处理模型</label>
+                    <div class="row">
+                        <input type="text" id="qwen-text-model" list="qwen-text-model-list" placeholder="例如: qwen-plus" />
+                        <button type="button" class="btn" id="qwen-text-model-add">添加</button>
+                    </div>
+                    <datalist id="qwen-text-model-list"></datalist>
+                    <div class="row" style="margin-top: 8px;">
+                        <select id="qwen-text-model-saved"></select>
+                        <button type="button" class="btn btn-secondary" id="qwen-text-model-delete">删除</button>
+                    </div>
+                    <div class="help-text">用于将“识别结果”按提示词润色/翻译等处理。默认 qwen-plus。</div>
+                </div>
+            </div>
+
+            <div id="siliconflow-config" style="display: none;">
+                <div class="form-group">
+                    <label>硅基流动 API Key</label>
+                    <div class="input-actions">
+                        <input type="password" id="siliconflow-key" placeholder="输入 SiliconFlow API Key">
+                        <button type="button" class="icon-btn" id="siliconflow-key-toggle" title="显示/隐藏">👁</button>
+                        <button type="button" class="icon-btn" id="siliconflow-key-copy" title="复制">📋</button>
+                    </div>
+                    <div class="help-text"><a href="#" onclick="window.electronAPI.utils.openExternal('https://cloud.siliconflow.cn/account/ak')">获取 API Key</a></div>
+                </div>
+                <div class="form-group">
+                    <label>语音模型</label>
+                    <div class="row">
+                        <input type="text" id="siliconflow-asr-model" list="siliconflow-asr-model-list" placeholder="例如: TeleAI/TeleSpeechASR" />
+                        <button type="button" class="btn" id="siliconflow-asr-model-add">添加</button>
+                    </div>
+                    <datalist id="siliconflow-asr-model-list"></datalist>
+                    <div class="row" style="margin-top: 8px;">
+                        <select id="siliconflow-asr-model-saved"></select>
+                        <button type="button" class="btn btn-secondary" id="siliconflow-asr-model-delete">删除</button>
+                    </div>
+                    <div class="help-text">默认使用 TeleAI/TeleSpeechASR（语音转文本）。</div>
+                </div>
+                <div class="form-group" style="display:none;">
+                    <label style="display: flex; gap: 8px; align-items: center; font-weight: 400;">
+                        <input type="checkbox" id="siliconflow-enable-postprocess" /> 启用文本处理（润色/翻译/改写）
+                    </label>
+                    <div class="help-text">默认关闭：仅输出语音转文字结果；开启后会按“系统提示词+文本模型”处理识别文本。</div>
+                </div>
+                <div class="form-group" style="display:none;">
+                    <label>文本处理模型</label>
+                    <div class="row">
+                        <input type="text" id="siliconflow-text-model" list="siliconflow-text-model-list" placeholder="例如: deepseek-ai/DeepSeek-V3.2" />
+                        <button type="button" class="btn" id="siliconflow-text-model-add">添加</button>
+                    </div>
+                    <datalist id="siliconflow-text-model-list"></datalist>
+                    <div class="row" style="margin-top: 8px;">
+                        <select id="siliconflow-text-model-saved"></select>
+                        <button type="button" class="btn btn-secondary" id="siliconflow-text-model-delete">删除</button>
+                    </div>
+                    <div class="help-text">默认 deepseek-ai/DeepSeek-V3.2。调用 Chat Completions 处理识别文本。</div>
+                </div>
+            </div>
+
+            <div id="openai-compatible-config" style="display: none;">
+                <div class="form-group">
+                    <label>配置档案</label>
+                    <div class="row">
+                        <select id="openai-compatible-profile-select"></select>
+                        <button class="btn" id="openai-compatible-new-btn" type="button">新增</button>
+                        <button class="btn btn-secondary" id="openai-compatible-delete-btn" type="button">删除</button>
+                    </div>
+                    <input type="text" id="openai-compatible-profile-name" placeholder="配置名称，例如：小米 MiMo ASR + Pro" style="margin-top: 8px;" />
+                    <div class="help-text">可以保存多组 OpenAI 兼容模型配置，例如小米、豆包、OpenAI、OpenRouter 等，切换档案后保存即可生效。</div>
+                </div>
+                <div class="form-group">
+                    <label>OpenAI 兼容 API URL</label>
+                    <input type="text" id="openai-compatible-url" placeholder="例如: https://api.xiaomimimo.com/v1 或 https://api.openai.com/v1" />
+                    <div class="help-text">填写兼容 OpenAI Chat Completions 的地址；可以填 /v1，也可以直接填 /v1/chat/completions。</div>
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <div class="input-actions">
+                        <input type="password" id="openai-compatible-key" placeholder="输入 API Key">
+                        <button type="button" class="icon-btn" id="openai-compatible-key-toggle" title="显示/隐藏">👁</button>
+                        <button type="button" class="icon-btn" id="openai-compatible-key-copy" title="复制">📋</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>语音/多模态模型</label>
+                    <input type="text" id="openai-compatible-audio-model" placeholder="例如: mimo-v2.5-asr / doubao-xxx / gpt-4o-audio-preview" />
+                    <div class="help-text">用于直接接收音频并转文字的模型。小米 MiMo 请填写 mimo-v2.5-asr；mimo-v2.5-pro 不能填在这里，只能作为文本处理模型。</div>
+                </div>
+                <div class="form-group">
+                    <label>音频格式策略</label>
+                    <select id="openai-compatible-audio-format-mode">
+                        <option value="auto">自动兼容（推荐）</option>
+                        <option value="original">保留原始格式</option>
+                        <option value="wav">转换为 WAV</option>
+                    </select>
+                    <div class="help-text">自动模式会优先保留录音原始格式；仅在小米 MiMo ASR 这类明确不支持 webm 的接口上自动转 WAV。</div>
+                </div>
+                <div class="form-group" style="display:none;">
+                    <label style="display: flex; gap: 8px; align-items: center; font-weight: 400;">
+                        <input type="checkbox" id="openai-compatible-enable-postprocess" /> 启用自定义文本处理模型
+                    </label>
+                    <div class="help-text">关闭时直接输出多模态模型返回内容；开启后会再调用文本模型按当前提示词润色、翻译或改写。</div>
+                </div>
+                <div class="form-group" style="display:none;">
+                    <label>文本处理模型</label>
+                    <input type="text" id="openai-compatible-text-model" placeholder="例如: mimo-v2.5-pro / gpt-4.1-mini / deepseek-chat" />
+                    <div class="help-text">留空时复用上面的语音模型。小米 mimo-v2.5-pro 和 MiniMax-M3 可用于这里做润色、翻译或改写。</div>
+                </div>
+            </div>
+
+            <div id="section-text" class="feature-heading">2. 文本处理与场景</div>
+            <div class="form-group">
+                <label>提示词场景</label>
+                <div class="row">
+                    <select id="prompt-profile-select"></select>
+                    <button class="btn" id="prompt-new-btn">新增</button>
+                    <button class="btn btn-secondary" id="prompt-delete-btn">删除</button>
+                </div>
+                <div class="help-text">例如：切换到“翻译”场景时，会返回翻译后的内容。</div>
+            </div>
+
+            <div id="text-postprocess-card" class="settings-section">
+                <div class="section-title">文本处理模型（可选）</div>
+                <label style="display:flex; gap:8px; align-items:center; font-weight:400;">
+                    <input type="checkbox" id="text-postprocess-enabled" />
+                    启用文本后处理
+                </label>
+                <div class="help-text">开启后，所有语音识别供应商都会把转写结果交给下方选中的文本模型处理。模型只需在这里新增一次，不再分散配置。</div>
+                <label style="margin-top:12px;">处理模型来源</label>
+                <select id="text-model-source"><option value="local">本插件配置</option><option value="shared">共享模型目录</option></select>
+                <div id="shared-text-config" style="display:none; margin-top:8px;">
+                    <select id="shared-text-model"></select>
+                    <div class="help-text">可选择余汉波AI助手已配置的文本模型，包括通过 OpenCode 认证的模型。此处只处理识别后的文字。</div>
+                    <button type="button" id="shared-text-refresh" class="btn-secondary" style="margin-top:8px;">刷新共享模型</button>
+                </div>
+                <div id="local-text-config">
+                <div class="row" style="margin-top:10px;">
+                    <select id="text-provider-profile"></select>
+                    <button type="button" class="btn" id="text-provider-new">新增</button>
+                    <button type="button" class="btn btn-secondary" id="text-provider-delete">删除</button>
+                </div>
+                <input type="text" id="text-provider-name" placeholder="配置名称" style="margin-top:8px;" />
+                <input type="text" id="text-provider-url" placeholder="OpenAI 兼容 API URL" style="margin-top:8px;" />
+                <input type="password" id="text-provider-key" placeholder="API Key" style="margin-top:8px;" />
+                <input type="text" id="text-provider-model" placeholder="文本模型，例如 qwen-plus / deepseek-chat" style="margin-top:8px;" />
+                </div>
+                <div style="margin-top:12px; padding-top:10px; border-top:1px solid #e5edf5;">
+                    <label style="display:flex; gap:8px; align-items:center; font-weight:400;">
+                        <input type="checkbox" id="text-postprocess-hotkey-enabled" />
+                        启用“切换文本处理”快捷键
+                    </label>
+                    <div class="hotkey-item" style="margin-top:8px;">
+                        <span class="hotkey-key">切换开关</span>
+                        <input type="text" id="text-postprocess-hotkey" class="hotkey-shortcut" readonly placeholder="点击录制快捷键" />
+                        <button type="button" id="text-postprocess-hotkey-record" class="hotkey-record-btn btn-secondary">录制</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>场景快捷键</label>
+                <div class="row" style="gap: 12px; align-items: center;">
+                    <label style="display: flex; gap: 8px; align-items: center; font-weight: 400; flex: 0 0 auto;">
+                        <input type="checkbox" id="scene-hotkey-enabled" /> 启用
+                    </label>
+                </div>
+                <div id="scene-hotkey-mapping" class="hotkey-grid" style="margin-top: 10px;">
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-1" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-1"></select></div>
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-2" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-2"></select></div>
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-3" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-3"></select></div>
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-4" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-4"></select></div>
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-5" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-5"></select></div>
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-6" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-6"></select></div>
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-7" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-7"></select></div>
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-8" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-8"></select></div>
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-9" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-9"></select></div>
+                    <div class="hotkey-item"><input id="scene-hotkey-shortcut-10" class="hotkey-shortcut" readonly placeholder="录制快捷键" /><select id="scene-hotkey-profile-10"></select></div>
+                </div>
+                <div class="help-text">点击左侧输入框后按下组合键；每个快捷键可绑定任意场景，不再固定为 Alt+数字。</div>
+            </div>
+
+            <div class="form-group">
+                <label>系统提示词 (Persona)</label>
+                <textarea id="system-prompt" placeholder="例如：请将语音内容翻译成英文并保持专业语气。"></textarea>
+                <div class="help-text">该提示词会影响最终输出（润色/翻译/改写等）。</div>
+            </div>
+
+            <div class="form-group">
+                <label>语音词库</label>
+                <textarea id="speech-glossary" placeholder="每行一个词，或使用 错词=>正确词"></textarea>
+                <div class="help-text">一键同步到手机时，会同时同步当前场景、提示词与词库。</div>
+            </div>
+
+            <div class="form-group">
+                <label>场景名称（用于新增）</label>
+                <input type="text" id="prompt-new-name" placeholder="例如：转写 / 翻译 / 会议纪要" />
+            </div>
+
+            <div class="form-group">
+                <button id="save-settings-btn">保存设置</button>
+            </div>
+
+            <!-- ── LAN Sync Panel ─────────────────────────────────────── -->
+            <div id="section-lan" class="feature-heading">3. 局域网、文件与随记</div>
+            <div class="form-group">
+                <label style="font-size:15px; font-weight:600;">📡 局域网同步</label>
+                <div class="help-text">与 Android AI输入法应用局域网互联，实现剪贴板同步和文件传输。</div>
+            </div>
+            <div class="form-group">
+                <div class="row" style="gap:10px; align-items:center;">
+                    <button id="lan-toggle-btn" style="flex:0 0 auto;">启动局域网服务</button>
+                    <span id="lan-status-badge" style="padding:4px 10px; border-radius:12px; font-size:12px; background:#f0f0f0; color:#555;">未运行</span>
+                </div>
+                <div id="lan-ips" class="help-text" style="margin-top:6px; display:none;"></div>
+            </div>
+            <div class="form-group">
+                <label style="display:flex; gap:8px; align-items:center; font-weight:400;">
+                    <input type="checkbox" id="lan-clip-sync" />
+                    剪贴板自动同步（文字）
+                </label>
+                <div class="help-text">勾选后，电脑剪贴板内容变化时自动推送到已连接的手机。</div>
+            </div>
+            <div class="form-group">
+                <div class="row" style="gap:10px;">
+                    <button id="lan-push-image-btn" class="btn-secondary" style="flex:0 0 auto;" title="将剪贴板中的图片推送到手机">推送剪贴板图片</button>
+                    <button id="lan-send-file-btn" class="btn-secondary" style="flex:0 0 auto;" title="选择本地文件发送到手机">发送文件到手机</button>
+                    <input type="file" id="lan-file-input" style="display:none;">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>手机上传文件保存目录</label>
+                <div class="row">
+                    <input id="lan-incoming-dir" type="text" readonly placeholder="默认保存到电脑下载目录" />
+                    <button id="lan-incoming-dir-btn" type="button" class="btn-secondary">选择目录</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>随记保存目录</label>
+                <div class="row">
+                    <input id="lan-note-dir" type="text" readonly placeholder="默认保存到电脑下载目录" />
+                    <button id="lan-note-dir-btn" type="button" class="btn-secondary">选择目录</button>
+                </div>
+            </div>
+            <div id="lan-log" style="font-size:12px; color:#666; max-height:100px; overflow-y:auto; padding:6px 8px; background:#fafafa; border:1px solid #eee; border-radius:4px; display:none;"></div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

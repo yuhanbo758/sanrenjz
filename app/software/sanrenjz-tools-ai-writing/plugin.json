@@ -1,0 +1,55 @@
+{
+  "pluginName": "AI 写作工作室",
+  "description": "导入文本、Word 和 PDF 素材，完成润色、改写、大纲、续写、校对等写作任务。",
+  "version": "1.1.0",
+  "author": "三人聚智",
+  "category": "AI 工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-ai-writing",
+      "explain": "文本润色",
+      "description": "导入素材，设定受众、语气和篇幅，生成排版清晰的写作结果。",
+      "cmds": [
+        "AI 写作工作室",
+        "润色",
+        "改写",
+        "扩写",
+        "缩写",
+        "标题",
+        "大纲",
+        "续写",
+        "校对",
+        "摘要",
+        {
+          "type": "over",
+          "label": "用AI 写作工作室处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "AI 工具",
+      "priority": 22,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

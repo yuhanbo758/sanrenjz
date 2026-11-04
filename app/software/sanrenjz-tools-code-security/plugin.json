@@ -1,0 +1,136 @@
+{
+  "pluginName": "编码与安全工具箱",
+  "description": "文本编解码、文件摘要校验、JWT 解析与安全随机值生成。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-codec-assistant",
+      "explain": "编码转换",
+      "description": "编码、摘要、令牌与安全随机 ID 的组合工作区。",
+      "cmds": [
+        "编解码",
+        "base64",
+        "base64url",
+        "json格式化",
+        "url编码",
+        "unicode",
+        {
+          "type": "over",
+          "label": "用编码与安全工具箱处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-hash-hmac",
+      "explain": "哈希校验",
+      "description": "编码、摘要、令牌与安全随机 ID 的组合工作区。",
+      "cmds": [
+        "哈希",
+        "md5",
+        "sha256",
+        "hmac",
+        "文件哈希",
+        "sha256校验",
+        {
+          "type": "over",
+          "label": "用编码与安全工具箱处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-jwt-inspector",
+      "explain": "JWT解析",
+      "description": "编码、摘要、令牌与安全随机 ID 的组合工作区。",
+      "cmds": [
+        "jwt",
+        "token解码",
+        "jwt验证",
+        {
+          "type": "over",
+          "label": "用编码与安全工具箱处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-id-generator",
+      "explain": "ID生成",
+      "description": "编码、摘要、令牌与安全随机 ID 的组合工作区。",
+      "cmds": [
+        "uuid",
+        "随机字符串",
+        "密码生成",
+        "id生成",
+        {
+          "type": "over",
+          "label": "用编码与安全工具箱处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

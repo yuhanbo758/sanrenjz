@@ -1,0 +1,24 @@
+{
+  "pluginName": "插件下载",
+  "description": "多功能下载工具，支持腾讯云对象存储文件下载和GitHub仓库克隆，提供自动解压、编码处理、实时进度显示等功能",
+  "version": "1.0.0",
+  "author": "余汉波",
+  "category": "传输工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "features": [
+    {
+      "code": "plugin-downloader",
+      "explain": "多功能插件下载器",
+      "cmds": ["插件下载", "腾讯云下载", "GitHub下载", "仓库克隆", "文件下载"],
+      "icon": "logo.ico",
+      "platform": ["win32", "darwin", "linux"],
+      "mode": "none"
+    }
+  ],
+  "pluginSetting": {
+    "width": 1000,
+    "height": 720,
+    "single": true
+  }
+} 

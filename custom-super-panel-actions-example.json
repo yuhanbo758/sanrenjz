@@ -1,0 +1,167 @@
+[
+  {
+    "id": "custom-calculator",
+    "title": "计算器",
+    "description": "打开系统计算器",
+    "icon": "🧮",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "calc.exe" },
+    "priority": 10
+  },
+  {
+    "id": "custom-notepad",
+    "title": "记事本",
+    "description": "打开记事本",
+    "icon": "📝",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "notepad.exe" },
+    "priority": 11
+  },
+  {
+    "id": "custom-task-manager",
+    "title": "任务管理器",
+    "description": "打开任务管理器",
+    "icon": "⚙️",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "taskmgr.exe" },
+    "priority": 12
+  },
+  {
+    "id": "custom-cmd",
+    "title": "命令提示符",
+    "description": "打开命令行",
+    "icon": "💻",
+    "type": "custom",
+    "category": "开发工具",
+    "command": "open-app",
+    "args": { "app": "cmd.exe" },
+    "priority": 13
+  },
+  {
+    "id": "custom-powershell",
+    "title": "PowerShell",
+    "description": "打开PowerShell",
+    "icon": "🔷",
+    "type": "custom",
+    "category": "开发工具",
+    "command": "open-app",
+    "args": { "app": "powershell.exe" },
+    "priority": 14
+  },
+  {
+    "id": "custom-explorer",
+    "title": "文件管理器",
+    "description": "打开资源管理器",
+    "icon": "📁",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "explorer.exe" },
+    "priority": 15
+  },
+  {
+    "id": "custom-control-panel",
+    "title": "控制面板",
+    "description": "打开控制面板",
+    "icon": "🎛️",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "control.exe" },
+    "priority": 16
+  },
+  {
+    "id": "custom-settings",
+    "title": "Windows设置",
+    "description": "打开Windows设置",
+    "icon": "⚙️",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-url",
+    "args": { "url": "ms-settings:" },
+    "priority": 17
+  },
+  {
+    "id": "custom-device-manager",
+    "title": "设备管理器",
+    "description": "打开设备管理器",
+    "icon": "🔧",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "devmgmt.msc" },
+    "priority": 18
+  },
+  {
+    "id": "custom-registry-editor",
+    "title": "注册表编辑器",
+    "description": "打开注册表编辑器",
+    "icon": "📋",
+    "type": "custom",
+    "category": "高级工具",
+    "command": "open-app",
+    "args": { "app": "regedit.exe" },
+    "priority": 19
+  },
+  {
+    "id": "custom-event-viewer",
+    "title": "事件查看器",
+    "description": "打开事件查看器",
+    "icon": "📊",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "eventvwr.msc" },
+    "priority": 20
+  },
+  {
+    "id": "custom-services",
+    "title": "服务管理",
+    "description": "打开服务管理器",
+    "icon": "🔄",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "services.msc" },
+    "priority": 21
+  },
+  {
+    "id": "custom-disk-management",
+    "title": "磁盘管理",
+    "description": "打开磁盘管理工具",
+    "icon": "💾",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "diskmgmt.msc" },
+    "priority": 22
+  },
+  {
+    "id": "custom-system-info",
+    "title": "系统信息",
+    "description": "打开系统信息",
+    "icon": "ℹ️",
+    "type": "custom",
+    "category": "系统工具",
+    "command": "open-app",
+    "args": { "app": "msinfo32.exe" },
+    "priority": 23
+  },
+  {
+    "id": "custom-network-connections",
+    "title": "网络连接",
+    "description": "打开网络连接",
+    "icon": "🌐",
+    "type": "custom",
+    "category": "网络工具",
+    "command": "open-app",
+    "args": { "app": "control.exe ncpa.cpl" },
+    "priority": 24
+  }
+]

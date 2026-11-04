@@ -1,0 +1,48 @@
+{
+  "pluginName": "局域网快传",
+  "description": "通过临时链接在电脑和手机间互传文字、文件，支持二维码与多文件发送。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-lan-transfer",
+      "explain": "局域网快传",
+      "description": "通过临时链接在电脑和手机间互传文字、文件，支持二维码与多文件发送。",
+      "cmds": [
+        "局域网传输",
+        "文件快传",
+        "lan",
+        {
+          "type": "over",
+          "label": "用局域网快传处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

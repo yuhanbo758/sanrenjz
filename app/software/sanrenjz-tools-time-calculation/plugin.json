@@ -1,0 +1,129 @@
+{
+  "pluginName": "时间与计算中心",
+  "description": "时间戳、世界时钟、日期和工作日、NTP 校时检测、单位换算与计算草稿。",
+  "version": "2.1.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-time-converter",
+      "explain": "时间戳",
+      "description": "把时间、日期、单位和逐行计算放到同一张工作桌。",
+      "cmds": [
+        "时间戳",
+        "时区转换",
+        "日期差",
+        {
+          "type": "over",
+          "label": "用时间与计算中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-date-world-clock",
+      "explain": "世界时钟",
+      "description": "把时间、日期、单位和逐行计算放到同一张工作桌。",
+      "cmds": [
+        "世界时钟",
+        "日期计算",
+        "工作日",
+        {
+          "type": "over",
+          "label": "用时间与计算中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-unit-converter",
+      "explain": "单位换算",
+      "description": "把时间、日期、单位和逐行计算放到同一张工作桌。",
+      "cmds": [
+        "单位换算",
+        "长度换算",
+        "温度换算",
+        {
+          "type": "over",
+          "label": "用时间与计算中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-calculation-paper",
+      "explain": "计算稿纸",
+      "description": "把时间、日期、单位和逐行计算放到同一张工作桌。",
+      "cmds": [
+        "计算稿纸",
+        "计算器",
+        "calc",
+        {
+          "type": "over",
+          "label": "用时间与计算中心处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "tools": [
+    "sanrenjz-tools-ai-video-studio",
+    "sanrenjz-tools-cast-receiver",
+    "sanrenjz-tools-reading-learning",
+    "sanrenjz-tools-video-parser",
+    "sanrenjz-tools-vnc"
+  ],
+  "python": [
+    "big_qmt_app",
+    "small_qmt_app",
+    "sanrenjz-python-loc_cos_backup"
+  ]
+}

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="explorer-tree">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>文件检查工作台</title>
+<style>
+:root{
+  --accent:#2f6f62;--accent-2:#3d8b7a;--accent-soft:rgba(47,111,98,.1);--accent-line:rgba(47,111,98,.3);
+  --bg:#f5f9f7;--surface:#fff;--surface-2:#eef5f1;--border:#d4e3dc;
+  --ink:#1a2e28;--muted:#5a7068;--faint:#9ab0a6;
+  --ok:#16a34a;--err:#dc2626;--warn:#d97706;--info:#2563eb;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.head{display:none}
+.icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:18px;height:18px;color:#fff}
+.head h1{margin:0;font-size:17px;font-weight:700}
+.head p{margin:0;color:var(--muted);font-size:12px}
+.spacer{flex:1}
+.tabs{display:flex;gap:6px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex:none}
+.tab{border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:.15s;display:flex;align-items:center;gap:7px}
+.tab svg{width:15px;height:15px}
+.tab:hover{background:var(--surface-2)}.tab.active{background:var(--accent);color:#fff}
+.content{flex:1;min-height:0;overflow:hidden;padding:16px 24px;display:flex;flex-direction:column}
+.panel{flex:1;min-height:0;display:none;flex-direction:column;gap:12px}
+.panel.active{display:flex}
+.ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent-line)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent}
+.btn.primary:hover{filter:brightness(1.08)}
+.inp{background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font:13px var(--mono);color:var(--ink);outline:none}
+.inp:focus{border-color:var(--accent-line)}
+.sel{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:13px;cursor:pointer;outline:none}
+.path-box{flex:1;font:12px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;min-width:0}
+.result{flex:1;min-height:0;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+.result.empty{display:flex;align-items:center;justify-content:center;color:var(--faint)}
+.match{padding:10px 16px;border-bottom:1px solid var(--surface-2);cursor:pointer;transition:.12s}
+.match:hover{background:var(--accent-soft)}
+.match .mp{font:11px var(--mono);color:var(--accent);margin-bottom:3px}
+.match .ml{font:13px var(--mono);color:var(--ink)}
+.match .ml .hl{background:rgba(217,119,6,.2);border-radius:3px;padding:0 2px}
+.cmp-table{width:100%;border-collapse:collapse;font:12px var(--mono)}
+.cmp-table th,.cmp-table td{padding:7px 12px;border-bottom:1px solid var(--border);text-align:left}
+.cmp-table th{background:var(--surface-2);position:sticky;top:0;font-family:var(--sans)}
+.st-same{color:var(--ok)}.st-diff{color:var(--err)}.st-left{color:var(--warn)}.st-right{color:var(--info)}
+.tree{padding:14px 18px;font:13px/1.7 var(--mono);white-space:pre-wrap;word-break:break-word;color:var(--ink)}
+.bar{flex:none;padding:6px 0;font:12px var(--mono);color:var(--muted);display:flex;align-items:center;gap:8px}
+.bar .d{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.bar.ok .d{background:var(--ok)}.bar.err .d{background:var(--err)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2e28;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.drop-overlay{display:none;position:fixed;inset:32px 0 0;background:rgba(47,111,98,.13);border:3px dashed var(--accent);z-index:40;align-items:center;justify-content:center;color:var(--accent);font-size:22px;font-weight:700;pointer-events:none}
+.drop-overlay.show{display:flex}
+.checks{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.checks label{display:inline-flex;align-items:center;gap:4px}
+.result-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.hint{font-size:12px;color:var(--muted)}
+button:disabled{opacity:.55;cursor:default}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#c0d4ca;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="tabs">
+    <button class="tab active" data-tool="file-content-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>内容搜索</button>
+    <button class="tab" data-tool="folder-compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>目录比较</button>
+    <button class="tab" data-tool="directory-tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="12" r="2"/><path d="M8 6h4a2 2 0 0 1 2 2v2M8 18h4a2 2 0 0 0 2-2v-2"/></svg>目录树</button>
+  </div>
+  <div class="content">
+    <div class="panel active" data-panel="file-content-search">
+      <div class="ctrl">
+        <button class="btn" id="fsPick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V5"/></svg>目录</button>
+        <span class="path-box" id="fsDir">未选择文件或目录，可拖入窗口</span>
+      </div>
+      <div class="ctrl">
+        <input class="inp" id="fsQuery" placeholder="搜索内容…" style="flex:1;min-width:200px">
+        <input class="inp" id="fsExt" placeholder="扩展名 txt,md,js" style="width:180px">
+        <button class="btn primary" id="fsRun">搜索</button>
+      </div>
+      <div class="ctrl checks"><label><input type="checkbox" id="fsCase"> 区分大小写</label><label><input type="checkbox" id="fsRegex"> 正则表达式</label><label>单文件上限 <input class="inp" id="fsMax" type="number" min="1" max="100" value="5" style="width:65px"> MB</label><span class="hint">拖入多个文件或一个目录；结果最多 5000 条</span></div>
+      <div class="result empty" id="fsResult">选择目录并输入搜索内容后开始</div>
+      <div class="bar" id="fsBar"><span class="d"></span><span>等待搜索</span><div class="result-actions"><button class="btn" id="fsExport" disabled>导出 CSV</button></div></div>
+    </div>
+    <div class="panel" data-panel="folder-compare">
+      <div class="ctrl"><button class="btn" id="fcPickA">目录 A</button><span class="path-box" id="fcDirA">未选择</span></div>
+      <div class="ctrl"><button class="btn" id="fcPickB">目录 B</button><span class="path-box" id="fcDirB">未选择</span></div>
+      <div class="ctrl"><label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="fcHash" checked> 按内容哈希比较</label><button class="btn primary" id="fcRun">比较</button><select class="sel" id="fcFilter"><option value="all">全部状态</option><option value="不同">不同</option><option value="仅左侧">仅左侧</option><option value="仅右侧">仅右侧</option><option value="相同">相同</option></select><input class="inp" id="fcPathFilter" placeholder="筛选相对路径" style="flex:1;min-width:150px"></div>
+      <div class="result empty" id="fcResult">选择两个目录后比较</div>
+      <div class="bar" id="fcBar"><span class="d"></span><span>等待比较</span><div class="result-actions"><button class="btn" id="fcExport" disabled>导出 CSV</button></div></div>
+    </div>
+    <div class="panel" data-panel="directory-tree">
+      <div class="ctrl"><button class="btn" id="dtPick">选择目录</button><span class="path-box" id="dtDir">未选择</span></div>
+      <div class="ctrl"><label style="font-size:12px;color:var(--muted)">格式</label><select class="sel" id="dtFmt"><option value="text">路径文本</option><option value="markdown">Markdown 列表</option><option value="json">JSON（含大小）</option></select><input class="inp" id="dtExt" placeholder="扩展名筛选（可选）" style="width:190px"><label class="checks">最大深度 <input class="inp" id="dtDepth" type="number" min="1" max="100" value="100" style="width:65px"></label><label class="checks"><input type="checkbox" id="dtSize"> 显示大小</label><button class="btn primary" id="dtRun">生成</button><button class="btn" id="dtCopy">复制</button><button class="btn" id="dtSave" disabled>保存</button></div>
+      <div class="result empty" id="dtResult">选择目录后生成结构树</div>
+      <div class="bar" id="dtBar"><span class="d"></span><span>等待生成</span></div>
+    </div>
+  </div>
+</main>
+<div class="drop-overlay" id="dropOverlay">松开以添加到当前功能</div>
+<div class="toast" id="toast"></div>
+<script src="renderer.js"></script>
+</body></html>

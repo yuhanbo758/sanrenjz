@@ -1,0 +1,207 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-layout="lab-console">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>文本工程实验室</title>
+<style>
+:root{
+  --accent:#7c3aed;--accent-2:#a855f7;--accent-soft:rgba(124,58,237,.12);--accent-line:rgba(124,58,237,.32);
+  --bg:#faf8ff;--surface:#fff;--surface-2:#f4f0fb;--border:#e6ddf5;
+  --ink:#1e1530;--muted:#6b6280;--faint:#a098b8;
+  --add:#16a34a;--del:#dc2626;--ok:#16a34a;--err:#dc2626;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{margin:0;padding-top:32px;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.app{height:calc(100vh - 32px);display:flex;flex-direction:column;min-height:0}
+.spacer{flex:1}
+.tabs{display:flex;gap:6px;padding:8px 18px;background:var(--surface);border-bottom:1px solid var(--border);flex:none;overflow-x:auto}
+.tab{border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:.15s;display:flex;align-items:center;gap:7px}
+.tab svg{width:15px;height:15px}
+.tab:hover{background:var(--surface-2)}
+.tab.active{background:var(--accent);color:#fff}
+.content{flex:1;min-height:0;overflow:hidden;padding:14px 18px}
+.panel{height:100%;min-height:0;display:none;flex-direction:column;gap:12px}
+.panel.active{display:flex}
+.ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
+.ctrl label{font-size:12px;color:var(--muted);font-weight:500}
+.txt{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:13px;font-family:var(--mono);outline:none}
+.txt:focus{border-color:var(--accent-line)}
+.txt::placeholder{color:var(--faint)}
+.sel{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;outline:none}
+.chk{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+.chk input{accent-color:var(--accent)}
+.run{border:0;border-radius:8px;padding:8px 20px;font-weight:600;font-size:13px;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;transition:.15s}
+.run:hover{filter:brightness(1.08)}
+.run:disabled{opacity:.5}
+.io{flex:1;min-height:0;display:grid;gap:12px}
+.io.dual{grid-template-columns:1fr 1fr}
+.io.single{grid-template-columns:1fr}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.card-h{padding:9px 14px;border-bottom:1px solid var(--border);font:600 11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;flex:none;display:flex;justify-content:space-between;align-items:center}
+.card textarea{flex:1;border:0;outline:0;resize:none;padding:14px;font:13px/1.6 var(--mono);background:var(--surface);min-height:0}
+.card pre{flex:1;overflow:auto;margin:0;padding:14px;font:13px/1.6 var(--mono);white-space:pre-wrap;word-break:break-word}
+.bar{flex:none;padding:6px 0;font:12px var(--mono);color:var(--muted);display:flex;align-items:center;gap:8px}
+.bar .d{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.bar.ok .d{background:var(--ok)}.bar.err .d{background:var(--err)}
+.bar.err{color:var(--err)}
+/* diff coloring */
+.diff-line{display:block;padding:1px 14px}
+.diff-add{background:rgba(22,163,74,.12);color:var(--add)}
+.diff-del{background:rgba(220,38,38,.1);color:var(--del)}
+.diff-same{color:var(--faint)}
+.file-drop{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;border:2px dashed var(--border);border-radius:14px;margin:8px;cursor:pointer;transition:.15s;color:var(--faint)}
+.file-drop:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.file-drop svg{width:42px;height:42px}
+.file-list{flex:1;overflow:auto;padding:8px 0}
+.file-item{display:flex;align-items:center;gap:10px;padding:8px 14px;font:12px var(--mono);color:var(--muted);border-bottom:1px solid var(--surface-2)}
+.file-item .nm{flex:1;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-item .st{color:var(--ok);font-size:11px}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent-line)}
+.btn svg{width:14px;height:14px}
+.mini{border:0;background:transparent;color:var(--accent);font-size:12px;cursor:pointer;padding:2px 4px}
+.mini:hover{text-decoration:underline}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:none}
+.hint{font-size:11px;color:var(--faint)}
+.drop-active{outline:2px dashed var(--accent)!important;outline-offset:-7px;background:var(--accent-soft)!important}
+.file-item .error{color:var(--err)}
+.file-item .warn{color:#b45309}
+.file-item .path{max-width:35%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint)}
+@media(max-width:950px){.io.dual{grid-template-columns:1fr;grid-template-rows:1fr 1fr}.content{padding:10px}.panel{gap:8px}.file-item .path{display:none}}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e1530;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#d6cce8;border-radius:4px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="tabs">
+    <button class="tab active" data-tool="regex-lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4a8 8 0 1 0 8 8M12 4v8M12 4l5 5"/></svg>正则实验</button>
+    <button class="tab" data-tool="text-diff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 8l3-3 3 3M3 16l3 3 3-3M21 8l-3-3-3 3M21 16l-3 3-3-3"/></svg>文本差异</button>
+    <button class="tab" data-tool="line-processor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>行处理</button>
+    <button class="tab" data-tool="text-encoding"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13l1.5 1.5L9 17M13 13v5"/></svg>编码转换</button>
+  </div>
+  <div class="content">
+    <!-- Regex -->
+    <div class="panel active" data-panel="regex-lab">
+      <div class="ctrl">
+        <label>正则</label><input class="txt" id="rePattern" value="\w+" style="width:200px" spellcheck="false">
+        <label>标志</label><input class="txt" id="reFlags" value="g" style="width:60px" spellcheck="false">
+        <label class="chk"><input type="checkbox" id="reDoReplace">替换</label><label>替换为</label><input class="txt" id="reReplace" placeholder="留空可删除匹配" style="width:150px">
+        <div class="spacer"></div><button class="run" data-run>执行</button>
+      </div>
+      <div class="toolbar"><button class="btn" data-import="reInput">导入文件</button><label class="hint">导入编码</label><select class="sel import-encoding"><option value="utf8">UTF-8</option><option value="gbk">GBK</option><option value="gb2312">GB2312</option><option value="big5">Big5</option><option value="shift_jis">Shift JIS</option></select><button class="btn" data-copy="reOutput">复制结果</button><button class="btn" data-save="reOutput">保存结果</button><span class="hint">也可将文件拖到输入区</span></div>
+      <div class="io dual">
+        <div class="card"><div class="card-h">测试文本</div><textarea id="reInput" spellcheck="false" placeholder="输入需要匹配或替换的文本"></textarea></div>
+        <div class="card"><div class="card-h">结果</div><pre id="reOutput"></pre></div>
+      </div>
+      <div class="bar" id="reBar"><span class="d"></span><span>等待执行</span></div>
+    </div>
+    <!-- Diff -->
+    <div class="panel" data-panel="text-diff">
+      <div class="toolbar"><button class="btn" data-import="diffLeft">导入 A</button><button class="btn" data-import="diffRight">导入 B</button><label class="hint">导入编码</label><select class="sel import-encoding"><option value="utf8">UTF-8</option><option value="gbk">GBK</option><option value="gb2312">GB2312</option><option value="big5">Big5</option><option value="shift_jis">Shift JIS</option></select><button class="btn" id="diffSwap">交换 A/B</button><label class="chk"><input type="checkbox" id="diffWhitespace">忽略行内空白差异</label><button class="btn" data-copy="diffOutput">复制差异</button><button class="btn" data-save="diffOutput">保存差异</button><span class="hint">可分别拖入 A/B 区域</span></div>
+      <div class="io dual" style="flex:1">
+        <div class="card"><div class="card-h">原始文本 (A)</div><textarea id="diffLeft" spellcheck="false" placeholder="粘贴左侧文本"></textarea></div>
+        <div class="card"><div class="card-h">修改文本 (B)</div><textarea id="diffRight" spellcheck="false" placeholder="粘贴右侧文本"></textarea></div>
+      </div>
+      <div class="ctrl"><div class="spacer"></div><button class="run" data-run>比较差异</button></div>
+      <div class="card" style="flex:1;min-height:120px"><div class="card-h">差异结果 <span style="font-size:10px;color:var(--faint)">绿色=新增 红色=删除</span></div><pre id="diffOutput" style="flex:1;overflow:auto"></pre></div>
+      <div class="bar" id="diffBar"><span class="d"></span><span>等待比较</span></div>
+    </div>
+    <!-- Line processor -->
+    <div class="panel" data-panel="line-processor">
+      <div class="ctrl">
+        <label>过滤包含</label><input class="txt" id="lpFilter" placeholder="关键字" style="width:120px">
+        <label class="chk"><input type="checkbox" id="lpUnique">去重</label>
+        <label class="chk"><input type="checkbox" id="lpSort">排序</label>
+        <label class="chk"><input type="checkbox" id="lpTrim">去首尾空白</label>
+        <label class="chk"><input type="checkbox" id="lpRemoveEmpty">移除空行</label>
+        <label class="chk"><input type="checkbox" id="lpCase">区分大小写</label>
+        <label class="chk"><input type="checkbox" id="lpReverse">倒序</label>
+        <label class="chk"><input type="checkbox" id="lpNumber">行号</label>
+        <label>前缀</label><input class="txt" id="lpPrefix" placeholder="" style="width:80px">
+        <label>后缀</label><input class="txt" id="lpSuffix" placeholder="" style="width:80px">
+        <div class="spacer"></div><button class="run" data-run>处理</button>
+      </div>
+      <div class="toolbar"><button class="btn" data-import="lpInput">导入文件</button><label class="hint">导入编码</label><select class="sel import-encoding"><option value="utf8">UTF-8</option><option value="gbk">GBK</option><option value="gb2312">GB2312</option><option value="big5">Big5</option><option value="shift_jis">Shift JIS</option></select><button class="btn" data-copy="lpOutput">复制结果</button><button class="btn" data-save="lpOutput">保存结果</button><span class="hint">也可将文件拖到输入区</span></div>
+      <div class="io dual">
+        <div class="card"><div class="card-h">输入行</div><textarea id="lpInput" spellcheck="false" placeholder="每行一条数据"></textarea></div>
+        <div class="card"><div class="card-h">结果</div><pre id="lpOutput"></pre></div>
+      </div>
+      <div class="bar" id="lpBar"><span class="d"></span><span>等待处理</span></div>
+    </div>
+    <!-- Encoding -->
+    <div class="panel" data-panel="text-encoding">
+      <div class="ctrl">
+        <label>源编码</label><select class="sel" id="encSrc"><option>utf8</option><option>gbk</option><option>gb2312</option><option>big5</option><option>shift_jis</option><option>iso-8859-1</option></select>
+        <label>目标编码</label><select class="sel" id="encDst"><option>utf8</option><option>gbk</option><option>gb2312</option><option>big5</option><option>shift_jis</option><option>iso-8859-1</option></select>
+        <label>换行符</label><select class="sel" id="encNl"><option value="">保持</option><option value="lf">LF</option><option value="crlf">CRLF</option></select>
+        <label>后缀</label><input class="txt" id="encSuffix" value=".converted.txt" style="width:140px">
+        <button class="btn" id="encPick">增加文件</button><button class="btn" id="encClear">清空队列</button>
+        <div class="spacer"></div><button class="run" data-run>预览</button><button class="run" id="encExec" style="background:var(--accent-2)">写入文件</button>
+      </div>
+      <div class="hint">支持拖入文件；最多 100 个、单个 20 MB。输出为原路径加后缀，目标已存在时跳过，不覆盖。</div>
+      <div class="card" style="flex:1;min-height:0">
+        <div class="card-h">文件列表与转换结果 <span id="encCount">0 个文件</span></div>
+        <div class="file-list" id="encList"><div style="padding:30px;text-align:center;color:var(--faint)">选择需要转换编码的文本文件</div></div>
+      </div>
+      <div class="bar" id="encBar"><span class="d"></span><span>等待选择文件</span></div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const api=window.pluginAPI;const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
+let current='regex-lab',encFiles=[],encResults=[];
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2400);}
+function setBar(sel,msg,st){const b=$(sel);b.className='bar'+(st==='ok'?' ok':st==='err'?' err':'');b.querySelector('span:last-child').textContent=msg;}
+function switchTool(id){if(!$('.tab[data-tool="'+id+'"]'))return;current=id;$$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tool===id));$$('.panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===id));}
+$$('.tab').forEach(t=>t.onclick=()=>switchTool(t.dataset.tool));
+$$('[data-run]').forEach(b=>b.onclick=()=>run(false));$('#encExec').onclick=()=>run(true);
+function basename(p){return String(p).split(/[\\\/]/).pop();}
+function addEncFiles(paths){encFiles=[...new Set([...encFiles,...paths])].slice(0,100);encResults=[];renderEncList();}
+$('#encPick').onclick=()=>addEncFiles(api.selectFiles({multiple:true})||[]);
+$('#encClear').onclick=()=>{encFiles=[];encResults=[];renderEncList();setBar('#encBar','队列已清空');};
+function renderEncList(){const l=$('#encList');$('#encCount').textContent=`${encFiles.length} 个文件`;if(!encFiles.length){l.innerHTML='<div style="padding:30px;text-align:center;color:var(--faint)">选择或拖入需要转换的文本文件</div>';return;}
+  l.innerHTML=encFiles.map((file,index)=>{const result=encResults.find(item=>item.source===file);const status=result?(result.status==='error'?`<span class="error">${esc(result.error)}</span>`:`<span class="${result.exists?'warn':'st'}">${result.status==='written'?'已写入':result.exists?'目标已存在':'可写入'} · ${result.characters} 字符</span>`):'';return `<div class="file-item"><span class="nm" title="${esc(file)}">${esc(basename(file))}</span><span class="path" title="${esc(file)}">${esc(file)}</span>${status}<button class="mini" data-remove="${index}" aria-label="移除 ${esc(basename(file))}">移除</button></div>`;}).join('');
+  $$('[data-remove]').forEach(button=>button.onclick=()=>{encFiles.splice(Number(button.dataset.remove),1);encResults=[];renderEncList();});}
+async function importFile(filePath,targetId){try{const encoding=$('#'+targetId).closest('.panel').querySelector('.import-encoding')?.value||'utf8';const result=await api.readTextFile(filePath,encoding);$('#'+targetId).value=result.text;toast(`已导入 ${basename(result.path)}`);}catch(error){toast(error.message||String(error));}}
+$$('[data-import]').forEach(button=>button.onclick=()=>{const files=api.selectFiles({multiple:false});if(files?.[0])importFile(files[0],button.dataset.import);});
+$$('textarea').forEach(area=>{area.addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files')){event.preventDefault();area.classList.add('drop-active');}});area.addEventListener('dragleave',()=>area.classList.remove('drop-active'));area.addEventListener('drop',event=>{area.classList.remove('drop-active');if(!event.dataTransfer?.files.length)return;event.preventDefault();const file=event.dataTransfer.files[0];if(file.path)importFile(file.path,area.id);else toast('无法读取文件路径');});});
+document.addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files'))event.preventDefault();});
+document.addEventListener('drop',event=>{if(!event.dataTransfer?.files.length)return;event.preventDefault();const files=[...event.dataTransfer.files].map(f=>f.path).filter(Boolean);if(current==='text-encoding')addEncFiles(files);else if(!event.target.matches('textarea')){const id={'regex-lab':'reInput','text-diff':'diffLeft','line-processor':'lpInput'}[current];if(files[0]&&id)importFile(files[0],id);}});
+$('#diffSwap').onclick=()=>{const left=$('#diffLeft');[left.value,$('#diffRight').value]=[$('#diffRight').value,left.value];};
+function outputText(id){return id==='diffOutput'?Array.from($('#diffOutput').querySelectorAll('.diff-line')).map(line=>line.textContent).join('\n'):$('#'+id).textContent;}
+$$('[data-copy]').forEach(button=>button.onclick=()=>{const value=outputText(button.dataset.copy);if(!value){toast('没有可复制的结果');return;}api.copyText(value);toast('已复制到剪贴板');});
+$$('[data-save]').forEach(button=>button.onclick=()=>{const value=outputText(button.dataset.save);if(!value){toast('没有可保存的结果');return;}const saved=api.saveResult({title:'保存文本结果',defaultPath:'text-result.txt',text:value,filters:[{name:'文本文件',extensions:['txt']}]});if(!saved.cancelled)toast(`已保存 ${basename(saved.path)}`);});
+async function run(exec=false){try{
+  if(current==='regex-lab'){
+    const input=$('#reInput').value;if(!input){setBar('#reBar','请输入测试文本','err');return;}
+    const result=api.textCore.inspectRegex(input,$('#rePattern').value,$('#reFlags').value,$('#reReplace').value,$('#reDoReplace').checked);
+    $('#reOutput').textContent=result.replaced!==null?result.replaced:JSON.stringify(result.matches,null,2);
+    setBar('#reBar',`匹配 ${result.matches.length}${result.truncated?'+':''} 处${result.replaced!==null?' · 已替换':''}`,'ok');
+  }else if(current==='text-diff'){
+    if(!$('#diffLeft').value&&!$('#diffRight').value){setBar('#diffBar','请输入文本','err');return;}
+    const result=api.textCore.compareText($('#diffLeft').value,$('#diffRight').value,$('#diffWhitespace').checked);
+    $('#diffOutput').innerHTML=result.lines.map(line=>`<span class="diff-line diff-${line.type}">${esc(`${line.type==='add'?'+':line.type==='del'?'-':' '} ${line.text}`)}</span>`).join('');
+    setBar('#diffBar',`新增 ${result.added} 行 · 删除 ${result.removed} 行`,'ok');
+  }else if(current==='line-processor'){
+    const input=$('#lpInput').value;if(!input){setBar('#lpBar','请输入内容','err');return;}
+    const result=api.textCore.processLines(input,{filter:$('#lpFilter').value,unique:$('#lpUnique').checked,sort:$('#lpSort').checked,trim:$('#lpTrim').checked,removeEmpty:$('#lpRemoveEmpty').checked,caseSensitive:$('#lpCase').checked,reverse:$('#lpReverse').checked,number:$('#lpNumber').checked,prefix:$('#lpPrefix').value,suffix:$('#lpSuffix').value});
+    $('#lpOutput').textContent=result.text;setBar('#lpBar',`已处理 ${result.count} 行`,'ok');
+  }else if(current==='text-encoding'){
+    if(!encFiles.length){setBar('#encBar','请先增加文件','err');return;}
+    $('#encExec').disabled=true;
+    try{encResults=await api.convertFiles(encFiles,{sourceEncoding:$('#encSrc').value,targetEncoding:$('#encDst').value,newline:$('#encNl').value,suffix:$('#encSuffix').value},exec);renderEncList();const failed=encResults.filter(item=>item.status==='error').length;setBar('#encBar',`${exec?'写入':'预览'}完成：${encResults.length-failed} 成功，${failed} 失败`,failed?'err':'ok');}finally{$('#encExec').disabled=false;}
+  }
+}catch(error){setBar({'regex-lab':'#reBar','text-diff':'#diffBar','line-processor':'#lpBar','text-encoding':'#encBar'}[current],error.message||String(error),'err');}}
+window.addEventListener('plugin-enter',event=>{const id=event.detail?.toolId;if(id)switchTool(id);const text=event.detail?.action?.payload||event.detail?.action?.clipboardText||event.detail?.payload||event.detail?.clipboardText||'';if(text){const map={'regex-lab':'#reInput','text-diff':'#diffLeft','line-processor':'#lpInput'};const el=$(map[current]);if(el)el.value=text;}});
+</script>
+</body></html>

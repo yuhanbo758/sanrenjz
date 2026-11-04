@@ -1,0 +1,87 @@
+{
+  "pluginName": "任务与习惯",
+  "description": "任务规划、番茄专注与每周习惯打卡。",
+  "version": "2.2.0",
+  "author": "三人聚智",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "plugin-market-task-pomodoro",
+      "explain": "番茄专注",
+      "description": "关联任务开始番茄计时，并记录完成的专注轮次。",
+      "cmds": ["番茄钟", "番茄专注", "pomodoro"],
+      "icon": "logo.ico",
+      "platform": ["win32", "darwin", "linux"],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20
+    },
+    {
+      "code": "plugin-market-todo-list",
+      "explain": "待办清单",
+      "description": "把一次性任务和长期习惯放在同一条进度线上。",
+      "cmds": [
+        "待办",
+        "todo",
+        "任务清单",
+        {
+          "type": "over",
+          "label": "用任务与习惯处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    },
+    {
+      "code": "plugin-market-habit-tracker",
+      "explain": "习惯打卡",
+      "description": "把一次性任务和长期习惯放在同一条进度线上。",
+      "cmds": [
+        "习惯",
+        "打卡",
+        "habit",
+        {
+          "type": "over",
+          "label": "用任务与习惯处理",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      ],
+      "icon": "logo.ico",
+      "platform": [
+        "win32",
+        "darwin",
+        "linux"
+      ],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 20,
+      "useClipboardText": true
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}

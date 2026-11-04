@@ -1,0 +1,69 @@
+{
+  "pluginName": "余汉波文本片段助手",
+  "description": "管理 Markdown 文本片段，支持收藏、最近使用、搜索、预览与安全编辑",
+  "version": "1.3.0",
+  "author": "余汉波",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "text-snippets",
+      "explain": "片段管理",
+      "description": "快速搜索和插入Markdown文本片段",
+      "cmds": [
+        "余汉波文本片段助手",
+        "文本片段助手",
+        "文本片段",
+        "超级文本",
+        "关键字上屏",
+        "自动上屏",
+        "文本片段管理"
+      ],
+      "icon": "logo.ico",
+      "platform": ["win32", "darwin", "linux"],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 5
+    },
+    {
+      "code": "settings",
+      "explain": "文本片段设置",
+      "description": "配置文本片段的存储路径和行为",
+      "cmds": [
+        "文本片段设置",
+        "片段设置"
+      ],
+      "mode": "none",
+      "superPanel": false
+    },
+    {
+      "code": "text-snippets-quick-access",
+      "explain": "片段速查",
+      "description": "从超级面板快速访问文本片段",
+      "icon": "logo.ico",
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 5
+    },
+    {
+      "code": "insert-snippet",
+      "explain": "插入片段",
+      "description": "直接插入指定的文本片段",
+      "icon": "logo.ico",
+      "mode": "none",
+      "superPanel": true,
+      "category": "快速片段",
+      "priority": 10
+    }
+  ],
+  "development": {
+    "main": "index.html"
+  },
+  "pluginSetting": {
+    "height": 600,
+    "single": true
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "pluginName": "SQLite 数据表管理器",
+  "description": "打开 SQLite 数据库并按真实表结构动态浏览、查询、新增、修改和删除数据。",
+  "version": "1.3.0",
+  "author": "余汉波",
+  "category": "效率工具",
+  "main": "index.html",
+  "logo": "logo.ico",
+  "preload": "preload.js",
+  "features": [
+    {
+      "code": "sqlite-table-manager",
+      "explain": "管理 SQLite 数据表",
+      "description": "打开 SQLite 数据库，动态适配不同数据表的字段并新增、修改或删除记录。",
+      "cmds": ["SQLite", "数据库管理", "数据表管理", "账号数据"],
+      "icon": "logo.ico",
+      "platform": ["win32", "darwin", "linux"],
+      "mode": "none",
+      "superPanel": true,
+      "category": "效率工具",
+      "priority": 12
+    }
+  ],
+  "pluginSetting": {
+    "width": 1180,
+    "height": 760,
+    "minWidth": 900,
+    "minHeight": 650,
+    "single": true,
+    "autoHideMenuBar": true,
+    "menuBarVisible": false
+  }
+}
