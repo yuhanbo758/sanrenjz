@@ -312,8 +312,10 @@ test('新独立启动器只使用新 settings 与统一配置，不回退旧宿�
     assert.equal(result.status, 0, result.stderr);
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.command[0], python);
-    // Windows临时目录可能使用8.3短路径；核对是否为同一个实际配置文件。
-    assert.equal(fs.realpathSync(parsed.config), fs.realpathSync(item.configPath));
+    // Windows realpath仍可能保留8.3别名，用卷与文件标识确认主程序和启动器读同一文件。
+    const actualConfig = fs.statSync(parsed.config, { bigint: true });
+    const expectedConfig = fs.statSync(item.configPath, { bigint: true });
+    assert.deepEqual([actualConfig.dev, actualConfig.ino], [expectedConfig.dev, expectedConfig.ino]);
     fs.writeFileSync(file, JSON.stringify({ pythonMode: 'none', customPythonPath: python }));
     const missing = spawnSync(python, ['-c', code, support, item.folderPath, file], { encoding: 'utf8', windowsHide: true, env: { ...process.env, PYTHONUTF8: '1' } });
     assert.notEqual(missing.status, 0);
