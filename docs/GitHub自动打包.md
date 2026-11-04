@@ -2,7 +2,7 @@
 
 推送到 `main`，或在 Actions 手动运行“多平台预览版”，会检查当前公开源码并构建四个目标。只有四个目标的构建、隐私审计和原生运行验收全部通过，发布任务才会向 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases) 上传预览版安装包及校验文件。
 
-当前配置版本为 `0.1.7-preview.1`。本说明描述发布流程，具体平台是否成功以对应 Actions 运行和 Release 的来源提交为准，不提前代表各平台构建、安装或业务功能已经完成验收。
+当前配置版本为 `0.1.7-preview.2`。本说明描述发布流程，具体平台是否成功以对应 Actions 运行和 Release 的来源提交为准，不提前代表各平台构建、安装或业务功能已经完成验收。
 
 ## 构建目标与下载文件
 
@@ -40,6 +40,8 @@ npm version prerelease --preid=preview --no-git-tag-version
 
 公开标签和资产不可被新提交覆盖。已有同名标签或资产与本次提交、内容不一致时，发布应停止；维护者须确认差异并升级预览版本，不能删除已公开版本后强行替换。手动在其他分支运行可以验证构建，只有 `main` 允许发布。
 
+草稿创建后使用服务端响应中的 Release ID 上传、校验和公开，避免新草稿尚未出现在列表或标签查询中时误判失败。同一提交的未完成草稿可核验后继续上传缺少的资产；不同提交或不同内容必须使用新版本，失败材料保留供检查。
+
 ## 下载与校验
 
 面向用户的下载入口为 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases)。选择与设备匹配的平台和架构文件，同时下载 `SHA256SUMS.txt`，比较其中对应文件的校验值。`release-manifest.json` 记录来源提交、平台架构及产物信息。
@@ -47,7 +49,7 @@ npm version prerelease --preid=preview --no-git-tag-version
 Windows PowerShell 示例：
 
 ```powershell
-Get-FileHash -LiteralPath .\sanrenjz-0.1.7-preview.1-win-x64.exe -Algorithm SHA256
+Get-FileHash -LiteralPath .\sanrenjz-0.1.7-preview.2-win-x64.exe -Algorithm SHA256
 ```
 
 macOS 可使用 `shasum -a 256 <下载文件>`，Linux 可使用 `sha256sum <下载文件>`。只下载一个平台文件时，比较清单中该文件对应的行即可。

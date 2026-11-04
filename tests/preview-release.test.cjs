@@ -35,49 +35,68 @@ function fixture() {
     }
     return { root, pkg, targets };
 }
-function mockGitHub(prepared, { published = false, partial = false, wrongTag = false, wrongDigest = false, missingDigest = false } = {}) {
+function mockGitHub(prepared, { published = false, partial = false, wrongTag = false, wrongDigest = false, missingDigest = false, delayedList = false, missingCreateField, wrongCreatedCommit = false, unavailableIdReads = 0, wrongPublishedId = false } = {}) {
     const calls = [];
     let tag = wrongTag ? 'b'.repeat(40) : published || partial ? sourceCommit : null;
-    const allAssets = prepared.assets.map(asset => ({ name: asset.filename, size: asset.bytes, digest: `sha256:${asset.sha256}`, state: 'uploaded' }));
+    const allAssets = prepared.assets.map((asset, index) => ({ id: index + 1, name: asset.filename, size: asset.bytes, digest: `sha256:${asset.sha256}`, state: 'uploaded' }));
     let release = published || partial ? { id: 123, tag_name: prepared.tag, target_commitish: sourceCommit, prerelease: true, draft: !published, html_url: `https://github.com/owner/repo/releases/tag/${prepared.tag}`, assets: published ? [...allAssets] : [allAssets[0]] } : null;
     if (wrongDigest && release) release.assets[0] = { ...release.assets[0], digest: `sha256:${'b'.repeat(64)}` };
     if (missingDigest && release) release.assets[0] = { ...release.assets[0], digest: null };
-    const run = args => {
+    let created = false;
+    const copy = value => JSON.parse(JSON.stringify(value));
+    const run = (args, options = {}) => {
         calls.push(args);
         if (args[0] === 'api') {
             const endpoint = args.at(-1);
+            const method = args.includes('--method') ? args[args.indexOf('--method') + 1] : 'GET';
             if (endpoint.includes('/git/ref/tags/')) return tag ? { object: { type: 'commit', sha: tag } } : null;
             if (endpoint.includes('/releases/tags/')) throw new Error('测试禁止通过公开tag接口读取草稿');
-            if (endpoint.endsWith('/releases?per_page=100')) return [release ? [release] : []];
-            if (endpoint.endsWith('/releases/123')) return JSON.parse(JSON.stringify(release));
-        }
-        if (args[0] === 'release' && args[1] === 'create') {
-            assert(args.includes('--draft') && args.includes('--prerelease'));
-            release = { id: 123, tag_name: prepared.tag, target_commitish: sourceCommit, prerelease: true, draft: true, html_url: `https://github.com/owner/repo/releases/tag/${prepared.tag}`, assets: [] };
-            return '';
-        }
-        if (args[0] === 'release' && args[1] === 'upload') {
-            for (const file of args.slice(3, args.indexOf('--repo'))) {
-                const asset = allAssets.find(value => value.name === path.basename(file));
-                assert(asset && !release.assets.some(value => value.name === asset.name));
-                release.assets.push(asset);
+            if (endpoint.endsWith('/releases?per_page=100')) {
+                assert(args.includes('Cache-Control: no-cache'));
+                return [release && !(created && delayedList) ? [release] : []];
             }
-            return '';
-        }
-        if (args[0] === 'release' && args[1] === 'edit') {
-            assert(args.includes('--draft=false') && release.assets.length === 9);
-            release.draft = false; tag = sourceCommit;
-            return '';
-        }
-        if (args[0] === 'release' && args[1] === 'download') {
-            const filename = args[args.indexOf('--pattern') + 1];
-            const destination = args[args.indexOf('--dir') + 1];
-            fs.copyFileSync(path.join(prepared.output, filename), path.join(destination, filename));
-            return '';
+            if (endpoint.endsWith('/releases') && method === 'POST') {
+                const raw = fs.readFileSync(args[args.indexOf('--input') + 1]);
+                assert(raw[0] !== 0xef && raw.toString('utf8').includes('三人聚智'));
+                const payload = JSON.parse(raw.toString('utf8'));
+                assert(payload.draft === true && payload.prerelease === true && payload.tag_name === prepared.tag && payload.target_commitish === sourceCommit);
+                release = { id: 123, tag_name: prepared.tag, target_commitish: sourceCommit, prerelease: true, draft: true, html_url: `https://github.com/owner/repo/releases/tag/${prepared.tag}`, assets: [] };
+                created = true;
+                const response = copy(release);
+                if (missingCreateField) delete response[missingCreateField];
+                if (wrongCreatedCommit) response.target_commitish = 'b'.repeat(40);
+                return response;
+            }
+            if (endpoint.startsWith('https://uploads.github.com/repos/owner/repo/releases/123/assets?name=') && method === 'POST') {
+                assert(args.includes('Content-Type: application/octet-stream'));
+                const name = new URL(endpoint).searchParams.get('name');
+                const asset = allAssets.find(value => value.name === name);
+                const file = args[args.indexOf('--input') + 1];
+                assert(asset && hash(fs.readFileSync(file)) === asset.digest.slice(7) && !release.assets.some(value => value.name === asset.name));
+                release.assets.push(asset);
+                return copy(asset);
+            }
+            if (endpoint.endsWith('/releases/123') && method === 'GET') {
+                if (unavailableIdReads-- > 0) return null;
+                return copy(release);
+            }
+            if (endpoint.endsWith('/releases/123') && method === 'PATCH') {
+                const payload = JSON.parse(fs.readFileSync(args[args.indexOf('--input') + 1], 'utf8'));
+                assert.deepEqual(payload, { draft: false, prerelease: true });
+                assert(release.assets.length === 9);
+                release.draft = false; tag = sourceCommit;
+                return { ...copy(release), id: wrongPublishedId ? 999 : release.id };
+            }
+            if (endpoint.includes('/releases/assets/') && method === 'GET') {
+                const asset = allAssets.find(value => value.id === Number(endpoint.split('/').at(-1)));
+                assert(asset && options.outputFile && args.includes('Accept: application/octet-stream'));
+                fs.copyFileSync(path.join(prepared.output, asset.name), options.outputFile);
+                return '';
+            }
         }
         throw new Error('出现未预期的GitHub调用');
     };
-    return { run, calls };
+    return { run, calls, wait: () => {} };
 }
 try {
     let f = fixture();
@@ -135,16 +154,32 @@ try {
         let network = mockGitHub(prepared);
         check(publishRelease(prepared, f.root, network).alreadyPublished === false, '全新发布必须先草稿再上传再公开');
         check(network.calls.some(args => args[1] === '--paginate') && !network.calls.some(args => args.includes('--clobber') || args.includes('delete')), '草稿使用分页列表，禁止覆盖或删除');
+        const mutating = args => args.includes('--method') && ['POST', 'PATCH', 'DELETE'].includes(args[args.indexOf('--method') + 1]);
+        const uploads = args => args.at(-1).startsWith('https://uploads.github.com/');
+        check(network.calls.filter(uploads).length === 9 && network.calls.every(args => args[0] === 'api'), '上传与公开全程按REST ID定位');
         network = mockGitHub(prepared, { published: true });
-        check(publishRelease(prepared, f.root, network).alreadyPublished === true && !network.calls.some(args => ['create', 'upload', 'edit'].includes(args[1])), '相同已公开Release保持只读');
+        check(publishRelease(prepared, f.root, network).alreadyPublished === true && !network.calls.some(mutating), '相同已公开Release保持只读');
         network = mockGitHub(prepared, { partial: true });
-        check(!publishRelease(prepared, f.root, network).alreadyPublished && network.calls.find(args => args[1] === 'upload').slice(3, -2).length === 8, '同提交草稿只补齐8个缺失资产');
+        check(!publishRelease(prepared, f.root, network).alreadyPublished && network.calls.filter(uploads).length === 8, '同提交草稿只补齐8个缺失资产');
         network = mockGitHub(prepared, { published: true, wrongDigest: true });
         reject(() => publishRelease(prepared, f.root, network), /校验不同/);
-        check(!network.calls.some(args => ['create', 'upload', 'edit'].includes(args[1])), '已有公开资产不同时不得修改远端');
+        check(!network.calls.some(mutating), '已有公开资产不同时不得修改远端');
         network = mockGitHub(prepared, { wrongTag: true }); reject(() => publishRelease(prepared, f.root, network), /其他提交/);
         network = mockGitHub(prepared, { published: true, missingDigest: true });
-        check(publishRelease(prepared, f.root, network).alreadyPublished && network.calls.some(args => args[1] === 'download'), '缺少服务器digest时下载验证');
+        check(publishRelease(prepared, f.root, network).alreadyPublished && network.calls.some(args => args.at(-1).includes('/releases/assets/')), '缺少服务器digest时按资产ID下载验证');
+        network = mockGitHub(prepared, { delayedList: true });
+        check(!publishRelease(prepared, f.root, network).alreadyPublished && network.calls.filter(args => args.includes('--paginate')).length === 1, '创建响应的ID不依赖后续列表可见性');
+        for (const field of ['id', 'tag_name', 'target_commitish', 'draft', 'prerelease', 'assets']) {
+            network = mockGitHub(prepared, { missingCreateField: field });
+            reject(() => publishRelease(prepared, f.root, network), /创建草稿响应/);
+            check(network.calls.filter(uploads).length === 0, '创建响应缺字段不得上传或猜测Release');
+        }
+        network = mockGitHub(prepared, { wrongCreatedCommit: true }); reject(() => publishRelease(prepared, f.root, network), /创建草稿响应/);
+        network = mockGitHub(prepared, { unavailableIdReads: 2 });
+        check(!publishRelease(prepared, f.root, network).alreadyPublished && network.calls.filter(args => args.at(-1).endsWith('/releases/123') && !mutating(args)).length === 3, '按ID读取仅有限重试后继续完整验证');
+        network = mockGitHub(prepared, { unavailableIdReads: 9 }); reject(() => publishRelease(prepared, f.root, network), /暂不可用/);
+        check(!network.calls.some(args => args.includes('PATCH')), 'ID不可读时不得公开草稿');
+        network = mockGitHub(prepared, { wrongPublishedId: true }); reject(() => publishRelease(prepared, f.root, network), /最终状态/);
     } finally {
         if (oldRepository === undefined) delete process.env.GITHUB_REPOSITORY; else process.env.GITHUB_REPOSITORY = oldRepository;
         if (oldCredential === undefined) delete process.env.GH_TOKEN; else process.env.GH_TOKEN = oldCredential;

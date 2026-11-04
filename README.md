@@ -2,7 +2,7 @@
 
 效率工具与 Python 程序管理的合并应用。以原效率工具为主框架，保留全局搜索、超级面板、窗口管理、插件存储和程序小店，增加独立的 Python 管理模块。
 
-当前配置版本为 **0.1.7-preview.1**，公开仓库为 [yuhanbo758/sanrenjz](https://github.com/yuhanbo758/sanrenjz)，预览版安装包入口为 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases)。只有对应的多平台构建及检查全部通过才会发布，暂不启用在线更新。两个来源项目保持独立。
+当前配置版本为 **0.1.7-preview.2**，公开仓库为 [yuhanbo758/sanrenjz](https://github.com/yuhanbo758/sanrenjz)，预览版安装包入口为 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases)。只有对应的多平台构建及检查全部通过才会发布，暂不启用在线更新。两个来源项目保持独立。
 
 ## 使用
 

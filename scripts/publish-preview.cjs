@@ -95,17 +95,22 @@ function prepareRelease(root = path.resolve(__dirname, '..'), options = {}) {
     }
     return { ...validated, output, assets, manifest };
 }
-function gh(args, { json = false, allowMissing = false } = {}) {
-    const result = spawnSync('gh', args, { encoding: 'utf8', windowsHide: true, maxBuffer: 8 * 1024 * 1024 });
+function gh(args, { json = false, allowMissing = false, outputFile } = {}) {
+    let descriptor;
+    let result;
+    try {
+        if (outputFile) descriptor = fs.openSync(outputFile, 'wx');
+        result = spawnSync('gh', args, { encoding: 'utf8', windowsHide: true, maxBuffer: 8 * 1024 * 1024, ...(outputFile ? { stdio: ['ignore', descriptor, 'pipe'] } : {}) });
+    } finally { if (descriptor !== undefined) fs.closeSync(descriptor); }
     if (result.error || result.status !== 0) {
         if (allowMissing && /HTTP 404/.test(result.stderr || '')) return null;
         const status = /HTTP (\d{3})/.exec(result.stderr || '');
         throw new Error(`GitHub操作失败${status ? `（HTTP ${status[1]}）` : ''}，命令类别：${args[0]}`);
     }
-    return json ? JSON.parse(result.stdout) : result.stdout.trim();
+    return json ? JSON.parse(result.stdout) : (result.stdout || '').trim();
 }
 function tagCommit(repository, tag, run = gh) {
-    const ref = run(['api', `repos/${repository}/git/ref/tags/${encodeURIComponent(tag)}`], { json: true, allowMissing: true });
+    const ref = run(['api', '--header', 'Cache-Control: no-cache', `repos/${repository}/git/ref/tags/${encodeURIComponent(tag)}`], { json: true, allowMissing: true });
     if (!ref) return null;
     let object = ref.object;
     for (let index = 0; object?.type === 'tag' && index < 10; index++) object = run(['api', `repos/${repository}/git/tags/${object.sha}`], { json: true }).object;
@@ -124,7 +129,8 @@ function verifyRemoteAssets(repository, tag, remoteAssets, prepared, { complete 
         } else {
             const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-release-verify-'));
             try {
-                run(['release', 'download', tag, '--repo', repository, '--pattern', asset.name, '--dir', temporary]);
+                if (!Number.isSafeInteger(asset.id) || asset.id <= 0) throw new Error('远端资产缺少有效标识');
+                run(['api', '--header', 'Accept: application/octet-stream', '--header', 'Cache-Control: no-cache', `repos/${repository}/releases/assets/${asset.id}`], { outputFile: path.join(temporary, asset.name) });
                 if (fileInfo(path.join(temporary, asset.name)).sha256 !== local.sha256) throw new Error('远端Release已有资产校验不同，必须使用新版本');
             } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
         }
@@ -139,15 +145,35 @@ function validateReleaseState(release, target, prepared) {
 }
 function findRelease(repository, tag, run = gh) {
     // 按tag接口只保证公开Release；列表对有写权限的任务也返回草稿，按ID继续操作。
-    const pages = run(['api', '--paginate', '--slurp', `repos/${repository}/releases?per_page=100`], { json: true });
+    const pages = run(['api', '--paginate', '--slurp', '--header', 'Cache-Control: no-cache', `repos/${repository}/releases?per_page=100`], { json: true });
     if (!Array.isArray(pages) || pages.some(page => !Array.isArray(page))) throw new Error('无法解析Release列表');
     const matches = pages.flat().filter(release => release.tag_name === tag);
     if (matches.length > 1) throw new Error('同一标签存在多份Release，停止猜测');
     if (!matches.length) return null;
     if (!Number.isSafeInteger(matches[0].id) || matches[0].id <= 0) throw new Error('Release标识无效');
-    return run(['api', `repos/${repository}/releases/${matches[0].id}`], { json: true });
+    return run(['api', '--header', 'Cache-Control: no-cache', `repos/${repository}/releases/${matches[0].id}`], { json: true });
 }
-function publishRelease(prepared, root = path.resolve(__dirname, '..'), { run = gh } = {}) {
+function validateCreatedRelease(release, prepared) {
+    if (!release || !Number.isSafeInteger(release.id) || release.id <= 0 || release.draft !== true || release.prerelease !== true || release.tag_name !== prepared.tag || release.target_commitish !== prepared.sourceCommit || !Array.isArray(release.assets) || release.assets.length !== 0) throw new Error('创建草稿响应缺少有效标识、来源或预览状态');
+    return release;
+}
+function jsonRequest(root, name, method, endpoint, payload, run) {
+    const file = path.join(root, 'dist', name);
+    fs.writeFileSync(file, `${JSON.stringify(payload)}\n`, 'utf8');
+    return run(['api', '--method', method, '--header', 'Content-Type: application/json; charset=utf-8', '--input', file, endpoint], { json: true });
+}
+const pause = milliseconds => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+function releaseById(repository, id, run, wait, expectedAssets = 0) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+        if (attempt) wait(200 * attempt);
+        const release = run(['api', '--header', 'Cache-Control: no-cache', `repos/${repository}/releases/${id}`], { json: true, allowMissing: true });
+        if (!release) continue;
+        if (release.id !== id || !Array.isArray(release.assets)) throw new Error('Release标识或资产响应不符');
+        if (release.assets.length >= expectedAssets) return release;
+    }
+    throw new Error('Release按标识读取暂不可用或资产未就绪');
+}
+function publishRelease(prepared, root = path.resolve(__dirname, '..'), { run = gh, wait = pause } = {}) {
     const repository = process.env.GITHUB_REPOSITORY || '';
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw new Error('缺少明确的GitHub发布仓库');
     if (!process.env.GH_TOKEN && !process.env.GITHUB_TOKEN) throw new Error('Release发布需要仅用于当前任务的GitHub凭据');
@@ -159,25 +185,35 @@ function publishRelease(prepared, root = path.resolve(__dirname, '..'), { run = 
         return { url: release.html_url, alreadyPublished: true };
     }
     if (!release) {
-        const notes = path.join(root, 'dist/preview-release-notes.md');
         const body = `三人聚智 ${prepared.version} 多平台预览版\n\n来源提交：${prepared.sourceCommit}\n\n- Windows x64：未签名测试安装包。\n- macOS Intel / Apple Silicon：仅 ad-hoc 签名，未使用 Developer ID，未公证；首次打开可能需要系统确认。\n- Linux x64：AppImage 与 tar.gz 测试包。\n- 默认不携带 Python 运行时、私有插件或用户配置。请按 SHA256SUMS.txt 校验下载文件。\n- 各目标已完成原生运行与公开范围检查，不能替代用户设备上的安装、升级与权限验收。\n`;
-        fs.writeFileSync(notes, body, 'utf8');
-        run(['release', 'create', prepared.tag, '--repo', repository, '--target', prepared.sourceCommit, '--title', `三人聚智 ${prepared.version} 预览版`, '--notes-file', notes, '--prerelease', '--draft']);
-        release = findRelease(repository, prepared.tag, run);
+        // 创建响应的ID是权威结果，不依赖列表或pending-tag索引的即时可见性。
+        release = validateCreatedRelease(jsonRequest(root, 'preview-release-create.json', 'POST', `repos/${repository}/releases`, { tag_name: prepared.tag, target_commitish: prepared.sourceCommit, name: `三人聚智 ${prepared.version} 预览版`, body, draft: true, prerelease: true }, run), prepared);
     }
     if (!release) throw new Error('无法读取刚创建的Release草稿');
-    const endpoint = `repos/${repository}/releases/${release.id}`;
+    const releaseId = release.id;
+    const endpoint = `repos/${repository}/releases/${releaseId}`;
     validateReleaseState(release, tagCommit(repository, prepared.tag, run), prepared);
     if (!release.draft) throw new Error('发布暂存必须是草稿');
     const missing = verifyRemoteAssets(repository, prepared.tag, release.assets || [], prepared, { run });
-    if (missing.length) run(['release', 'upload', prepared.tag, ...missing.map(asset => path.join(prepared.output, asset.filename)), '--repo', repository]);
-    release = run(['api', endpoint], { json: true });
+    for (const asset of missing) {
+        const uploaded = run(['api', '--method', 'POST', '--header', 'Content-Type: application/octet-stream', '--input', path.join(prepared.output, asset.filename), `https://uploads.github.com/repos/${repository}/releases/${release.id}/assets?name=${encodeURIComponent(asset.filename)}`], { json: true });
+        if (!uploaded || uploaded.name !== asset.filename || !Number.isSafeInteger(uploaded.id) || uploaded.id <= 0) throw new Error('上传资产响应标识或名称不符');
+        verifyRemoteAssets(repository, prepared.tag, [uploaded], prepared, { run });
+    }
+    release = releaseById(repository, release.id, run, wait, prepared.assets.length);
     verifyRemoteAssets(repository, prepared.tag, release.assets || [], prepared, { complete: true, run });
     target = tagCommit(repository, prepared.tag, run);
     validateReleaseState(release, target, prepared);
-    run(['release', 'edit', prepared.tag, '--repo', repository, '--draft=false', '--prerelease']);
-    release = run(['api', endpoint], { json: true });
-    if (release.draft || !release.prerelease || tagCommit(repository, prepared.tag, run) !== prepared.sourceCommit) throw new Error('Release最终状态或标签来源不符');
+    release = jsonRequest(root, 'preview-release-publish.json', 'PATCH', endpoint, { draft: false, prerelease: true }, run);
+    if (!release || release.id !== releaseId || release.draft !== false || release.prerelease !== true || release.tag_name !== prepared.tag || !Array.isArray(release.assets)) throw new Error('Release最终状态不符');
+    let publishedCommit;
+    for (let attempt = 0; attempt < 4; attempt++) {
+        if (attempt) wait(200 * attempt);
+        publishedCommit = tagCommit(repository, prepared.tag, run);
+        if (publishedCommit) break;
+    }
+    if (publishedCommit !== prepared.sourceCommit) throw new Error('Release标签来源不符');
+    verifyRemoteAssets(repository, prepared.tag, release.assets, prepared, { complete: true, run });
     return { url: release.html_url, alreadyPublished: false };
 }
 function main(argv = process.argv.slice(2)) {
@@ -188,4 +224,4 @@ function main(argv = process.argv.slice(2)) {
     console.log(JSON.stringify({ version: prepared.version, tag: prepared.tag, sourceCommit: prepared.sourceCommit, targets: prepared.targets.length, assets: prepared.assets.length, ...result }));
 }
 if (require.main === module) { try { main(); } catch (error) { console.error(error.message); process.exitCode = 1; } }
-module.exports = { TARGETS, checksums, validateInputs, prepareRelease, verifyRemoteAssets, validateReleaseState, findRelease, publishRelease };
+module.exports = { TARGETS, checksums, validateInputs, prepareRelease, verifyRemoteAssets, validateReleaseState, findRelease, validateCreatedRelease, releaseById, publishRelease };
