@@ -31,3 +31,4 @@
 - 隐私检查必须覆盖 Git 公开候选、实际索引及公开构建暂存内容，包含 HTML/CJS、JSON 引号字段和 UTF-16 文本；公开 Python 配置只允许空模板。误报仅按文件、规则和行校验值逐项复核，不得整目录放行；原始扫描报告只在本地保留。
 - Python插件目录复制保留明确的filter回调，避免Windows下Node22的cpSync原生快路径在中文目录上异常退出；不得用跳过导入测试代替兼容修复。
 - Windows安装态插件仍在安装目录；macOS/Linux安装态插件与公共插件运行时放入独立userData目录，不能写入签名.app或AppImage只读挂载目录。macOS预览版仅作ad-hoc签名并明确未公证，不能冒充Developer ID正式签名；签名权限plist保持无BOM的LF文本，签名前由Apple工具校验和规范化。
+- 每个构建任务只构建并验收自身架构；macOS目标配置不显式展开双架构，架构由对应原生runner的CLI参数指定，收集器拒绝额外平台或架构产物。

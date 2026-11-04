@@ -5,6 +5,16 @@ const path = require('path');
 const os = require('os');
 const { createStage, parseSelections, parseBuildOptions, builderEnvironment } = require('../scripts/package-local');
 const { auditEntries, auditPackage } = require('../scripts/audit-public-scope');
+const projectPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
+assert(projectPackage.build.mac.target.every(target => typeof target === 'string' || !target.arch), 'macOS矩阵架构必须由本次CLI指定，不能被目标数组展开为两个架构');
+const { computeArchToTargetNamesMap } = require('app-builder-lib/out/targets/targetFactory');
+const { Arch } = require('builder-util');
+const { Platform } = require('app-builder-lib/out/core');
+for (const architecture of [Arch.x64, Arch.arm64]) {
+    const targets = computeArchToTargetNamesMap(new Map([[architecture, []]]), { platformSpecificBuildOptions: projectPackage.build.mac, defaultTarget: ['dmg', 'zip'] }, Platform.MAC);
+    assert.deepStrictEqual([...targets.keys()], [architecture], '真实builder目标解析不得追加另一架构');
+    assert.deepStrictEqual(targets.get(architecture).sort(), ['dmg', 'zip']);
+}
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-package-'));
 const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value), 'utf8'); };
 try {
