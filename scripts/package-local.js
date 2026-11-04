@@ -12,7 +12,7 @@ function copyRuntime(source, destination, { plugin = false, configName = 'config
     if (stat.isDirectory()) {
         fs.mkdirSync(destination, { recursive: true });
         for (const entry of fs.readdirSync(source)) {
-            if (UNSAFE_NAMES.has(entry.toLowerCase()) || entry.startsWith('.') || /(?:\.log|\.tmp|\.bak|\.pyc|\.sqlite(?:3)?|\.db|\.bin|\.enc)$/i.test(entry)) continue;
+            if (UNSAFE_NAMES.has(entry.toLowerCase()) || entry.startsWith('.') || /(?:\.log|\.tmp|\.bak|\.pyc|\.sqlite(?:3)?|\.db|\.bin|\.enc|\.pem|\.key|\.pfx|\.p12|\.keystore|\.jks)$/i.test(entry)) continue;
             if (plugin && (entry === configName || entry === 'config.json')) continue;
             copyRuntime(path.join(source, entry), path.join(destination, entry), { plugin, configName });
         }
@@ -87,12 +87,36 @@ function createStage({ root, stage, personal = [] }) {
     }
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     delete pkg.repository; delete pkg.homepage; delete pkg.bugs; delete pkg.scripts;
-    pkg.build = { ...pkg.build, publish: null, files: ['*.js', '*.html', '*.css', 'LICENSE', '*.json', 'app/**/*', 'assets/**/*', 'config/**/*', 'build/**/*', 'node_modules/**/*'], extraResources: [{ from: 'app', to: 'app', filter: ['**/*'] }, { from: 'config', to: 'config', filter: ['python-runtime.json', 'public-plugins.json'] }, { from: 'build', to: 'build', filter: ['*.ico', '*.png', '*.icns'] }] };
+    pkg.build = { ...pkg.build, publish: null, files: ['*.js', '*.html', '*.css', 'LICENSE', '*.json', 'app/**/*', 'assets/**/*', 'config/**/*', 'build/**/*', '!build/preview-sign.cjs', 'node_modules/**/*'], extraResources: [{ from: 'app', to: 'app', filter: ['**/*'] }, { from: 'config', to: 'config', filter: ['python-runtime.json', 'public-plugins.json'] }, { from: 'build', to: 'build', filter: ['*.ico', '*.png', '*.icns'] }] };
+    if (process.env.SANRENJZ_PREVIEW_BUILD === '1') {
+        // 预览包只由显式 afterPack 钩子执行 ad-hoc 签名，不发现或使用个人证书。
+        pkg.build.mac = { ...pkg.build.mac, identity: null, forceCodeSigning: false };
+    }
     if (personal.length) { pkg.build.productName = `${pkg.build.productName}（个人版）`; pkg.build.artifactName = 'sanrenjz-personal-${version}-${os}-${arch}.${ext}'; }
     fs.writeFileSync(path.join(stage, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
     const audit = auditPackage(stage, { publicCatalog, privateCatalog, personal });
     if (audit.errors.length) throw new Error(`暂存审计失败：${audit.errors.join('；')}`);
     return { stage, files: audit.files, personal };
+}
+function resolvePackageLayout(output, { platform = 'win', arch = 'x64' } = {}, pkg = {}) {
+    if (!['win', 'mac', 'linux'].includes(platform) || !['x64', 'arm64'].includes(arch) || (platform !== 'mac' && arch !== 'x64')) throw new Error('不支持的构建平台或架构');
+    const unpacked = path.join(output, platform === 'win' ? 'win-unpacked' : platform === 'linux' ? 'linux-unpacked' : arch === 'arm64' ? 'mac-arm64' : 'mac');
+    const productName = pkg.build?.productName || '三人聚智';
+    if (!fs.existsSync(unpacked) || !fs.lstatSync(unpacked).isDirectory() || fs.lstatSync(unpacked).isSymbolicLink()) throw new Error('缺少有效的对应平台解包产物');
+    let appRoot = unpacked;
+    let binary;
+    let resources;
+    if (platform === 'mac') {
+        const apps = fs.readdirSync(unpacked, { withFileTypes: true }).filter(entry => entry.name.endsWith('.app'));
+        if (apps.length !== 1 || !apps[0].isDirectory() || apps[0].isSymbolicLink() || apps[0].name !== `${productName}.app`) throw new Error('macOS产物必须包含唯一的预期应用包');
+        appRoot = path.join(unpacked, apps[0].name);
+        binary = path.join(appRoot, 'Contents', 'MacOS', pkg.build?.mac?.executableName || productName);
+        resources = path.join(appRoot, 'Contents', 'Resources');
+    } else {
+        binary = path.join(unpacked, platform === 'win' ? `${pkg.build?.win?.executableName || productName}.exe` : pkg.build?.linux?.executableName || pkg.name || 'sanrenjz');
+        resources = path.join(unpacked, 'resources');
+    }
+    return { unpacked, appRoot, binary, executable: binary, resources };
 }
 function main(argv = process.argv.slice(2)) {
     const root = path.resolve(__dirname, '..');
@@ -114,11 +138,10 @@ function main(argv = process.argv.slice(2)) {
     if (argv.includes('--dir')) args.push('--dir');
     const child = spawnSync(process.execPath, args, { cwd: root, stdio: 'inherit', windowsHide: true });
     if (child.status !== 0) throw new Error('本地打包失败，暂存目录已保留');
-    const unpacked = path.join(output, platform === 'win' ? 'win-unpacked' : platform === 'linux' ? 'linux-unpacked' : architecture === 'arm64' ? 'mac-arm64' : 'mac');
-    if (!fs.existsSync(unpacked)) throw new Error('构建完成但没有找到对应平台产物，暂存与日志已保留');
+    const { unpacked } = resolvePackageLayout(output, { platform, arch: architecture }, JSON.parse(fs.readFileSync(path.join(stage, 'package.json'), 'utf8')));
     const audited = auditPackage(unpacked, { publicCatalog: loadCatalog(root, 'public'), privateCatalog, personal });
     if (audited.errors.length) throw new Error(`构建产物审计失败：${audited.errors.join('；')}`);
     console.log(JSON.stringify({ output, files: audited.files, published: false, personal }));
 }
 if (require.main === module) { try { main(); } catch (error) { console.error(error.message); process.exitCode = 1; } }
-module.exports = { ROOT_FILES, copyRuntime, parseSelections, parseBuildOptions, createStage };
+module.exports = { ROOT_FILES, copyRuntime, parseSelections, parseBuildOptions, createStage, resolvePackageLayout };

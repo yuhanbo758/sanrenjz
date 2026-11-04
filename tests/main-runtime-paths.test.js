@@ -14,7 +14,7 @@ try {
   const archive = path.join(resources, 'app.asar');
   fs.mkdirSync(archive, { recursive: true });
   // 复现 extraResources 布局：ASAR 内没有 app，模块只位于 resources/app。
-  for (const file of ['console-encoding.js', 'plugin_runtime/plugin-window-ready.js', 'plugin_runtime/opencode-runtime.js', 'plugin_runtime/opencode-profile.js', 'plugin_runtime/windows-hook-output.js', 'plugin_store.js', 'super_panel_context.js']) {
+  for (const file of ['console-encoding.js', 'install-root.js', 'plugin_runtime/plugin-window-ready.js', 'plugin_runtime/opencode-runtime.js', 'plugin_runtime/opencode-profile.js', 'plugin_runtime/windows-hook-output.js', 'plugin_store.js', 'super_panel_context.js']) {
     const dest = path.join(resources, 'app', file);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(path.join(root, 'app', file), dest);

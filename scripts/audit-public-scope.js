@@ -7,15 +7,29 @@ const ENGINE_DIRS = { tools: 'software', python: 'python-software' };
 function loadCatalog(root, name) {
     return JSON.parse(fs.readFileSync(path.join(root, 'config', `${name}-plugins.json`), 'utf8'));
 }
-function walk(directory, prefix = '') {
+function inside(root, target) {
+    const relative = path.relative(root, target);
+    return relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`));
+}
+function walk(directory, prefix = '', boundary = directory) {
     if (!fs.existsSync(directory)) return [];
+    const realBoundary = fs.realpathSync(boundary);
     const output = [];
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-        if (entry.name === 'node_modules') continue;
         const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
         const absolute = path.join(directory, entry.name);
-        if (entry.isSymbolicLink()) throw new Error(`包中不允许符号链接：${relative}`);
-        if (entry.isDirectory()) output.push(...walk(absolute, relative));
+        if (entry.isSymbolicLink()) {
+            let target;
+            try { target = fs.realpathSync(absolute); }
+            catch (_) { throw new Error(`包中包含悬空或循环链接：${relative}`); }
+            if (!inside(realBoundary, target)) throw new Error(`包中链接指向外部目录：${relative}`);
+            // macOS Framework 的 Current/Resources 链接合法；只审计链接，不跟随递归。
+            if (fs.statSync(target).isDirectory() && inside(target, fs.realpathSync(directory))) throw new Error(`包中链接形成目录循环：${relative}`);
+            output.push(relative);
+            continue;
+        }
+        if (entry.name === 'node_modules') continue;
+        if (entry.isDirectory()) output.push(...walk(absolute, relative, realBoundary));
         else output.push(relative);
     }
     return output;
@@ -32,8 +46,8 @@ function auditEntries(entries, { publicCatalog, privateCatalog, personal = [] })
     for (const input of entries) {
         const name = input.replace(/\\/g, '/').replace(/^\/+/, '');
         if (/(^|\/)(?:\.git|tests|logs|plugin-data|plugin-configs|python-plugin-configs|user-data|__pycache__)(\/|$)/i.test(name) ||
-            /(^|\/)(?:account-token\.bin|Cookies|Login Data|\.env(?:\..*)?|.*-secrets\.bin)$/i.test(name)) errors.push(`用户或开发数据：${name}`);
-        if (/(^|\/)(?:runtime|python)(\/|$)/i.test(name) || /(^|\/)python(?:w|\d+(?:\.\d+)*)?\.exe$/i.test(name)) errors.push(`预装Python运行时：${name}`);
+            /(^|\/)(?:account-token\.bin|Cookies|Login Data|\.env(?:\..*)?|.*-secrets\.bin)$/i.test(name) || /\.(?:pem|key|pfx|p12|keystore|jks)$/i.test(name)) errors.push(`用户或开发数据：${name}`);
+        if (/(^|\/)(?:runtime|python)(\/|$)/i.test(name) || /(^|\/)python(?:w|\d+(?:\.\d+)*)?(?:\.exe)?$/i.test(name) || /(^|\/)(?:lib)?python\d+(?:\.\d+)*(?:[a-z]*)?\.(?:dll|dylib|so(?:\.\d+)*)$/i.test(name)) errors.push(`预装Python运行时：${name}`);
         for (const [engine, directory] of Object.entries(ENGINE_DIRS)) {
             const pattern = new RegExp(`(?:^|/)app/${directory}/([^/]+)(?:/|$)`);
             const match = name.match(pattern);

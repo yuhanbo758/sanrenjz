@@ -2,7 +2,7 @@
 
 效率工具与 Python 程序管理的合并应用。以原效率工具为主框架，保留全局搜索、超级面板、窗口管理、插件存储和程序小店，增加独立的 Python 管理模块。
 
-当前版本为 **0.1.6 预览版**，公开仓库为 [yuhanbo758/sanrenjz](https://github.com/yuhanbo758/sanrenjz)，暂不启用在线更新。两个来源项目保持独立。
+当前配置版本为 **0.1.7-preview.1**，公开仓库为 [yuhanbo758/sanrenjz](https://github.com/yuhanbo758/sanrenjz)，预览版安装包入口为 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases)。只有对应的多平台构建及检查全部通过才会发布，暂不启用在线更新。两个来源项目保持独立。
 
 ## 使用
 
@@ -24,7 +24,9 @@
 ## 本地开发与打包
 
 ```powershell
-npm ci
+npm ci --ignore-scripts
+node node_modules/electron/install.js
+npx --no-install electron-builder install-app-deps
 npm start
 npm run test:merge
 npm run audit:privacy
@@ -32,9 +34,11 @@ npm run audit:public
 npm run build-win
 ```
 
-Windows 安装包输出在 `dist/public-package-时间戳/`。所有构建均强制不发布，不会推送 Git 或上传 Release。
+本地安装包输出在 `dist/public-package-时间戳/`。所有 electron-builder 调用均强制使用 `--publish never`，本地构建不会推送 Git 或上传 Release。
 
-GitHub Actions 配置为推送 `main` 或手动运行时自动构建 Windows x64，并上传经过范围审计的安装包和 SHA256。工作流不递增版本、不创建 Release，也不启用旧产品更新通道；详情见 [GitHub 自动打包](docs/GitHub自动打包.md)。提交前必须通过隐私检查，首次云端构建仍需实际运行验证。
+GitHub Actions 配置为推送 `main` 或手动运行时构建 Windows x64、macOS Intel x64、macOS Apple Silicon arm64 和 Linux x64。四个目标的构建、隐私审计及原生隔离运行检查全部通过后，独立发布任务才会创建预览版 Release，上传 7 个安装包、SHA256 清单和来源清单。版本由维护者手动更新，不自动递增，不覆盖已有公开标签或资产，也不启用旧产品更新通道；详情见 [GitHub 自动打包](docs/GitHub自动打包.md)。
+
+Windows 提供 NSIS EXE；两种 macOS 架构分别提供 DMG 和 ZIP；Linux 提供 AppImage 和 tar.gz。当前预览包没有 Windows 正式代码签名，macOS 仅采用 ad-hoc 签名、未经 Developer ID 签名及 Apple 公证。构建结果以对应 Actions 运行和 Release 来源提交为准，不代表安装升级、Gatekeeper 或真实设备权限已完成验收。
 
 扫描命令、精确误报复核及原始报告保护规则见 [隐私保护](docs/隐私保护.md)。
 
@@ -48,12 +52,12 @@ npm run build:personal -- --win --include tools:插件目录名,python:插件目
 
 只允许 `config/private-plugins.json` 已登记的目录；个人包不上传。不要把公开包和个人包混用。
 
-macOS/Linux 保留构建入口和手动解释器支持，首版未完成对应设备验收，不提供一键安装。签名及跨平台发行仍需各平台环境独立验证。
+macOS/Linux 保留手动解释器支持，不提供一键安装 Python。四目标会在对应架构 runner 上检查实际打包程序；目标设备安装、升级与平台权限仍需独立验证。
 
 ## 数据与兼容
 
 - 主设置位于系统应用数据目录下的 `sanrenjz/settings.json`，与旧应用隔离。
-- 效率插件开发目录 `app/software`，安装目录 `plugins`；Python 插件开发目录 `app/python-software`，安装目录 `python-plugins`。
+- 效率插件开发目录 `app/software`，Python 插件开发目录 `app/python-software`；Windows 安装态继续使用安装目录下的 `plugins` 和 `python-plugins`，macOS/Linux 使用新应用用户数据目录下的同名目录，避免修改应用签名内容或 AppImage 只读挂载。
 - 效率插件数据默认在用户数据目录的 `plugin-data`；Python 配置默认在 `python-plugin-configs`，也可选择其他独立目录。
 - 保留 `plugin.json`、Python `settings.json`、旧 Python 配置环境变量及 `.enc` 格式。标准 Windows VBS 启动器读取新应用所选环境；自定义启动器不会被静默覆盖，迁移报告会明确提示。
 - NSIS 升级保留两类插件、旧配置目录和按需安装的 Python，失败时保留升级备份。

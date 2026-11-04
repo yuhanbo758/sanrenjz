@@ -1,24 +1,63 @@
-# GitHub 自动打包
+# GitHub 多平台预览版打包
 
-推送到 `main` 或在 Actions 手动运行“Windows 自动打包”，会构建当前版本的 Windows x64 公开安装包。工作流只读取仓库，不修改版本号，不创建标签或 GitHub Release，不启用主程序自动更新。
+推送到 `main`，或在 Actions 手动运行“多平台预览版”，会检查当前公开源码并构建四个目标。只有四个目标的构建、隐私审计和原生运行验收全部通过，发布任务才会向 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases) 上传预览版安装包及校验文件。
 
-## 执行步骤
+当前配置版本为 `0.1.7-preview.1`。本说明描述发布流程，具体平台是否成功以对应 Actions 运行和 Release 的来源提交为准，不提前代表各平台构建、安装或业务功能已经完成验收。
 
-1. 检出代码后，在安装依赖前运行 `scripts/check-privacy.py --git`。
-2. 使用 Node.js 22、Python 3.11 和 Windows 2022 runner。Python 仅作为 CI 编译与测试工具，不随安装包分发。
-3. 执行 `npm ci --ignore-scripts`，单独下载 Electron，再通过 `electron-builder install-app-deps` 按 Electron ABI 重建 SQLite 等原生模块，避免先为宿主 Node 编译旧版 SQLite。
-4. 运行隐私、公开插件范围、合并功能、快捷键及中文控制台测试。联网下载 Python 的验收测试默认跳过，测试使用隔离配置。
-5. 运行 `npm run build-win -- --x64`。该命令经过公开清单暂存，并固定使用 `--publish never`，不从开发目录直接打包。
-6. 再对本次唯一公开暂存目录执行内容隐私扫描，并二次审计解包结果，确认没有私有插件、用户数据或 Python 运行时；只收集本次唯一公开安装包。
+## 构建目标与下载文件
 
-所有步骤成功后，Actions 页面会提供 `sanrenjz-windows-x64-<运行编号>` 产物，保留 30 天。压缩包内包含安装 EXE、`SHA256SUMS.txt` 和不含本机绝对路径的 `build-info.json`。工作流不上传整个 `dist/`，也不上传原始隐私扫描报告、测试用户数据或构建缓存。
+| 目标 | Runner | 安装包 |
+| --- | --- | --- |
+| Windows x64 | `windows-2022` | NSIS `.exe` |
+| macOS Intel x64 | `macos-15-intel` | `.dmg`、`.zip` |
+| macOS Apple Silicon arm64 | `macos-15` | `.dmg`、`.zip` |
+| Linux x64 | `ubuntu-22.04` | `.AppImage`、`.tar.gz` |
 
-## 查看和校验
+每个预览版合计 7 个安装包。Release 还包含 `SHA256SUMS.txt` 和 `release-manifest.json`，共 9 个下载资产。文件名包含版本、平台和架构，macOS 的 Intel 与 Apple Silicon 文件不会互相覆盖。预览版在 Release 列表中标记为 **Pre-release**。
 
-打开仓库的 **Actions → Windows 自动打包 → 对应运行 → Artifacts** 下载产物。Windows PowerShell 可用 `Get-FileHash -Algorithm SHA256 <安装包路径>` 校验，与 `SHA256SUMS.txt` 对照。Actions 的绿色结果表示云端构建和所列检查通过，不能替代真实安装、升级和业务功能验收。
+## 检查与构建顺序
 
-## 公开范围和平台限制
+1. 检出同一提交，运行隐私检查单测、`scripts/check-privacy.py --git` 和公开插件范围审计，确认版本是有效的预览版本。
+2. 四个原生 runner 分别准备 Node.js 22、Python 3.11 和同架构 Electron。Python 仅作为 CI 编译工具，不随安装包分发。
+3. 执行 `npm ci --ignore-scripts`，单独安装 Electron，再通过 `electron-builder install-app-deps --arch <架构>` 重建 SQLite 等原生模块，避免先为宿主 Node 编译旧版 SQLite。
+4. 检查高分辨率 PNG、ICO、ICNS 和 DMG 背景等构建资源，运行产物收集和发布规则的隔离测试。Windows runner 另执行完整合并功能、快捷键和中文控制台回归；联网下载 Python 的测试默认跳过。
+5. 通过 `scripts/package-local.js` 按公开允许清单创建独立暂存目录，执行对应平台、架构的构建。所有 electron-builder 调用固定使用 `--publish never`，不在构建阶段发布。
+6. 扫描本次唯一公开暂存目录，并检查实际解包文件、ASAR、原生模块和架构。macOS 只允许包内合法链接，包外链接或私有内容会阻止收集。
+7. 在本机架构运行打包后的程序，使用全新临时 profile 检查版本、平台架构、SQLite、40+4 插件目录、默认无 Python、两类菜单、统一日志、设置保存和正常退出。Linux 在 Xvfb 中运行，只有此隔离验收进程使用 `--no-sandbox`，产品默认启动参数不改变。
+8. 本平台验收成功后，只收集明确的安装包、SHA256 与无个人路径的构建信息，上传对应 Actions Artifact。四个目标全部成功后，发布任务重新核对版本、来源提交、平台架构、安装包集合和校验值，再创建预览 Release。
 
-默认安装包采用 `config/public-plugins.json` 允许清单。私有插件仍只保留在开发机；CI 不调用 `build:personal`，不需要开发者账号、模型密钥或用户配置。
+工作流默认权限为 `contents: read`，只有发布任务使用 `contents: write`。不需要开发者个人 Token、模型密钥或真实用户配置。原始日志、扫描报告、临时 profile、整个 `dist/` 和个人包均不作为下载资产上传。
 
-首轮仅启用已验收的 Windows x64。macOS/Linux 的源码构建入口保留；扩展 Actions 前应先补齐对应平台的高分辨率图标、macOS DMG 资源与签名策略，并在对应架构 runner 验证原生依赖。当前没有 macOS/Linux 的云端成功构建或实机验收声明。
+## 版本与发布保护
+
+版本由维护者手动更新，`package.json` 和 `package-lock.json` 必须一致。例如，从当前版本准备下一次预览时，可运行：
+
+```powershell
+npm version prerelease --preid=preview --no-git-tag-version
+```
+
+审阅代码、运行检查后再提交推送。工作流不自动修改版本或提交代码，不启用主程序更新器，也不沿用旧产品的更新通道。
+
+公开标签和资产不可被新提交覆盖。已有同名标签或资产与本次提交、内容不一致时，发布应停止；维护者须确认差异并升级预览版本，不能删除已公开版本后强行替换。手动在其他分支运行可以验证构建，只有 `main` 允许发布。
+
+## 下载与校验
+
+面向用户的下载入口为 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases)。选择与设备匹配的平台和架构文件，同时下载 `SHA256SUMS.txt`，比较其中对应文件的校验值。`release-manifest.json` 记录来源提交、平台架构及产物信息。
+
+Windows PowerShell 示例：
+
+```powershell
+Get-FileHash -LiteralPath .\sanrenjz-0.1.7-preview.1-win-x64.exe -Algorithm SHA256
+```
+
+macOS 可使用 `shasum -a 256 <下载文件>`，Linux 可使用 `sha256sum <下载文件>`。只下载一个平台文件时，比较清单中该文件对应的行即可。
+
+Actions Artifacts 保留 30 天，作为构建过程的临时产物；对外安装包通过 Release 下载。Actions 成功意味着声明的构建和隔离检查通过，不替代现有安装覆盖升级、系统权限、真实设备和业务任务验收。
+
+## 公开范围与平台限制
+
+默认包采用 `config/public-plugins.json` 的 40 个效率插件和 4 个 Python 插件允许清单。私有插件及专用资料只保留在开发机；真实配置、Cookie、授权值、运行日志和按需 Python 运行时均不进入 Git 或公开包。公开 Python 配置仅保留 `{}` 空模板。
+
+Windows 保持安装目录下的 `plugins/`、`python-plugins/`。macOS/Linux 使用新应用用户数据目录下的同名插件目录，避免修改 `.app` 的签名内容或写入 AppImage 只读挂载。已有 Windows 配置与本地私有文件不因构建或烟测而迁移、删除或覆盖。
+
+当前为预览分发：Windows 未提供正式代码签名；macOS 仅采用 ad-hoc 签名，没有 Developer ID 和 Apple 公证，不代表 Gatekeeper、局域网隐私身份或用户授权已经通过验证。Linux 同样作为预览版提供。macOS/Linux 保留手动选择 Python 解释器能力，不提供一键安装 Python；正式发行还需独立完成平台签名、安装升级与目标设备验收。

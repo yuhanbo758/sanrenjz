@@ -57,6 +57,9 @@ const { detectTextContextTypes } = require(app.isPackaged
 const { hookOutputSource } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'plugin_runtime', 'windows-hook-output.js')
     : './app/plugin_runtime/windows-hook-output');
+const { getInstalledAppRoot } = require(app.isPackaged
+    ? path.join(process.resourcesPath, 'app', 'install-root.js')
+    : './app/install-root');
 
 let autoUpdater = null;
 let autoUpdaterLoadError = '';
@@ -234,9 +237,7 @@ function getPluginInstallDir() {
 }
 
 function getInstalledAppDir() {
-    if (!app.isPackaged) return __dirname;
-    // Portable 版实际运行于临时解包目录，必须使用便携 EXE 原始所在目录。
-    return process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
+    return getInstalledAppRoot(app, { developmentRoot: __dirname });
 }
 
 function getBundledPluginDir() {
@@ -1122,27 +1123,9 @@ function getResourcePath(relativePath) {
 
 // 获取图标路径
 function getIconPath() {
-    // 优先使用 .ico 格式，适用于 Windows
-    const icoPath = app.isPackaged
-        ? path.join(process.resourcesPath, 'build', 'icon.ico')
-        : path.join(__dirname, 'build', 'icon.ico');
-
-    // 检查 .ico 文件是否存在
-    if (fs.existsSync(icoPath)) {
-        console.log('使用图标路径:', icoPath);
-        return icoPath;
-    }
-
-    // 备用方案：使用 assets 中的 png 图标
-    const pngPath = getResourcePath('assets/icon.png');
-    if (fs.existsSync(pngPath)) {
-        console.log('使用备用图标路径:', pngPath);
-        return pngPath;
-    }
-
-    // 最后备用方案：返回 null，让 Electron 使用默认图标
-    console.log('未找到任何图标文件，使用默认图标');
-    return null;
+    const root = app.isPackaged ? path.join(process.resourcesPath, 'build') : path.join(__dirname, 'build');
+    const names = process.platform === 'win32' ? ['icon.ico', 'icon.png'] : ['icon.png', 'icon.ico'];
+    return names.map(name => path.join(root, name)).find(file => fs.existsSync(file)) || null;
 }
 
 // 鼠标监控进程

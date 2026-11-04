@@ -1,4 +1,4 @@
-name: Windows 自动打包
+name: 多平台预览版
 
 on:
   push:
@@ -9,82 +9,164 @@ permissions:
   contents: read
 
 concurrency:
-  group: package-${{ github.ref }}
-  cancel-in-progress: true
+  group: preview-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  windows-x64:
-    runs-on: windows-2022
-    timeout-minutes: 45
+  verify:
+    name: 公开源码与发布版本检查
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - name: 验证隐私门禁
+        run: |
+          python -X utf8 tests/privacy-scanner.test.py
+          python -X utf8 scripts/check-privacy.py --git
+          node scripts/audit-public-scope.js
+      - name: 确认预览版本
+        id: version
+        run: node scripts/preview-version.cjs
+
+  build:
+    name: ${{ matrix.id }}
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: windows-x64
+            platform: win
+            arch: x64
+            runner: windows-2022
+          - id: macos-x64
+            platform: mac
+            arch: x64
+            runner: macos-15-intel
+          - id: macos-arm64
+            platform: mac
+            arch: arm64
+            runner: macos-15
+          - id: linux-x64
+            platform: linux
+            arch: x64
+            runner: ubuntu-22.04
     defaults:
       run:
         shell: pwsh
     env:
-      SANRENJZ_PYTHON_LIVE: '0'
       PYTHONUTF8: '1'
+      SANRENJZ_PYTHON_LIVE: '0'
+      SANRENJZ_PREVIEW_BUILD: '1'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
-      - name: 检出公开源码
+      - name: 检出相同提交
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-
-      - name: 设置 Python 编译工具
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11'
-
-      - name: 安装依赖前检查公开文件
-        run: |
-          python -X utf8 tests/privacy-scanner.test.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -X utf8 scripts/check-privacy.py --git
-
-      - name: 设置 Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: npm
-
+          architecture: ${{ matrix.arch }}
+      - name: 安装依赖前扫描
+        run: python -X utf8 scripts/check-privacy.py --git
+      - name: 准备 Linux 图形与打包依赖
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libxss1 libasound2 libgbm1 libfuse2
       - name: 安装锁定依赖
         run: npm ci --ignore-scripts
-
-      - name: 安装 Electron 和原生模块
+      - name: 安装 Electron 与同架构原生模块
         run: |
           node node_modules/electron/install.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npx --no-install electron-builder install-app-deps
-
-      - name: 检查隐私和公开插件范围
+          npx --no-install electron-builder install-app-deps --arch ${{ matrix.arch }}
+      - name: 验证构建资源与公开范围
         run: |
-          npm run audit:privacy
+          node scripts/prepare-build-assets.cjs --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test tests/build-assets.test.cjs tests/ci-artifacts.test.cjs tests/preview-release.test.cjs tests/packaged-runtime-probe.test.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run audit:public
-
-      - name: 验证合并功能
-        run: npm run test:merge
-
-      - name: 验证快捷键和中文日志
+      - name: Windows 完整功能回归
+        if: runner.os == 'Windows'
         run: |
+          npm run test:merge
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run test:hotkeys
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run test:console
-
-      - name: 构建公开 Windows x64 安装包
-        run: npm run build-win -- --x64
-
-      - name: 检查公开暂存内容
+      - name: 构建公开安装包
+        run: node scripts/package-local.js --${{ matrix.platform }} --${{ matrix.arch }}
+      - name: 检查本次公开暂存内容
         run: |
           $taskStages = @(Get-ChildItem -LiteralPath dist -Directory | Where-Object { $_.Name -match '^public-stage-\d+-\d+$' })
-          if ($taskStages.Count -ne 1) { throw '必须只有本次公开构建暂存目录' }
+          if ($taskStages.Count -ne 1) { throw '必须只有本次公开暂存目录' }
           python -X utf8 scripts/check-privacy.py --target $taskStages[0].FullName
-
-      - name: 审计并收集安装包
-        run: node scripts/collect-ci-artifacts.cjs
-
-      - name: 上传已验证产物
+      - name: 原生平台隔离运行验收
+        if: runner.os != 'Linux'
+        run: node scripts/test-packaged-runtime.cjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+      - name: Linux 图形环境隔离运行验收
+        if: runner.os == 'Linux'
+        shell: bash
+        run: xvfb-run -a node scripts/test-packaged-runtime.cjs --platform linux --arch x64
+      - name: 验证运行后 macOS 包签名保持完整
+        if: runner.os == 'macOS'
+        run: |
+          $taskPackages = @(Get-ChildItem -LiteralPath dist -Directory | Where-Object { $_.Name -match '^public-package-\d+-\d+$' })
+          if ($taskPackages.Count -ne 1) { throw '必须只有本次公开构建' }
+          $taskMacDirectory = if ('${{ matrix.arch }}' -eq 'arm64') { 'mac-arm64' } else { 'mac' }
+          $taskApps = @(Get-ChildItem -LiteralPath (Join-Path $taskPackages[0].FullName $taskMacDirectory) -Directory -Filter '*.app')
+          if ($taskApps.Count -ne 1) { throw '必须只有一个macOS应用' }
+          codesign --verify --deep --strict $taskApps[0].FullName
+      - name: 收集已审计安装包和校验文件
+        run: node scripts/collect-ci-artifacts.cjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+      - name: 上传本平台公开产物
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: sanrenjz-windows-x64-${{ github.run_number }}
+          name: public-${{ matrix.id }}
           path: dist/ci-artifacts/*
           if-no-files-found: error
           retention-days: 30
+
+  publish:
+    name: 汇总并发布预览版 Release
+    needs: [verify, build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: 下载四个目标的已验证产物
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: public-*
+          path: dist/release-input
+      - name: 校验完整资产集合并发布预览版
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/publish-preview.cjs --publish

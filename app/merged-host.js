@@ -6,6 +6,7 @@ const { PythonManager } = require('./python-manager');
 const { MigrationManager } = require('./migration-manager');
 const { extractZip, findRoots, importTools, inside } = require('./plugin-import');
 const { RunLogStore, validateLogFilter } = require('./run-log-store');
+const { getInstalledAppRoot } = require('./install-root');
 
 function publicRuntime(runtime) {
     if (!runtime || runtime.canceled) return runtime;
@@ -14,7 +15,7 @@ function publicRuntime(runtime) {
 }
 
 function createMergedHost({ app, ipcMain, dialog, shell, getWindow, getManager, loadSettings, saveSettings, refresh, send, appRoot: suppliedRoot }) {
-    const appRoot = suppliedRoot || (app.isPackaged ? (process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath)) : path.resolve(__dirname, '..'));
+    const appRoot = suppliedRoot || getInstalledAppRoot(app);
     const userData = app.getPath('userData');
     const pythonDir = app.isPackaged ? path.join(appRoot, 'python-plugins') : path.join(appRoot, 'app', 'python-software');
     fs.mkdirSync(pythonDir, { recursive: true });
@@ -22,7 +23,7 @@ function createMergedHost({ app, ipcMain, dialog, shell, getWindow, getManager, 
         const bundled = path.join(process.resourcesPath, 'app', 'python-software');
         if (fs.existsSync(bundled)) for (const item of fs.readdirSync(bundled)) {
             const destination = path.join(pythonDir, item);
-            if (!item.startsWith('.') && !fs.existsSync(destination)) fs.cpSync(path.join(bundled, item), destination, { recursive: true });
+            if (!item.startsWith('.') && !fs.existsSync(destination)) fs.cpSync(path.join(bundled, item), destination, { recursive: true, filter: () => true });
         }
     }
     const changed = async ({ pythonImported = [] } = {}) => {

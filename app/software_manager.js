@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { PluginCatalog } = require('./plugin-catalog');
 const { waitForPluginWindowReady } = require('./plugin_runtime/plugin-window-ready');
 const { decodeUtf8Stream } = require('./console-encoding');
+const { getInstalledAppRoot } = require('./install-root');
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const HOST_DEBUG_MESSAGES = new Set(['自定义标题栏创建完成', '点击最小化按钮', '点击最大化按钮', '点击关闭按钮', '注册插件进入事件', '注册插件准备就绪事件', '当前平台不支持键盘模拟', '序列化测试通过']);
 const HOST_DEBUG_PREFIXES = ['点击钉住按钮，当前状态:', '钉住状态更新为:', '插件初始钉住状态:', '收到钉住状态更新事件:', '模拟键盘按键:', '键盘模拟完成，退出码:',
@@ -18,7 +19,7 @@ class PluginManager {
             this.loggedWebContents = new WeakSet();
             const candidatePluginDirs = app.isPackaged
                 ? [
-                    path.join(process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath), 'plugins')
+                    path.join(getInstalledAppRoot(app), 'plugins')
                 ]
                 : [
                     path.join(__dirname, 'software'),
@@ -1793,8 +1794,8 @@ class PluginManager {
             
             // 如果都没有，使用主应用的图标
             const appIconPath = app.isPackaged 
-                ? path.join(process.resourcesPath, 'build', 'icon.ico')
-                : path.join(__dirname, '..', 'build', 'icon.ico');
+                ? path.join(process.resourcesPath, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+                : path.join(__dirname, '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
                 
             if (fs.existsSync(appIconPath)) {
                 console.log(`插件无自定义图标，使用主应用图标: ${appIconPath}`);
@@ -1866,8 +1867,8 @@ class PluginManager {
             
             // 如果都没有，使用主应用的.ico图标
             const appIconPath = app.isPackaged 
-                ? path.join(process.resourcesPath, 'build', 'icon.ico')
-                : path.join(__dirname, '..', 'build', 'icon.ico');
+                ? path.join(process.resourcesPath, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+                : path.join(__dirname, '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
                 
             if (fs.existsSync(appIconPath)) {
                 console.log(`插件无自定义图标，使用主应用.ico图标: ${appIconPath}`);

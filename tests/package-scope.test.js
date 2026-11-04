@@ -19,6 +19,7 @@ try {
     write(path.join(root, 'app', 'resource-layout.js'), "module.exports=require('../config/python-runtime.json');");
     write(path.join(root, 'settings.json'), { account: 'never-package' });
     write(path.join(root, 'python', 'python.exe'), 'never-package');
+    write(path.join(root, 'build', 'developer.p12'), 'never-package');
     for (const id of ['public-tool', 'private-tool', 'evil-unlisted']) {
         write(path.join(root, 'app', 'software', id, 'plugin.json'), { pluginName: id });
         write(path.join(root, 'app', 'software', id, 'index.html'), id);
@@ -33,6 +34,7 @@ try {
     assert(!fs.existsSync(path.join(stage, 'app', 'software', 'private-tool')));
     assert(!fs.existsSync(path.join(stage, 'app', 'software', 'evil-unlisted')));
     assert(!fs.existsSync(path.join(stage, 'python')) && !fs.existsSync(path.join(stage, 'settings.json')));
+    assert(!fs.existsSync(path.join(stage, 'build', 'developer.p12')));
     assert(fs.existsSync(path.join(stage, 'app', 'python-software', 'public-python', 'settings.json')));
     assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(stage, 'app', 'python-software', 'public-python', 'config.json'))), {});
     const pkg = JSON.parse(fs.readFileSync(path.join(stage, 'package.json')));
@@ -51,6 +53,7 @@ try {
     assert(auditEntries(['resources/app/software/evil-unlisted/index.html'], { publicCatalog, privateCatalog }).length);
     assert(auditEntries(['resources/app/python-software/private-python/main.py'], { publicCatalog, privateCatalog }).length);
     assert(auditEntries(['resources/python/python.exe', 'resources/app/plugin-data/account-token.bin'], { publicCatalog, privateCatalog }).length >= 2);
+    assert(auditEntries(['resources/bin/python3.14', 'resources/lib/libpython3.14.dylib', 'resources/signing/developer.p12'], { publicCatalog, privateCatalog }).length === 3);
     assert.throws(() => parseSelections(['--include', 'tools:private-tool'], privateCatalog), /--personal/);
     assert.throws(() => parseSelections(['--personal'], privateCatalog), /--include/);
     assert.throws(() => parseSelections(['--personal', '--include', 'tools:..'], privateCatalog), /无效/);
