@@ -2,7 +2,7 @@
 
 推送到 `main`，或在 Actions 手动运行“多平台自动打包发布”，会检查当前公开源码并构建四个目标。只有四个目标的构建、隐私审计和原生运行验收全部通过，发布任务才会向 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases) 上传安装包及校验文件。
 
-当前配置版本为 `0.1.8`。本说明描述发布流程，具体平台是否成功以对应 Actions 运行和 Release 的来源提交为准，不提前代表各平台构建、安装或业务功能已经完成验收。
+当前配置版本为 `0.1.9`。本说明描述发布流程，具体平台是否成功以对应 Actions 运行和 Release 的来源提交为准，不提前代表各平台构建、安装或业务功能已经完成验收。
 
 ## 构建目标与下载文件
 
@@ -51,7 +51,7 @@ npm version patch --no-git-tag-version
 Windows PowerShell 示例：
 
 ```powershell
-Get-FileHash -LiteralPath .\sanrenjz-0.1.8-win-x64.exe -Algorithm SHA256
+Get-FileHash -LiteralPath .\sanrenjz-0.1.9-win-x64.exe -Algorithm SHA256
 ```
 
 macOS 可使用 `shasum -a 256 <下载文件>`，Linux 可使用 `sha256sum <下载文件>`。只下载一个平台文件时，比较清单中该文件对应的行即可。

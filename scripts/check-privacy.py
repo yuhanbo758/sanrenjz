@@ -89,12 +89,12 @@ def public_scope_errors(names, staged=False):
     errors = []
     private = load_policy("private-plugins", staged=staged)
     public = load_policy("public-plugins", staged=staged)
-    forbidden = {".git", "node_modules", "dist", "runtime", "user-data", "plugin-data", "plugin-configs", "python-plugin-configs", "migration-backups"}
+    forbidden = {".git", "node_modules", "dist", "runtime", "user-data", "plugin-data", "plugin-configs", "python-plugin-configs", "account-avatar", "migration-backups"}
     for name in names:
         parts = name.split("/")
         private_name = parts[-1].lower()
         private_env = private_name == ".env" or private_name.startswith(".env.") and private_name != ".env.example"
-        if any(part in forbidden for part in parts) or private_env or name == "settings.json" or private_name in {"account-token.bin", "cookies", "login data"} or private_name.endswith("-secrets.bin"):
+        if any(part.lower() in forbidden for part in parts) or private_env or name == "settings.json" or private_name in {"account-token.bin", "cookies", "login data"} or private_name.endswith("-secrets.bin"):
             errors.append({"file": name, "rule": "PRIVATE-DATA-PATH"})
         if re.search(r"(?i)\.(?:pem|key|pfx|p12|keystore|jks|db|sqlite3?|log)$", name):
             errors.append({"file": name, "rule": "CREDENTIAL-OR-USER-FILE"})

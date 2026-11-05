@@ -62,6 +62,51 @@ class PrivacyTest(unittest.TestCase):
         rules = {item["rule"] for item in privacy.public_scope_errors(names)}
         self.assertTrue({"PRIVATE-DATA-PATH", "PRIVATE-PLUGIN", "CREDENTIAL-OR-USER-FILE", "MISSING-PUBLIC-MANIFEST"}.issubset(rules))
 
+    def test_avatar_data_path_blocks_binary_without_blocking_modules(self):
+        avatar_paths = ["account-avatar/avatar.json", "nested/account-avatar/photo.png", "nested/Account-Avatar/screenshot.png"]
+        modules = ["app/account-avatar.js", "app/account-avatar-store.js"]
+        rejected = {item["file"] for item in privacy.public_scope_errors(avatar_paths + modules) if item["rule"] == "PRIVATE-DATA-PATH"}
+        self.assertEqual(rejected, set(avatar_paths))
+        # 二进制照片没有可扫描文本，必须由目录范围检查拦截。
+        self.assertEqual(privacy.scan_text(avatar_paths[1], b"\x89PNG\x00\x01\x02"), [])
+
+    def test_staged_avatar_photo_and_manifest_are_rejected(self):
+        with tempfile.TemporaryDirectory(prefix="sanrenjz-privacy-") as directory:
+            root = Path(directory)
+            (root / "config").mkdir()
+            for name in ("public", "private"):
+                (root / f"config/{name}-plugins.json").write_text(json.dumps({"tools": [], "python": []}), encoding="utf-8")
+            (root / "account-avatar").mkdir()
+            (root / "account-avatar/avatar.json").write_text('{"version":1}', encoding="utf-8")
+            photo = b"\x89PNG\x00\x01\x02"
+            (root / "account-avatar/photo.png").write_bytes(photo)
+            (root / "app").mkdir()
+            for module in ("account-avatar.js", "account-avatar-store.js"):
+                (root / "app" / module).write_text("module.exports={};", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            output = io.StringIO()
+            with patch.object(privacy, "ROOT", root), contextlib.redirect_stdout(output), patch.object(sys, "argv", ["check-privacy.py", "--staged"]):
+                self.assertEqual(privacy.main(), 1)
+            report = json.loads(output.getvalue())
+            self.assertEqual(report["findings"], [])
+            self.assertEqual({item["file"] for item in report["errors"]}, {"account-avatar/avatar.json", "account-avatar/photo.png"})
+            self.assertEqual((root / "account-avatar/photo.png").read_bytes(), photo)
+
+    def test_gitignore_excludes_avatar_directories_only(self):
+        policy = privacy.ROOT / ".gitignore"
+        with tempfile.TemporaryDirectory(prefix="sanrenjz-privacy-") as directory:
+            root = Path(directory)
+            (root / ".gitignore").write_bytes(policy.read_bytes())
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            # 不创建或读取真实照片；check-ignore直接核对不存在的合成路径。
+            for name in ("account-avatar/avatar.json", "nested/account-avatar/photo.png", "app/software/public-tool/account-avatar/screenshot.png"):
+                result = subprocess.run(["git", "-C", str(root), "check-ignore", "--no-index", "--quiet", name])
+                self.assertEqual(result.returncode, 0, name)
+            for name in ("app/account-avatar.js", "app/account-avatar-store.js"):
+                result = subprocess.run(["git", "-C", str(root), "check-ignore", "--no-index", "--quiet", name])
+                self.assertEqual(result.returncode, 1, name)
+
     def test_staged_reads_index(self):
         with tempfile.TemporaryDirectory(prefix="sanrenjz-privacy-") as directory:
             root = Path(directory)

@@ -3,6 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { spawnSync } = require('child_process');
 const { createStage, parseSelections, parseBuildOptions, builderEnvironment } = require('../scripts/package-local');
 const { auditEntries, auditPackage } = require('../scripts/audit-public-scope');
 const projectPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
@@ -27,6 +28,8 @@ try {
     write(path.join(root, 'main.js'), 'fixture');
     write(path.join(root, 'merged-ui.js'), 'fixture');
     write(path.join(root, 'app', 'resource-layout.js'), "module.exports=require('../config/python-runtime.json');");
+    write(path.join(root, 'app', 'account-avatar.js'), 'module.exports={fixture:true};');
+    write(path.join(root, 'app', 'account-avatar-store.js'), 'module.exports={fixture:true};');
     write(path.join(root, 'settings.json'), { account: 'never-package' });
     write(path.join(root, 'python', 'python.exe'), 'never-package');
     write(path.join(root, 'build', 'developer.p12'), 'never-package');
@@ -38,6 +41,13 @@ try {
         write(path.join(root, 'app', 'python-software', id, 'settings.json'), { main_file: 'main.py', config_file: 'config.json' });
         write(path.join(root, 'app', 'python-software', id, 'main.py'), 'fixture');
         write(path.join(root, 'app', 'python-software', id, 'config.json'), { token: 'never-package' });
+    }
+    const avatarLocations = ['app/plugin_runtime/account-avatar', 'app/software/public-tool/account-avatar', 'app/python-software/public-python/account-avatar'];
+    const binaryPhoto = Buffer.from([137, 80, 78, 71, 0, 1, 2, 3]);
+    for (const location of avatarLocations) {
+        write(path.join(root, location, 'avatar.json'), { version: 1, filename: 'fixture.png' });
+        fs.writeFileSync(path.join(root, location, 'fixture.png'), binaryPhoto);
+        fs.writeFileSync(path.join(root, location, 'screenshot.png'), binaryPhoto);
     }
     const stage = path.join(root, 'stage-public');
     createStage({ root, stage });
@@ -60,6 +70,21 @@ try {
     fs.copyFileSync(path.join(stage, 'app', 'resource-layout.js'), path.join(resourceRoot, 'app', 'resource-layout.js'));
     assert.strictEqual(require(path.join(resourceRoot, 'app', 'resource-layout.js')).version, 'fixture', 'ASAR外模块必须能从相邻resources/config读取运行清单');
     assert.deepStrictEqual(auditPackage(stage, { publicCatalog, privateCatalog }).errors, []);
+    for (const location of avatarLocations) {
+        assert(!fs.existsSync(path.join(stage, location)), '公开插件或运行模块中的头像目录也必须排除');
+        assert.deepStrictEqual(fs.readFileSync(path.join(root, location, 'fixture.png')), binaryPhoto, '过滤只能排除，不能改动原头像文件');
+    }
+    for (const filename of ['account-avatar.js', 'account-avatar-store.js']) assert(fs.existsSync(path.join(stage, 'app', filename)), '头像运行源码不能被头像数据目录规则误排除');
+    const forbiddenAvatarPaths = ['account-avatar/avatar.json', 'resources/app/account-avatar/photo.png', 'resources/app/software/public-tool/account-avatar/screenshot.png'];
+    assert.strictEqual(auditEntries(forbiddenAvatarPaths, { publicCatalog, privateCatalog }).length, forbiddenAvatarPaths.length, 'manifest与二进制照片/截图都按目录拒绝，不依赖文本内容');
+    assert.deepStrictEqual(auditEntries(['app/account-avatar.js', 'resources/app/account-avatar-store.js'], { publicCatalog, privateCatalog }), []);
+    const archiveSource = path.join(root, 'archive-source'), archivedPayload = path.join(root, 'archive-payload');
+    write(path.join(archiveSource, 'account-avatar', 'avatar.json'), { version: 1 });
+    fs.writeFileSync(path.join(archiveSource, 'account-avatar', 'photo.png'), binaryPhoto);
+    fs.mkdirSync(archivedPayload);
+    const archiveCreated = spawnSync(process.execPath, ['-e', "let asar;try{asar=require('@electron/asar')}catch(_){asar=require('asar')}asar.createPackage(process.argv[1],process.argv[2]).catch(()=>process.exit(1));", archiveSource, path.join(archivedPayload, 'fixture.asar')], { cwd: path.resolve(__dirname, '..'), windowsHide: true, stdio: 'ignore' });
+    assert.strictEqual(archiveCreated.status, 0, 'ASAR隐私验收fixture必须成功创建');
+    assert(auditPackage(archivedPayload, { publicCatalog, privateCatalog }).errors.some(error => error.includes('account-avatar/photo.png')), '实际ASAR中的二进制头像不能通过包范围检查');
     assert(auditEntries(['resources/app/software/evil-unlisted/index.html'], { publicCatalog, privateCatalog }).length);
     assert(auditEntries(['resources/app/python-software/private-python/main.py'], { publicCatalog, privateCatalog }).length);
     assert(auditEntries(['resources/python/python.exe', 'resources/app/plugin-data/account-token.bin'], { publicCatalog, privateCatalog }).length >= 2);

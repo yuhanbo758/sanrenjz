@@ -45,7 +45,7 @@ function auditEntries(entries, { publicCatalog, privateCatalog, personal = [] })
     }
     for (const input of entries) {
         const name = input.replace(/\\/g, '/').replace(/^\/+/, '');
-        if (/(^|\/)(?:\.git|tests|logs|plugin-data|plugin-configs|python-plugin-configs|user-data|__pycache__)(\/|$)/i.test(name) ||
+        if (/(^|\/)(?:\.git|tests|logs|plugin-data|plugin-configs|python-plugin-configs|user-data|account-avatar|__pycache__)(\/|$)/i.test(name) ||
             /(^|\/)(?:account-token\.bin|Cookies|Login Data|\.env(?:\..*)?|.*-secrets\.bin)$/i.test(name) || /\.(?:pem|key|pfx|p12|keystore|jks)$/i.test(name)) errors.push(`用户或开发数据：${name}`);
         if (/(^|\/)(?:runtime|python)(\/|$)/i.test(name) || /(^|\/)python(?:w|\d+(?:\.\d+)*)?(?:\.exe)?$/i.test(name) || /(^|\/)(?:lib)?python\d+(?:\.\d+)*(?:[a-z]*)?\.(?:dll|dylib|so(?:\.\d+)*)$/i.test(name)) errors.push(`预装Python运行时：${name}`);
         for (const [engine, directory] of Object.entries(ENGINE_DIRS)) {

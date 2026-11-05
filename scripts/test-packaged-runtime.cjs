@@ -245,6 +245,12 @@ async function runSmoke({ root = path.resolve(__dirname, '..'), platform, arch, 
             record(actualProfile.dev === expectedProfile.dev && actualProfile.ino === expectedProfile.ino, 'temporary-profile-isolation');
             const sqlite = await evaluate("(()=>{const Database=require('better-sqlite3');const db=new Database(':memory:');try{return db.prepare('select 1 as ok').get().ok;}finally{db.close();}})()");
             record(sqlite === 1, 'sqlite-native-module');
+            stage = 'default-avatar';
+            await waitFor(() => evaluate("(()=>{const image=document.getElementById('account-avatar');return Boolean(image && image.complete && image.naturalWidth>0 && !image.hidden);})()"));
+            const logo = `data:image/png;base64,${fs.readFileSync(path.join(layout.resources, 'build', 'icon.png')).toString('base64')}`;
+            record(await evaluate("document.getElementById('account-avatar').src") === logo, 'packaged-default-avatar-logo');
+            const avatar = await evaluate("require('electron').ipcRenderer.invoke('account-avatar:get')");
+            record(avatar.custom === false && avatar.dataUrl === null && !fs.existsSync(path.join(profile, 'account-avatar')), 'avatar-default-no-data-write');
             stage = 'public-catalog';
             const initial = await evaluate("(async()=>{const ipc=require('electron').ipcRenderer;return {list:await ipc.invoke('unified:list',{includeHidden:true}),python:await ipc.invoke('python:status')};})()");
             const expected = new Set([...catalog.tools.map(id => `tools:${id}`), ...catalog.python.map(id => `python:${id}`)]);
@@ -269,6 +275,7 @@ async function runSmoke({ root = path.resolve(__dirname, '..'), platform, arch, 
             record(!(await evaluate("document.getElementById('python-logs-dialog').open")), 'unified-log-close');
             stage = 'settings';
             record(await evaluate("Boolean(document.getElementById('migration-settings-tab') && document.getElementById('merge-migration') && document.getElementById('update-release-btn'))"), 'migration-and-stable-update-settings-entries');
+            record(await evaluate("Boolean(document.getElementById('migration-settings-plugin-choose'))"), 'plugin-program-import-controls');
             const settings = await evaluate("(async()=>{const ipc=require('electron').ipcRenderer;await ipc.invoke('save-settings',{rightClickDelay:421});return ipc.invoke('get-settings');})()");
             const diskSettings = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
             record(settings.rightClickDelay === 421 && diskSettings.rightClickDelay === 421 && settings.pythonMode === 'none' && settings.autoStart === false, 'isolated-settings-save-and-readback');

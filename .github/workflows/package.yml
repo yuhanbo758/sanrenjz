@@ -103,7 +103,7 @@ jobs:
         run: |
           node scripts/prepare-build-assets.cjs --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node --test tests/build-assets.test.cjs tests/ci-artifacts.test.cjs tests/preview-release.test.cjs tests/packaged-runtime-probe.test.cjs tests/dmg-detach-retry.test.cjs tests/release-updates.test.cjs tests/shop-account.test.js tests/migration-manager.test.js
+          node --test tests/build-assets.test.cjs tests/ci-artifacts.test.cjs tests/preview-release.test.cjs tests/packaged-runtime-probe.test.cjs tests/dmg-detach-retry.test.cjs tests/release-updates.test.cjs tests/shop-account.test.js tests/migration-manager.test.js tests/account-avatar.test.js tests/account-avatar-store.test.js tests/migration-plugin-import.test.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run audit:public
       - name: Windows 完整功能回归
@@ -118,6 +118,9 @@ jobs:
           npx --no-install electron tests/release-updates-electron.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx --no-install electron tests/shop-account-electron.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tests/account-avatar-electron.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 构建公开安装包
         run: node scripts/package-local.js --${{ matrix.platform }} --${{ matrix.arch }}
       - name: 检查本次公开暂存内容

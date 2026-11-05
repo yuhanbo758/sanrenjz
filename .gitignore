@@ -51,6 +51,8 @@ Desktop.ini
 /settings.json
 plugin-data/
 user-data/
+# 本机头像与照片只保存在用户目录；任何层级的副本也不得公开
+account-avatar/
 
 # 备份文件
 *.bak

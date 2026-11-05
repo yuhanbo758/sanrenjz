@@ -403,7 +403,7 @@
     migrationPane.id = 'merge-migration'; migrationPane.className = 'settings-tab-content';
     migrationPane.setAttribute('role', 'tabpanel'); migrationPane.setAttribute('aria-labelledby', migrationTab.id);
     migrationPane.innerHTML = `<header class="settings-page-header"><h2>数据导入</h2><p class="card-description">把两个旧应用的插件和使用配置带到“三人聚智”，减少重新配置。</p></header>
-        <section class="settings-card migration-guidance"><div class="card-heading"><h3>先预览，再导入</h3><span class="status-badge neutral">手动确认后执行</span></div><p class="card-description">导入前先备份，只补充缺少的数据，同名插件和已有配置保留。旧应用和原文件不变；导入不会运行插件，旧自启动需要你另行启用。</p><p class="card-description">登录凭据、Cookie 和旧 Python 运行时不迁移。可选复用已安装的解释器路径，卸载旧应用后需重新确认路径。</p><div class="settings-secondary-actions"><button type="button" id="migration-detect">重新检测旧应用</button><button type="button" id="migration-settings-choose">手动选择目录</button></div><p id="migration-settings-status" class="card-description" role="status" aria-live="polite">打开此页后检测旧应用；不会自动导入。</p></section>
+        <section class="settings-card migration-guidance"><div class="card-heading"><h3>先预览，再导入</h3><span class="status-badge neutral">手动确认后执行</span></div><p class="card-description">插件程序与配置可以分别选择导入，包括你自行安装的非开源插件。程序通常位于旧安装位置，用户数据目录可能只有配置。</p><p class="card-description">导入前先备份，只补充缺少的数据，同名插件和已有配置保留。旧应用和原文件不变；导入不会运行插件，旧自启动需要你另行启用。</p><p class="card-description">登录凭据、Cookie 和旧 Python 运行时不迁移。可选复用已安装的解释器路径，卸载旧应用后需重新确认路径。</p><div class="settings-secondary-actions"><button type="button" id="migration-detect">重新检测旧应用</button><button type="button" id="migration-settings-choose">手动选择目录</button><button type="button" id="migration-settings-plugin-choose">选择插件所在目录</button></div><p id="migration-settings-status" class="card-description" role="status" aria-live="polite">打开此页后检测旧应用；不会自动导入。</p></section>
         <div id="migration-settings-sources" class="migration-product-grid"></div>
         <section id="migration-settings-result" class="settings-card migration-result" hidden aria-live="polite"></section>`;
     document.querySelector('.settings-main').appendChild(migrationPane);
@@ -418,6 +418,8 @@
         preferences: Boolean(source.importable?.preferences),
         interpreter: Boolean(source.importable?.interpreter ?? source.hasInterpreter)
     });
+    const migrationPluginCount = source => (Number(source.toolsCount) || 0) + (Number(source.pythonCount) || 0);
+    const migrationMissingPrograms = source => migrationPluginCount(source) ? '' : `<div class="migration-program-hint"><strong>尚未找到插件程序</strong><p>${!source.root || source.origin === 'profile' ? '当前来源是用户数据目录，通常只保存设置和配置，因此插件程序显示为 0。这不代表原插件已丢失。' : '此来源尚未识别到可导入的插件程序，已有配置仍可单独导入。'}</p><p>请选择旧应用安装位置、插件集合目录，或直接选择一个插件文件夹。</p></div>`;
     function migrationStatus(message, failed = false) {
         const output = document.getElementById('migration-settings-status');
         output.textContent = message; output.classList.toggle('merge-error', failed);
@@ -437,11 +439,12 @@
         }
         document.getElementById('migration-detect').textContent = migrationOperation === 'inspect' ? '检测中…' : '重新检测旧应用';
     }
-    const migrationSourcePaths = source => `<dl class="migration-path-list">${source.root ? `<dt>应用 / 便携目录</dt><dd>${escape(source.root)}</dd>` : ''}${source.profileRoot ? `<dt>用户数据目录</dt><dd>${escape(source.profileRoot)}</dd>` : ''}${(source.configLocations || []).map(location => `<dt>${location.kind === 'tools-data' ? '效率插件数据' : 'Python 插件配置'}${location.custom ? '（自定义）' : ''}</dt><dd>${escape(location.path)}</dd>`).join('')}</dl>`;
+    const migrationSourcePaths = source => `<dl class="migration-path-list">${source.root ? `<dt>应用 / 便携目录</dt><dd>${escape(source.root)}</dd>` : ''}${source.profileRoot ? `<dt>用户数据目录</dt><dd>${escape(source.profileRoot)}</dd>` : ''}${(source.pluginLocations || []).map(location => `<dt>${location.engine === 'python' ? 'Python 程序目录' : '效率插件目录'} · ${Number(location.count) || 0} 个</dt><dd>${escape(location.path)}</dd>`).join('')}${(source.configLocations || []).map(location => `<dt>${location.kind === 'tools-data' ? '效率插件数据' : 'Python 插件配置'}${location.custom ? '（自定义）' : ''}</dt><dd>${escape(location.path)}</dd>`).join('')}</dl>`;
+    const migrationPluginList = source => Array.isArray(source.plugins) && source.plugins.length ? `<details class="migration-program-list"><summary>已识别插件程序清单（${source.plugins.length} 个）</summary><ul>${source.plugins.slice(0, 100).map(plugin => `<li><strong>${escape(plugin.name || plugin.id)}</strong><small>${plugin.engine === 'python' ? 'Python 程序' : '效率工具'} · ${escape(plugin.id)}</small></li>`).join('')}</ul>${source.plugins.length > 100 ? '<p>此处展示前 100 个，其余程序也按已选类型导入。</p>' : ''}</details>` : '';
     function renderMigrationPreview() {
         const picker = document.getElementById('migration-source-picker');
         picker.innerHTML = [...migrationSources.values()].map(source => `<option value="${escape(source.id)}">${escape(source.label || migrationProductName(source.product))} · ${escape(source.root || source.profileRoot || '旧应用数据')}</option>`).join('');
-        if (!migrationSources.has(migrationSelectedId)) migrationSelectedId = migrationSources.keys().next().value || '';
+        if (!migrationSources.has(migrationSelectedId)) migrationSelectedId = [...migrationSources.values()].find(migrationPluginCount)?.id || migrationSources.keys().next().value || '';
         picker.value = migrationSelectedId;
         document.getElementById('migration-result').hidden = !migrationResultSourceId || migrationResultSourceId !== migrationSelectedId;
         const source = migrationSources.get(migrationSelectedId), container = document.getElementById('migration-sources');
@@ -453,15 +456,16 @@
         if (!migrationSelections.has(source.id)) migrationSelections.set(source.id, { ...available, interpreter: false });
         const selection = migrationSelections.get(source.id);
         const options = [
-            ['toolsPlugins', `效率插件（${Number(source.importable?.toolsPlugins ?? source.toolsCount) || 0}）`, '复制缺少的效率插件，不运行插件。'],
-            ['pythonPlugins', `Python 插件（${Number(source.importable?.pythonPlugins ?? source.pythonCount) || 0}）`, '保留 Python 插件协议和配套资源，不安装依赖。'],
+            ['toolsPlugins', `效率插件程序（${Number(source.importable?.toolsPlugins ?? source.toolsCount) || 0}）`, '复制插件程序及资源，包括自行安装的非开源插件；同名不覆盖，不运行插件。'],
+            ['pythonPlugins', `Python 程序 / 插件（${Number(source.importable?.pythonPlugins ?? source.pythonCount) || 0}）`, '复制 Python 程序和配套资源；同名不覆盖，不安装依赖或运行程序。'],
             ['configs', '插件配置与数据', '包含检测到的自定义配置位置，只补充缺少文件。'],
             ['preferences', '插件显示与搜索关键词', '只补充缺项。窗口选项随插件配置迁入；不启用旧自启动，不更改当前快捷键。'],
             ['interpreter', '复用旧解释器路径（可选）', '先验证再记录；不复制 Python 环境，旧安装卸载后路径可能失效。']
         ];
-        container.innerHTML = `<section class="migration-preview-source"><div class="card-heading"><h3>${escape(source.label || migrationProductName(source.product))}</h3><span class="status-badge neutral">${source.origin === 'profile' ? '旧用户数据' : source.origin === 'selection' ? '手动选择' : '旧应用目录'}</span></div>${migrationSourcePaths(source)}${(source.descriptions || []).map(text => `<p class="merge-help">${escape(text)}</p>`).join('')}<div class="migration-options">${options.map(([key, label, description]) => `<label class="migration-option"><input type="checkbox" data-option="${key}" data-unavailable="${!available[key]}" ${available[key] && selection[key] ? 'checked' : ''} ${available[key] ? '' : 'disabled'}><span><strong>${escape(label)}</strong><small>${escape(available[key] ? description : '此来源未检测到可导入内容。')}</small></span></label>`).join('')}</div><button type="button" id="migration-run" class="merge-primary">备份并导入所选内容</button></section>`;
+        container.innerHTML = `<section class="migration-preview-source"><div class="card-heading"><h3>${escape(source.label || migrationProductName(source.product))}</h3><span class="status-badge neutral">${source.origin === 'profile' ? '旧用户数据' : source.origin === 'selection' ? '手动选择' : '旧应用目录'}</span></div>${migrationSourcePaths(source)}${migrationMissingPrograms(source)}<div class="settings-secondary-actions"><button type="button" id="migration-plugin-choose">选择插件所在目录</button></div>${migrationPluginList(source)}${(source.descriptions || []).map(text => `<p class="merge-help">${escape(text)}</p>`).join('')}<div class="migration-options">${options.map(([key, label, description]) => `<label class="migration-option"><input type="checkbox" data-option="${key}" data-unavailable="${!available[key]}" ${available[key] && selection[key] ? 'checked' : ''} ${available[key] ? '' : 'disabled'}><span><strong>${escape(label)}</strong><small>${escape(available[key] ? description : '此来源未检测到可导入内容。')}</small></span></label>`).join('')}</div><button type="button" id="migration-run" class="merge-primary">备份并导入所选内容</button></section>`;
         container.querySelectorAll('[data-option]').forEach(input => input.onchange = () => { selection[input.dataset.option] = input.checked; renderMigrationControls(); });
         document.getElementById('migration-run').onclick = () => runMigration(source.id).catch(errorMessage);
+        document.getElementById('migration-plugin-choose').onclick = () => chooseMigration(true).catch(errorMessage);
         renderMigrationControls();
     }
     function renderMigrationSourceCards() {
@@ -470,9 +474,10 @@
             const sources = [...migrationSources.values()].filter(source => source.product === product);
             const card = document.createElement('section'); card.className = 'settings-card migration-product-card';
             card.dataset.product = product;
-            card.innerHTML = `<div class="card-heading"><h3>${migrationProductName(product)}</h3><span class="status-badge ${sources.length ? 'good' : 'neutral'}">${sources.length ? `发现 ${sources.length} 个来源` : '未检测到'}</span></div><p class="card-description">${product === 'tools' ? '导入效率插件、插件数据，以及显示、关键词和窗口偏好。' : '导入 Python 插件及配置，可选验证旧解释器路径；不会复制运行时。'}</p><div class="migration-product-sources">${sources.length ? sources.map(source => `<div class="migration-source-card"><strong>${escape(source.label || migrationProductName(product))}</strong><p class="python-path">${escape(source.root || source.profileRoot)}</p><p class="card-description">效率插件 ${Number(source.toolsCount) || 0} · Python 插件 ${Number(source.pythonCount) || 0}${source.hasConfigs ? ' · 有插件配置' : ''}</p><button type="button" data-migration-preview="${escape(source.id)}">预览并选择</button></div>`).join('') : '<p class="migration-empty">未找到时，选择旧应用安装位置或便携目录；也支持旧用户数据目录和插件目录。</p>'}</div><div class="settings-secondary-actions"><button type="button" data-migration-select="${product}">选择${product === 'tools' ? '效率工具' : 'Python 程序管理'}目录</button></div>`;
+            card.innerHTML = `<div class="card-heading"><h3>${migrationProductName(product)}</h3><span class="status-badge ${sources.length ? 'good' : 'neutral'}">${sources.length ? `发现 ${sources.length} 个来源` : '未检测到'}</span></div><p class="card-description">${product === 'tools' ? '导入效率插件程序、插件数据，以及显示、关键词和窗口偏好。' : '导入 Python 程序及插件配置，可选验证旧解释器路径；不会复制运行时。'}</p><div class="migration-product-sources">${sources.length ? sources.map(source => `<div class="migration-source-card"><strong>${escape(source.label || migrationProductName(product))}</strong><p class="python-path">${escape(source.root || source.profileRoot)}</p><p class="card-description">插件程序：效率 ${Number(source.toolsCount) || 0} · Python ${Number(source.pythonCount) || 0}${source.hasConfigs ? ' · 有配置可单独导入' : ''}</p>${migrationMissingPrograms(source)}<div class="settings-secondary-actions"><button type="button" data-migration-preview="${escape(source.id)}">预览并选择</button>${!migrationPluginCount(source) ? `<button type="button" data-migration-plugin-select="${escape(source.id)}">选择插件所在目录</button>` : ''}</div></div>`).join('') : '<p class="migration-empty">未找到时，选择旧应用安装位置、便携目录、单个插件文件夹或插件集合；用户数据目录通常只有配置。</p>'}</div><div class="settings-secondary-actions"><button type="button" data-migration-select="${product}">选择${product === 'tools' ? '效率插件' : 'Python 程序'}所在目录</button></div>`;
             card.querySelectorAll('[data-migration-preview]').forEach(button => button.onclick = () => showMigration(button.dataset.migrationPreview).catch(errorMessage));
-            card.querySelector('[data-migration-select]').onclick = () => chooseMigration().catch(errorMessage);
+            card.querySelector('[data-migration-select]').onclick = () => chooseMigration(true).catch(errorMessage);
+            card.querySelectorAll('[data-migration-plugin-select]').forEach(button => button.onclick = () => chooseMigration(true).catch(errorMessage));
             container.appendChild(card);
         }
         renderMigrationControls();
@@ -483,7 +488,7 @@
         migrationInspected = true;
         renderMigrationSourceCards(); renderMigrationPreview();
         const problems = (result.errors || []).map(item => item.error || item.message || '某个来源未能读取');
-        migrationStatus(problems.length ? `部分来源未能检查：${problems.join('；')}。可以手动选择目录后重试。` : migrationSources.size ? `找到 ${migrationSources.size} 个可预览来源，选择内容后再执行导入。` : '暂未发现旧应用。可手动选择安装目录、便携目录、旧用户数据目录或插件目录。', Boolean(problems.length));
+        migrationStatus(problems.length ? `部分来源未能检查：${problems.join('；')}。可以手动选择目录后重试。` : migrationSources.size ? `找到 ${migrationSources.size} 个可预览来源。${[...migrationSources.values()].some(migrationPluginCount) ? '选择插件程序或配置后再执行导入。' : '当前只找到用户数据或配置；要导入程序，请选择插件所在目录。'}` : '暂未发现旧应用。可手动选择安装目录、便携目录、旧用户数据目录、单个插件文件夹或插件集合。', Boolean(problems.length));
     }
     async function migrationAction(operation, action) {
         if (migrationOperation) return;
@@ -495,11 +500,18 @@
     async function inspectMigration() {
         return migrationAction('inspect', async () => { migrationStatus('正在检查旧应用和用户数据目录，不会自动导入…'); renderSources(await call('migration:inspect')); });
     }
-    async function chooseMigration() {
+    async function chooseMigration(preferPrograms = false) {
         return migrationAction('choose', async () => {
+            const previous = new Set(migrationSources.keys());
             const result = await call('migration:choose');
             if (result.canceled) { migrationStatus('已取消选择，检测结果和导入选项保持不变。'); return; }
             renderSources(result, true);
+            if (preferPrograms) {
+                const candidates = (result.sources || []).filter(migrationPluginCount);
+                const selected = candidates.find(source => !previous.has(source.id)) || candidates[0];
+                if (selected) await showMigration(selected.id);
+                else if (!(result.errors || []).length) migrationStatus('所选来源仍未检测到插件程序。请直接选择包含插件文件的文件夹，或其上一级插件集合目录；配置仍可单独导入。');
+            }
         });
     }
     function renderMigrationResult(result, sourceId) {
@@ -542,6 +554,7 @@
     document.getElementById('migration-open').onclick = () => openMigrationSettings().catch(errorMessage);
     document.getElementById('migration-detect').onclick = () => inspectMigration().catch(errorMessage);
     document.getElementById('migration-settings-choose').onclick = () => chooseMigration().catch(errorMessage);
+    document.getElementById('migration-settings-plugin-choose').onclick = () => chooseMigration(true).catch(errorMessage);
     document.getElementById('migration-choose').onclick = () => chooseMigration().catch(errorMessage);
     document.getElementById('migration-source-picker').onchange = event => { migrationSelectedId = event.target.value; renderMigrationPreview(); };
     document.getElementById('migration-skip').onclick = () => migration.close();

@@ -3020,6 +3020,20 @@ ipcMain.handle('account:me', async () => {
     return toSerializable(await refreshAccountState());
 });
 
+let localAccountAvatars;
+function getLocalAccountAvatars(event) {
+    if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame) throw new Error('请在主界面修改头像');
+    if (!localAccountAvatars) {
+        const { AccountAvatarStore } = require(app.isPackaged
+            ? path.join(process.resourcesPath, 'app', 'account-avatar-store.js') : './app/account-avatar-store');
+        localAccountAvatars = new AccountAvatarStore({ directory: path.join(app.getPath('userData'), 'account-avatar'), nativeImage, dialog });
+    }
+    return localAccountAvatars;
+}
+ipcMain.handle('account-avatar:get', event => getLocalAccountAvatars(event).get());
+ipcMain.handle('account-avatar:select', event => getLocalAccountAvatars(event).select(mainWindow));
+ipcMain.handle('account-avatar:reset', event => getLocalAccountAvatars(event).reset());
+
 ipcMain.handle('account:access', async () => {
     return toSerializable(await fetchToolsAccess());
 });

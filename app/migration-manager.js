@@ -21,6 +21,7 @@ function contains(root, candidate) {
     return !relative || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 function sourceRoot(directory) {
+    if (pluginDirectory(directory, 'tools') || (fs.existsSync(path.join(directory, 'settings.json')) && pluginDirectory(directory, 'python'))) return directory;
     const base = path.basename(directory).toLowerCase();
     if (['plugins', 'python-plugins', 'plugin-configs', 'plugin-data'].includes(base)) return path.dirname(directory);
     if (['software', 'python-software'].includes(base) && path.basename(path.dirname(directory)).toLowerCase() === 'app') {
@@ -28,6 +29,10 @@ function sourceRoot(directory) {
         return path.basename(parent).toLowerCase() === 'resources' ? path.dirname(parent) : parent;
     }
     if (base === 'resources' && exists(path.join(directory, 'app'))) return path.dirname(directory);
+    if (base === 'app' && (exists(path.join(directory, 'software')) || exists(path.join(directory, 'python-software')))) {
+        const parent = path.dirname(directory);
+        return path.basename(parent).toLowerCase() === 'resources' ? path.dirname(parent) : parent;
+    }
     return directory;
 }
 function isProfile(root, product) {
@@ -42,10 +47,29 @@ function mergedApplication(root) {
     try { if (readObject(path.join(root, 'package.json')).name === 'sanrenjz') return true; } catch (_) { }
     return fs.existsSync(path.join(root, 'resources', 'app', 'merged-host.js')) && fs.existsSync(path.join(root, 'resources', 'config', 'public-plugins.json'));
 }
-function privateEntry(name) {
+function privateEntry(name, { plugin = false, dependencies = false } = {}) {
+    if (plugin && name.toLowerCase() === 'node_modules') return false;
+    if (dependencies && name.toLowerCase() === 'runtime') return false;
     return /^(?:\.git|\.downloads|\.venv|node_modules|__pycache__|runtime|python|venv|logs?|Cache|Code Cache|GPUCache|Cookies(?:-journal)?|Login Data(?:-journal)?|Network|Local Storage|Session Storage|account-token\.bin)$/i.test(name) || /\.log$/i.test(name);
 }
 function environmentDirectory(directory) { return exists(directory) && fs.existsSync(path.join(directory, 'pyvenv.cfg')); }
+function pluginDirectory(directory, engine) {
+    if (!exists(directory) || environmentDirectory(directory)) return false;
+    const tool = fs.existsSync(path.join(directory, 'plugin.json'));
+    if (engine === 'tools') return tool;
+    if (tool) return false;
+    const hasPrograms = () => fs.readdirSync(directory, { withFileTypes: true }).some(entry => entry.isFile() && /\.(py|enc)$/i.test(entry.name) && !['plugin_config_runtime.py', 'standalone_launcher.py'].includes(entry.name));
+    const metadataFile = path.join(directory, 'settings.json');
+    if (fs.existsSync(metadataFile)) {
+        try {
+            const metadata = readObject(metadataFile);
+            if (typeof metadata.main_file === 'string') return true;
+            if (['pythonMode', 'globalHotkey', 'customPluginDataPath', 'customPluginConfigDir', 'pythonPluginConfigDir'].some(key => Object.hasOwn(metadata, key))) return false;
+            return hasPrograms();
+        } catch (_) { return hasPrograms(); } // 有程序的损坏清单仍保留可见性，复制阶段会报告。
+    }
+    return hasPrograms();
+}
 function assertNoLinks(target) {
     let current = path.resolve(target);
     for (;;) {
@@ -71,34 +95,40 @@ function pythonConfigFile(directory) {
 }
 function engineDirectories(root, engine) {
     if (!root) return [];
+    if (pluginDirectory(root, 'tools')) return engine === 'tools' ? [root] : [];
     const choices = engine === 'tools' ? ['plugins', 'app/software', 'resources/app/software'] : ['python-plugins', 'plugins', 'app/software', 'app/python-software', 'resources/app/software', 'resources/app/python-software'];
-    const manifest = engine === 'tools' ? 'plugin.json' : 'settings.json';
     const seen = new Set();
-    const candidates = choices.flatMap(name => {
-        const base = path.join(root, name);
+    const bases = choices.map(name => path.join(root, name));
+    // 固定布局优先，保留用户后来安装的副本；任意命名的集合目录也可直接选择。
+    const hasLayout = bases.some(exists);
+    const singlePython = pluginDirectory(root, 'python') && (fs.existsSync(path.join(root, 'settings.json')) ||
+        (!hasLayout && !childDirectories(root).some(directory => pluginDirectory(directory, 'tools') || pluginDirectory(directory, 'python'))));
+    if (singlePython) return engine === 'python' ? [root] : [];
+    bases.push(root);
+    const candidates = bases.flatMap(base => {
         if (engine === 'tools') return childDirectories(base);
         if (!exists(base)) return [];
-        return fs.readdirSync(base, { withFileTypes: true }).filter(entry => !entry.name.startsWith('.') && (entry.isDirectory() || (entry.isFile() && /\.(py|enc)$/i.test(entry.name)))).map(entry => path.join(base, entry.name));
+        return fs.readdirSync(base, { withFileTypes: true }).filter(entry => !entry.name.startsWith('.') && (entry.isDirectory() || (entry.isFile() && !(base === root && hasLayout) && /\.(py|enc)$/i.test(entry.name) && !['plugin_config_runtime.py', 'standalone_launcher.py'].includes(entry.name)))).map(entry => path.join(base, entry.name));
     });
     return candidates.filter(directory => {
+        if (bases.some(base => base !== root && path.resolve(base) === path.resolve(directory))) return false;
         const id = path.basename(directory).toLowerCase();
-        if (seen.has(id)) return false;
+        if (seen.has(id) || privateEntry(path.basename(directory)) || environmentDirectory(directory)) return false;
         const plainFile = engine === 'python' && fs.statSync(directory).isFile();
-        const pythonWithoutMetadata = engine === 'python' && !plainFile && !fs.existsSync(path.join(directory, 'plugin.json')) && fs.readdirSync(directory, { withFileTypes: true }).some(entry => entry.isFile() && /\.(py|enc)$/i.test(entry.name) && !['plugin_config_runtime.py', 'standalone_launcher.py'].includes(entry.name));
-        if (!plainFile && !pythonWithoutMetadata && !fs.existsSync(path.join(directory, manifest))) return false;
+        if (!plainFile && !pluginDirectory(directory, engine)) return false;
         seen.add(id); return true;
     });
 }
-function copySafe(source, destination, { exclude = false } = {}) {
+function copySafe(source, destination, options = {}) {
     const stat = fs.lstatSync(source);
     if (stat.isSymbolicLink()) throw new Error('迁移源包含链接，已停止复制');
     if (stat.isDirectory()) {
         if (environmentDirectory(source)) return;
         fs.mkdirSync(destination, { recursive: true });
         for (const name of fs.readdirSync(source)) {
-            if (privateEntry(name) || environmentDirectory(path.join(source, name))) continue;
+            if (privateEntry(name, options) || environmentDirectory(path.join(source, name))) continue;
             // 用户已选择迁移插件配置：嵌套数据库和加密插件配置同样保留，账号会话仍由上方精确排除。
-            copySafe(path.join(source, name), path.join(destination, name), { exclude });
+            copySafe(path.join(source, name), path.join(destination, name), { ...options, dependencies: options.dependencies || (options.plugin && name.toLowerCase() === 'node_modules') });
         }
     } else fs.copyFileSync(source, destination, fs.constants.COPYFILE_EXCL);
 }
@@ -174,7 +204,24 @@ class MigrationManager {
             const hasInterpreter = product === 'python' && settings.pythonMode === 'custom' && typeof settings.customPythonPath === 'string' && fs.existsSync(settings.customPythonPath);
             const hasPreferences = Object.keys(settings.pluginPreferences || {}).length > 0 || (product === 'tools' && Object.keys(settings.pluginSearchSettings || {}).length > 0);
             const configLocations = [[toolsData, 'tools-data', Boolean(settings.customPluginDataPath)], [pythonConfigs, 'python-configs', Boolean(settings.pythonPluginConfigDir || settings.customPluginConfigDir)]].filter(([directory]) => directory && exists(directory)).map(([directory, kind, custom]) => ({ kind, path: path.resolve(directory), custom }));
-            candidates.push({ id: source.id, product, label: product === 'tools' ? '原效率工具' : '原Python程序管理', root: source.root, profileRoot, origin, toolsCount: toolsPlugins.length, pythonCount: pythonPlugins.length, hasConfigs, hasPreferences, hasInterpreter, importable: { toolsPlugins: toolsPlugins.length, pythonPlugins: pythonPlugins.length, configs: hasConfigs, preferences: hasPreferences, interpreter: hasInterpreter }, configLocations, descriptions: [root ? '从旧安装目录读取插件，结合原用户设置定位配置' : '从旧用户数据目录读取设置与配置；如需插件程序，可再选择旧安装目录', '只补充新应用缺少的内容；同名文件保留现有值并列入报告', '窗口选项随插件配置/数据迁入；不复制登录会话或 Python 环境，不启用旧自启动和全局快捷键'] });
+            const plugins = [], pluginLocations = [];
+            for (const [engine, directories] of [['tools', toolsPlugins], ['python', pythonPlugins]]) {
+                const locations = new Map();
+                for (const directory of directories) {
+                    const id = path.basename(directory);
+                    let name = id;
+                    try {
+                        const metadata = readObject(path.join(directory, engine === 'tools' ? 'plugin.json' : 'settings.json'));
+                        const label = engine === 'tools' ? metadata.pluginName : metadata.name || metadata.pluginName;
+                        if (typeof label === 'string' && label.trim()) name = label.slice(0, 200);
+                    } catch (_) { }
+                    plugins.push({ engine, id, name });
+                    const location = directory === root ? directory : path.dirname(directory);
+                    locations.set(location, (locations.get(location) || 0) + 1);
+                }
+                for (const [location, count] of locations) pluginLocations.push({ engine, path: location, count });
+            }
+            candidates.push({ id: source.id, product, label: product === 'tools' ? '原效率工具' : '原Python程序管理', root: source.root, profileRoot, origin, toolsCount: toolsPlugins.length, pythonCount: pythonPlugins.length, hasConfigs, hasPreferences, hasInterpreter, importable: { toolsPlugins: toolsPlugins.length, pythonPlugins: pythonPlugins.length, configs: hasConfigs, preferences: hasPreferences, interpreter: hasInterpreter }, configLocations, pluginLocations, plugins, descriptions: [root ? '从旧安装或插件目录读取程序，包含用户自行安装的非开源插件；结合原用户设置定位配置' : '此来源仅含用户设置与配置；导入插件程序请另选旧安装目录或插件所在目录', '只补充新应用缺少的内容；同名文件保留现有值并列入报告', '窗口选项随插件配置/数据迁入；不复制登录会话或 Python 环境，不启用旧自启动和全局快捷键'] });
         };
         const errors = [];
         for (const product of ['tools', 'python']) {
@@ -193,8 +240,12 @@ class MigrationManager {
             let recognized = false;
             for (const product of ['tools', 'python']) {
                 try {
-                    if (isProfile(root, product)) { recognized = true; add('', product, root, 'selection'); }
-                    else if (engineDirectories(root, product).length || (product === 'python' && exists(path.join(root, 'plugin-configs')))) { recognized = true; add(root, product); }
+                    // 安装目录可能与旧 profile 同名，必须优先识别实际插件，不能仅凭名字抹掉程序来源。
+                    if (engineDirectories(root, product).length || (product === 'python' && exists(path.join(root, 'plugin-configs')))) {
+                        recognized = true;
+                        const localSettings = fs.existsSync(path.join(root, 'settings.json')) && isProfile(root, product) && !pluginDirectory(root, product);
+                        add(root, product, localSettings ? root : profiles[product], manualRoots.has(root) ? 'selection' : 'installation');
+                    } else if (isProfile(root, product)) { recognized = true; add('', product, root, 'selection'); }
                 } catch (_) { errors.push({ product, root, error: '旧设置文件无法读取，请先检查JSON格式' }); }
             }
             if (!recognized && manualRoots.has(root)) errors.push({ root, error: '未识别到旧应用插件或用户数据，请选择旧安装目录或旧用户数据目录' });
@@ -238,7 +289,8 @@ class MigrationManager {
                     try {
                         fs.mkdirSync(path.dirname(target), { recursive: true });
                         assertNoLinks(directory);
-                        copySafe(directory, staging);
+                        // 插件自带的JS依赖属于程序资源；只在插件复制时保留，配置迁移仍使用严格排除。
+                        copySafe(directory, staging, { plugin: true });
                         if (engine === 'tools') {
                             const metadata = readObject(path.join(staging, 'plugin.json'));
                             keepStartupDisabled(metadata.pluginName || id);

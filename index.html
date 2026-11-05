@@ -124,7 +124,7 @@
             height: 32px;
             border-radius: 50%;
             border: 1px solid #d9d9d9;
-            background: linear-gradient(135deg, #1890ff, #52c41a);
+            background: #fff;
             color: #fff;
             cursor: pointer;
             display: flex;
@@ -139,23 +139,15 @@
         .avatar-button img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
+            padding: 3px;
+            box-sizing: border-box;
             display: block;
         }
 
-        .avatar-button.member::after {
-            content: 'tools';
-            position: absolute;
-            right: -8px;
-            bottom: -8px;
-            padding: 1px 5px;
-            border-radius: 999px;
-            background: #52c41a;
-            color: #fff;
-            font-size: 10px;
-            line-height: 14px;
-            border: 1px solid #fff;
-        }
+        .avatar-button.member { border-color: #52c41a; }
+        .avatar-button img[hidden] { display: none; }
+        .avatar-button img.custom-avatar { object-fit: cover; padding: 0; }
 
         .account-dropdown {
             display: none;
@@ -208,6 +200,9 @@
         .account-dropdown button:hover {
             background: #f5f5f5;
         }
+
+        .account-dropdown button:disabled { color: #aaa; cursor: default; background: #fff; }
+        .account-avatar-note { padding: 0 16px 10px; color: #8c8c8c; font-size: 12px; border-bottom: 1px solid #f0f0f0; }
 
         .account-dropdown button.danger {
             color: #ff4d4f;
@@ -1245,14 +1240,17 @@
             <button class="header-button" id="contact-btn">联系我们</button>
             <button class="header-button" id="settings-btn">设置</button>
             <div class="account-menu" id="account-menu">
-                <button class="avatar-button" id="avatar-btn" title="账号">
-                    <img src="build/icon.png" alt="账号头像">
+                <button class="avatar-button" id="avatar-btn" title="账号与头像设置" aria-label="账号与头像设置">
+                    <img id="account-avatar" alt="" hidden>
                 </button>
                 <div class="account-dropdown" id="account-dropdown">
                     <div class="account-summary">
                         <div class="account-name" id="account-name">未登录</div>
                         <div class="account-status" id="account-status">登录后分别查看两类会员状态</div>
                     </div>
+                    <button id="account-avatar-select-btn" title="支持 PNG、JPG，最大 5 MB；仅保存在此设备">更改头像…</button>
+                    <button id="account-avatar-reset-btn" disabled>恢复默认头像</button>
+                    <div class="account-avatar-note">头像仅保存在本机</div>
                     <button id="account-login-btn">登录程序小店</button>
                     <button id="account-refresh-btn">刷新会员状态</button>
                     <button id="check-update-btn">检查更新</button>
@@ -1502,6 +1500,14 @@
         const { ipcRenderer, shell } = require('electron');
         const fs = require('fs');
         const path = require('path');
+        // 内联脚本的 __dirname 可能指向 Electron renderer 引导目录，页面文件 URL 才是稳定的宿主位置。
+        const avatarDocumentDirectory = path.dirname(require('url').fileURLToPath(window.location.href));
+        const avatarRuntimePath = path.join(process.resourcesPath, 'app', 'account-avatar.js');
+        const { loadAppLogo, createAccountAvatar } = require(fs.existsSync(avatarRuntimePath) ? avatarRuntimePath : path.join(avatarDocumentDirectory, 'app', 'account-avatar.js'));
+        const defaultAccountLogo = loadAppLogo({ appDirectory: avatarDocumentDirectory, resourcesPath: process.resourcesPath });
+        const accountAvatarImage = document.getElementById('account-avatar');
+        const accountAvatar = createAccountAvatar({ image: accountAvatarImage, logo: defaultAccountLogo });
+        if (!defaultAccountLogo) console.warn('应用 logo 资源缺失');
         
         // 安全加载remote模块
         let remote;
@@ -1834,6 +1840,39 @@
 
 
         const accountDropdown = document.getElementById('account-dropdown');
+        let avatarOperation = 0, avatarBusy = false, localAvatar = { custom: false, dataUrl: null };
+        function applyLocalAvatar(preference) {
+            localAvatar = preference || { custom: false, dataUrl: null };
+            accountAvatar.update(localAvatar);
+            document.getElementById('account-avatar-select-btn').disabled = avatarBusy;
+            document.getElementById('account-avatar-reset-btn').disabled = avatarBusy || !(localAvatar.custom || localAvatar.warning);
+        }
+        async function changeLocalAvatar(channel) {
+            if (avatarBusy) return;
+            const operation = ++avatarOperation;
+            avatarBusy = true; applyLocalAvatar(localAvatar);
+            accountDropdown.classList.remove('show');
+            try {
+                const result = await ipcRenderer.invoke(channel);
+                if (operation !== avatarOperation) return;
+                applyLocalAvatar(result);
+                if (!result.cancelled) showNotification('头像已更新', result.custom ? '自定义头像已保存到本机' : '已恢复程序默认 logo', 'success');
+            } catch (error) { showNotification('头像修改失败', (error.message || '请重新选择图片').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''), 'error'); }
+            finally { if (operation === avatarOperation) { avatarBusy = false; applyLocalAvatar(localAvatar); } }
+        }
+        document.getElementById('account-avatar-select-btn').addEventListener('click', () => changeLocalAvatar('account-avatar:select'));
+        document.getElementById('account-avatar-reset-btn').addEventListener('click', () => changeLocalAvatar('account-avatar:reset'));
+        (async () => {
+            const operation = avatarOperation;
+            try {
+                const result = await ipcRenderer.invoke('account-avatar:get');
+                if (operation === avatarOperation) {
+                    applyLocalAvatar(result);
+                    if (result.warning) showNotification('头像读取提示', result.warning, 'info');
+                }
+            }
+            catch (_) { /* 读取失败保留默认 logo，用户仍可重新选择。 */ }
+        })();
         document.getElementById('avatar-btn').addEventListener('click', (event) => {
             event.stopPropagation();
             accountDropdown.classList.toggle('show');

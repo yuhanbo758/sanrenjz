@@ -5,7 +5,7 @@ const { spawnSync } = require('child_process');
 const { loadCatalog, auditPackage } = require('./audit-public-scope');
 
 const ROOT_FILES = ['main.js', 'index.html', 'search-window.html', 'super-panel.html', 'screenshot-overlay.html', 'log-window.html', 'python-log.html', 'merged-ui.js', 'merged-ui.css', 'custom-super-panel-actions-example.json', 'LICENSE'];
-const UNSAFE_NAMES = new Set(['.git', 'node_modules', '__pycache__', 'logs', 'cache', '.cache', 'user-data', 'plugin-data', 'plugin-configs', 'python-plugin-configs', 'dist', 'tests', '.downloads']);
+const UNSAFE_NAMES = new Set(['.git', 'node_modules', '__pycache__', 'logs', 'cache', '.cache', 'user-data', 'plugin-data', 'plugin-configs', 'python-plugin-configs', 'account-avatar', 'dist', 'tests', '.downloads']);
 function copyRuntime(source, destination, { plugin = false, configName = 'config.json' } = {}) {
     const stat = fs.lstatSync(source);
     if (stat.isSymbolicLink()) throw new Error('打包源包含符号链接，请先移除链接后重试');
