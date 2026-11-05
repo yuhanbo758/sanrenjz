@@ -6,7 +6,11 @@ const { app, BrowserWindow, globalShortcut, session } = require('electron');
 const { PluginCatalog } = require('../app/plugin-catalog');
 const Manager = require('../app/software_manager');
 const pythonModule = require('../app/python-manager');
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-save-effects-'));
+const temporary = process.env.SANRENJZ_SETTINGS_EFFECTS_ROOT;
+if (!temporary || path.dirname(path.resolve(temporary)) !== path.resolve(os.tmpdir()) ||
+    !path.basename(temporary).startsWith('sanrenjz-save-effects-') || fs.lstatSync(temporary).isSymbolicLink()) {
+    throw new Error('必须使用父测试进程分配的独立临时目录');
+}
 const profile = path.join(temporary, 'profile'); fs.mkdirSync(profile);
 const tools = path.join(temporary, 'tools'); fs.mkdirSync(tools);
 const python = path.join(temporary, 'python'); fs.mkdirSync(python);
@@ -99,7 +103,5 @@ require('../main');
         fs.writeFileSync(output, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report));
         app.isQuiting = true; app.quit();
     }
-    setTimeout(() => app.exit(report.success ? 0 : 1), 500).unref();
 })().catch(error => { console.error(error); app.exit(1); });
 setTimeout(() => { console.error('系统副作用保存验收超时'); app.exit(2); }, 35000).unref();
-app.once('quit', () => { try { fs.rmSync(temporary, { recursive: true, force: true }); } catch {} });
