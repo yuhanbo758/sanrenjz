@@ -11,6 +11,7 @@ if (pythonIndex >= 0 && (!pythonExecutable || !fs.existsSync(pythonExecutable)))
 const root = path.resolve(__dirname, '..');
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-package-'));
 const profile = path.join(sandbox, 'profile'); fs.mkdirSync(profile);
+fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ migrationPrompted: true }));
 const output = path.join(root, 'dist', 'packaged-app-report.json');
 const report = { executable: path.resolve(executable), assertions: [], errors: [] };
 const logs = fs.createWriteStream(path.join(root, 'dist', 'packaged-app-console.log'));
@@ -58,6 +59,7 @@ async function evaluate(expression) {
         assert(initial.title === '三人聚智', '真实打包版标题及ASAR外模块加载');
         assert(initial.list.length === 44, '默认包恰好40个效率插件和4个Python插件');
         assert(initial.status.mode === 'none' && !initial.status.configured, '默认包无Python仍正常启动');
+        assert(await evaluate("Boolean(document.getElementById('migration-settings-tab') && document.getElementById('merge-migration') && document.getElementById('update-release-btn'))"), '实际安装包包含独立数据导入页及正式版更新入口');
         assert(initial.list.filter(p => p.engine === 'python').length === 4, 'Python目录种子正确安装到python-plugins');
         const resources = path.join(path.dirname(executable), 'resources');
         assert(fs.existsSync(path.join(resources, 'config', 'python-runtime.json')), '实际资源目录包含运行时清单');

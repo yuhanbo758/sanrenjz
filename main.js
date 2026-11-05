@@ -1,9 +1,7 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, Menu, Tray, nativeImage, shell, dialog, session, safeStorage, desktopCapturer, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, Menu, Tray, nativeImage, shell, dialog, session, safeStorage, desktopCapturer, screen, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec, spawn } = require('child_process');
-const http = require('http');
-const https = require('https');
 // extraResources 中的运行模块与 ASAR 是同级目录，显式连接应用自身依赖。
 if (app.isPackaged) {
     process.env.NODE_PATH = [path.join(process.resourcesPath, 'app.asar', 'node_modules'), path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules'), process.env.NODE_PATH].filter(Boolean).join(path.delimiter);
@@ -35,7 +33,7 @@ function initializeMobileRemote() {
         screen, hiddenCastWindow: mobileAcceptance, getCastDisplay: () => screen.getDisplayMatching(mainWindow.getBounds()),
         loadSettings, saveSettings,
         cancelAi: requestId => openCodeRuntime.cancel(requestId),
-        accountStatus: async () => ({ loggedIn: Boolean(cachedAccount), message: '账号登录和会员认证请在电脑完成' })
+        accountStatus: async () => ({ loggedIn: cachedAccount?.authenticated === true, message: '账号登录和会员认证请在电脑完成' })
     });
     const { CastPluginLoader } = require(app.isPackaged ? path.join(process.resourcesPath, 'app', 'remote', 'cast-plugin-loader.js') : './app/remote/cast-plugin-loader');
     mobileRemoteService.castPlugins = new CastPluginLoader(mobileRemoteService);
@@ -61,20 +59,10 @@ const { getInstalledAppRoot } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'install-root.js')
     : './app/install-root');
 
-let autoUpdater = null;
-let autoUpdaterLoadError = '';
-try {
-    autoUpdater = require('electron-updater').autoUpdater;
-} catch (error) {
-    autoUpdaterLoadError = error?.stack || error?.message || String(error);
-    console.warn('自动更新模块不可用:', autoUpdaterLoadError);
-}
-
-function assertAutoUpdaterAvailable() {
-    if (autoUpdater) return;
-    const detail = autoUpdaterLoadError ? `: ${autoUpdaterLoadError}` : '';
-    throw new Error(`自动更新模块不可用，请确认安装包已包含 electron-updater 及其依赖${detail}`);
-}
+const { ReleaseUpdates, GITHUB_RELEASES_URL } = require(app.isPackaged
+    ? path.join(process.resourcesPath, 'app', 'release-updates.js')
+    : './app/release-updates');
+let releaseUpdates;
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
@@ -119,17 +107,14 @@ const SHOP_MEMBER_CENTER_URL = `${SHOP_BASE_URL}/member-center`;
 const SHOP_TOOLS_STORE_URL = `${SHOP_BASE_URL}/tools`;
 const SHOP_HOSTNAME = new URL(SHOP_BASE_URL).hostname;
 const SHOP_DOWNLOAD_HOSTNAME = 'xz.sanrenjz.com';
-const TOOLS_UPDATE_GENERIC_URL = process.env.SANRENJZ_TOOLS_UPDATE_GENERIC_URL || 'https://xz.sanrenjz.com/Download/tools/';
-const TOOLS_GITHUB_OWNER = 'yuhanbo758';
-const TOOLS_GITHUB_REPO = 'sanrenjz-tools';
-const TOOLS_GITHUB_RELEASES_API = `https://api.github.com/repos/${TOOLS_GITHUB_OWNER}/${TOOLS_GITHUB_REPO}/releases`;
 const ACCOUNT_TOKEN_FILE = 'account-token.bin';
 const BUILTIN_BROWSER_PARTITION = 'persist:sanrenjz-shop';
 const SUPPORTED_PLUGIN_DOWNLOAD_EXTENSIONS = new Set(['.zip']);
 let cachedAccount = null;
-let lastUpdateSource = 'github';
-let lastCheckedUpdateInfo = null;
-let pendingManualUpdate = null;
+let accountSnapshotGeneration = 0;
+let accountRefreshTimer = null;
+let accountLoggingOut = false;
+let accountSessionSuppressed = false;
 let builtinSessionEventsBound = false;
 
 function trackSuperPanelChildWindow(windowInstance) {
@@ -184,10 +169,6 @@ function sanitizeFileName(fileName) {
         .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
         .replace(/\s+/g, ' ')
         .trim() || 'download';
-}
-
-function normalizeAssetName(value) {
-    return String(value || '').trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '');
 }
 
 function getBuiltinSession() {
@@ -363,6 +344,13 @@ function bindBuiltinSessionEvents() {
     if (builtinSessionEventsBound) return;
     builtinSessionEventsBound = true;
     const builtinSession = getBuiltinSession();
+    // 统一登录可能只更新 HttpOnly Cookie，不发生页面导航。
+    builtinSession.cookies.on('changed', (_event, cookie) => {
+        if (accountLoggingOut || accountSessionSuppressed) return;
+        if (!isShopDomain(cookie.domain) || !['__Host-srj_shop', 'srj_shop_test'].includes(cookie.name)) return;
+        clearTimeout(accountRefreshTimer);
+        accountRefreshTimer = setTimeout(() => { refreshAccountState().catch(() => {}); }, 150);
+    });
     builtinSession.on('will-download', (event, item, webContents) => {
         const sourceUrl = item.getURL() || webContents?.getURL() || '';
         const fileName = sanitizeFileName(item.getFilename());
@@ -397,15 +385,16 @@ function tokenPath() {
 }
 
 function saveAccountToken(token) {
+    if (!safeStorage?.isEncryptionAvailable()) return false;
     const file = tokenPath();
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    const encrypted = safeStorage && safeStorage.isEncryptionAvailable()
-        ? safeStorage.encryptString(String(token))
-        : Buffer.from(String(token), 'utf8');
+    const encrypted = safeStorage.encryptString(String(token));
     fs.writeFileSync(file, encrypted);
+    return true;
 }
 
 function readAccountToken() {
+    if (accountLoggingOut || accountSessionSuppressed) return '';
     const file = tokenPath();
     if (!fs.existsSync(file)) return '';
     const data = fs.readFileSync(file);
@@ -414,11 +403,13 @@ function readAccountToken() {
             return safeStorage.decryptString(data);
         }
     } catch (_) { }
-    return data.toString('utf8');
+    // 仅兼容旧版明文 JWT，解密失败的二进制不能作为令牌发送。
+    const legacy = data.toString('utf8').trim();
+    return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(legacy) ? legacy : '';
 }
 
 function clearAccountToken() {
-    try { fs.unlinkSync(tokenPath()); } catch (_) { }
+    try { fs.unlinkSync(tokenPath()); } catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
 
 async function readTokenFromWebContents(webContents) {
@@ -436,112 +427,53 @@ async function readTokenFromWebContents(webContents) {
 }
 
 async function syncAccountFromWebContents(webContents) {
+    if (accountLoggingOut || accountSessionSuppressed) return cachedAccount;
+    const generation = ++accountSnapshotGeneration;
     const token = await readTokenFromWebContents(webContents);
-    if (token) {
-        saveAccountToken(token);
-    } else if (isShopUrl(webContents?.getURL?.())) {
-        clearAccountToken();
-    }
-    cachedAccount = await loadAccountSnapshot();
-    sendRendererEvent('account:changed', cachedAccount || { authenticated: false, canDownloadUpdates: false, user: null });
-    return cachedAccount;
+    if (accountLoggingOut || accountSessionSuppressed || generation !== accountSnapshotGeneration) return cachedAccount;
+    if (token) saveAccountToken(token);
+    // localStorage 没有 token 是新版正常状态，不再据此清空登录信息。
+    return refreshAccountState();
+}
+
+async function refreshAccountState() {
+    if (accountLoggingOut || accountSessionSuppressed) return cachedAccount;
+    const generation = ++accountSnapshotGeneration;
+    const snapshot = await loadAccountSnapshot();
+    if (accountLoggingOut || accountSessionSuppressed || generation !== accountSnapshotGeneration) return cachedAccount;
+    cachedAccount = snapshot;
+    sendRendererEvent('account:changed', snapshot);
+    return snapshot;
 }
 
 async function clearShopSession() {
     const builtinSession = getBuiltinSession();
+    let failed = false;
     try {
         await builtinSession.clearStorageData({ origin: SHOP_BASE_URL, storages: ['localstorage'] });
-    } catch (_) { }
-    const cookies = await builtinSession.cookies.get({ url: SHOP_BASE_URL });
+    } catch (_) { failed = true; }
+    let cookies = [];
+    try { cookies = await builtinSession.cookies.get({ url: SHOP_BASE_URL }); }
+    catch (_) { failed = true; }
     for (const cookie of cookies) {
         const domain = String(cookie.domain || '').replace(/^\./, '');
         const protocol = cookie.secure ? 'https://' : 'http://';
         const cookieUrl = `${protocol}${domain}${cookie.path || '/'}`;
-        try { await builtinSession.cookies.remove(cookieUrl, cookie.name); } catch (_) { }
+        try { await builtinSession.cookies.remove(cookieUrl, cookie.name); } catch (_) { failed = true; }
     }
-}
-
-async function shopRequest(apiPath, options = {}) {
-    const fetchImpl = global.fetch;
-    if (typeof fetchImpl !== 'function') {
-        throw new Error('当前 Electron 运行时不支持 fetch');
-    }
-    const headers = {
-        Accept: 'application/json, text/plain, */*',
-        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(options.headers || {})
-    };
-    const token = String(options.token || '').trim();
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const response = await fetchImpl(`${SHOP_BASE_URL}${apiPath}`, {
-        method: options.method || 'GET',
-        headers,
-        body: options.body ? JSON.stringify(options.body) : undefined
-    });
-    const text = await response.text();
-    let payload = {};
-    try { payload = text ? JSON.parse(text) : {}; } catch (_) { payload = { raw: text }; }
-    if (!response.ok) {
-        throw new Error(payload?.message || payload?.error || payload?.detail || `请求失败: ${response.status}`);
-    }
-    return payload;
-}
-
-async function shopSessionRequest(apiPath, options = {}) {
-    const token = String(options.token || readAccountToken() || '').trim();
-    if (!token) throw new Error('未登录');
-    const builtinSession = getBuiltinSession();
-    if (typeof builtinSession.fetch !== 'function') {
-        return shopRequest(apiPath, { ...options, token });
-    }
-    const headers = {
-        Accept: 'application/json, text/plain, */*',
-        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-        Authorization: `Bearer ${token}`,
-        ...(options.headers || {})
-    };
-    const response = await builtinSession.fetch(`${SHOP_BASE_URL}${apiPath}`, {
-        method: options.method || 'GET',
-        headers,
-        body: options.body ? JSON.stringify(options.body) : undefined,
-        credentials: 'include'
-    });
-    const text = await response.text();
-    let payload = {};
-    try { payload = text ? JSON.parse(text) : {}; } catch (_) { payload = { raw: text }; }
-    if (!response.ok) {
-        throw new Error(payload?.message || payload?.error || payload?.detail || `请求失败: ${response.status}`);
-    }
-    return payload;
-}
-
-function isToolsMember(accessPayload) {
-    const payload = accessPayload?.data || accessPayload || {};
-    if (payload.canDownloadUpdates === true) return true;
-    if (payload.entitlements?.canDownloadUpdates === true) return true;
-    const memberships = payload.entitlements?.activeMemberships || payload.activeMemberships || [];
-    return memberships.some((item) => {
-        const key = item?.planKey || item?.typeCategory || item?.category || item;
-        return key === 'tools' || key === 'all';
-    });
+    if (failed) throw new Error('商店会话未完全清理');
 }
 
 async function loadAccountSnapshotFromSession() {
-    try {
-        const token = readAccountToken();
-        if (!token) return { authenticated: false, canDownloadUpdates: false, access: {} };
-        const me = await shopSessionRequest('/api/users/electron/me?typeCategory=tools', { token });
-        const responses = await Promise.allSettled(['tools', 'python'].map(category => shopSessionRequest(`/api/users/electron/access?typeCategory=${category}`, { token })));
-        const access = {};
-        ['tools', 'python'].forEach((category, index) => {
-            const item = responses[index];
-            if (item.status === 'rejected') { access[category] = { available: false, error: '权限查询失败' }; return; }
-            const payload = item.value?.data || item.value || {};
-            const memberships = payload.entitlements?.activeMemberships || payload.activeMemberships || [];
-            access[category] = { available: true, member: payload.canDownloadUpdates === true || payload.entitlements?.canDownloadUpdates === true || memberships.some(m => [category, 'all'].includes(m?.planKey || m?.typeCategory || m?.category || m)) };
-        });
-        return { authenticated: true, user: toSerializable(me?.user || me?.data?.user || me?.data || me), access, canDownloadUpdates: false };
-    } catch (error) { return { authenticated: false, canDownloadUpdates: false, access: {}, error: error.message }; }
+    if (accountLoggingOut || accountSessionSuppressed) return cachedAccount || { authenticated: false, canDownloadUpdates: false, user: null, access: {} };
+    const { ShopAccountClient } = require(app.isPackaged
+        ? path.join(process.resourcesPath, 'app', 'shop-account.js') : './app/shop-account');
+    const snapshot = await new ShopAccountClient({ net: require('electron').net,
+        getSession: getBuiltinSession, baseUrl: SHOP_BASE_URL, readToken: readAccountToken }).snapshot();
+    if (snapshot.verificationFailed && cachedAccount?.authenticated) {
+        return { ...cachedAccount, verificationFailed: true, error: snapshot.error };
+    }
+    return snapshot;
 }
 
 async function fetchToolsAccess() {
@@ -573,6 +505,7 @@ function openBuiltinBrowserWindow(url) {
     browserWin.webContents.on('did-finish-load', syncAccountState);
     browserWin.webContents.on('did-navigate-in-page', syncAccountState);
     browserWin.webContents.on('did-navigate', syncAccountState);
+    browserWin.on('focus', syncAccountState);
     browserWin.webContents.on('will-navigate', (event, targetUrl) => {
         if (!isDirectPluginDownloadUrl(targetUrl)) return;
         event.preventDefault();
@@ -592,174 +525,25 @@ function openBuiltinBrowserWindow(url) {
     return browserWin;
 }
 
-function sendUpdateEvent(type, payload = {}) {
-    sendRendererEvent('update:status', { type, source: lastUpdateSource, ...payload });
-}
-
-async function fetchGithubReleaseByVersion(version) {
-    const fetchImpl = global.fetch;
-    if (typeof fetchImpl !== 'function') {
-        throw new Error('当前 Electron 运行时不支持 GitHub Release 查询');
-    }
-    const tag = String(version || '').trim().replace(/^v/i, '');
-    if (!tag) throw new Error('缺少可下载的版本号，请先重新检查更新');
-    const response = await fetchImpl(`${TOOLS_GITHUB_RELEASES_API}/tags/v${encodeURIComponent(tag)}`, {
-        headers: {
-            Accept: 'application/vnd.github+json',
-            'User-Agent': 'sanrenjz-tools-updater'
-        }
+function getReleaseUpdates() {
+    if (!releaseUpdates) releaseUpdates = new ReleaseUpdates({
+        currentVersion: app.getVersion(), updatesDir: path.join(app.getPath('userData'), 'updates'),
+        request: options => net.request(options),
+        emit: payload => sendRendererEvent('update:status', { source: 'github', ...payload })
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-        throw new Error(payload?.message || `查询 GitHub Release 失败: ${response.status}`);
+    return releaseUpdates;
+}
+
+async function runUpdateAction(event, action) {
+    // 更新只能由宿主主界面主动触发，商店页面和插件无权安装主程序。
+    if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) {
+        return { success: false, message: '请从主界面的应用更新窗口操作' };
     }
-    return payload;
-}
-
-function resolveGithubInstallerAsset(releasePayload, version) {
-    const assets = Array.isArray(releasePayload?.assets) ? releasePayload.assets : [];
-    const normalizedVersion = String(version || '').trim().replace(/^v/i, '');
-    const expectedNames = [
-        `Sanrenjz-Tools-Setup-${normalizedVersion}-x64.exe`,
-        `Sanrenjz Tools Setup ${normalizedVersion} x64.exe`,
-        `sanrenjz-tools-${normalizedVersion}-x64.exe`,
-        `三人聚智效率工具-${normalizedVersion}-x64.exe`,
-        `三人聚智效率工具-${normalizedVersion}-win-x64.exe`
-    ];
-    const expectedNameSet = new Set(expectedNames.map((item) => normalizeAssetName(item)));
-    let asset = assets.find((item) => expectedNameSet.has(normalizeAssetName(item?.name)));
-    if (!asset) {
-        asset = assets.find((item) => {
-            const name = String(item?.name || '');
-            return /\.exe$/i.test(name) && name.includes(normalizedVersion) && !/portable/i.test(name);
-        });
+    try { return await action(getReleaseUpdates()); }
+    catch (error) {
+        const message = String(error?.message || '更新失败，请稍后重试').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+        return { success: false, message };
     }
-    if (!asset?.browser_download_url) {
-        throw new Error(`未找到 ${normalizedVersion} 对应的安装包资源`);
-    }
-    return asset;
-}
-
-function downloadFileWithRedirects(url, destinationPath, onProgress, redirectCount = 0) {
-    if (redirectCount > 5) return Promise.reject(new Error('下载重定向次数过多'));
-    return new Promise((resolve, reject) => {
-        const transport = String(url).startsWith('https:') ? https : http;
-        const request = transport.get(url, {
-            headers: {
-                'User-Agent': 'sanrenjz-tools-updater',
-                Accept: 'application/octet-stream'
-            }
-        }, (response) => {
-            const statusCode = Number(response.statusCode || 0);
-            const redirectLocation = response.headers.location;
-            if ([301, 302, 303, 307, 308].includes(statusCode) && redirectLocation) {
-                response.resume();
-                resolve(downloadFileWithRedirects(new URL(redirectLocation, url).toString(), destinationPath, onProgress, redirectCount + 1));
-                return;
-            }
-            if (statusCode !== 200) {
-                response.resume();
-                reject(new Error(`下载安装包失败，状态码: ${statusCode}`));
-                return;
-            }
-            fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
-            const fileStream = fs.createWriteStream(destinationPath);
-            const totalBytes = Number(response.headers['content-length'] || 0);
-            let receivedBytes = 0;
-            let settled = false;
-            const fail = (error) => {
-                if (settled) return;
-                settled = true;
-                try { fileStream.destroy(); } catch (_) { }
-                try { fs.unlinkSync(destinationPath); } catch (_) { }
-                reject(error);
-            };
-            response.on('data', (chunk) => {
-                receivedBytes += chunk.length;
-                if (typeof onProgress === 'function') {
-                    onProgress({
-                        percent: totalBytes > 0 ? (receivedBytes / totalBytes) * 100 : 0,
-                        transferred: receivedBytes,
-                        total: totalBytes
-                    });
-                }
-            });
-            response.on('error', fail);
-            fileStream.on('error', fail);
-            fileStream.on('finish', () => {
-                if (settled) return;
-                settled = true;
-                fileStream.close(() => resolve(destinationPath));
-            });
-            response.pipe(fileStream);
-        });
-        request.on('error', (error) => {
-            try { fs.unlinkSync(destinationPath); } catch (_) { }
-            reject(error);
-        });
-    });
-}
-
-async function downloadGithubReleaseInstaller(version) {
-    const releasePayload = await fetchGithubReleaseByVersion(version);
-    const installerAsset = resolveGithubInstallerAsset(releasePayload, version);
-    const updatesDir = ensureDir(path.join(app.getPath('userData'), 'updates'));
-    const targetPath = path.join(updatesDir, sanitizeFileName(installerAsset.name || `Sanrenjz-Tools-Setup-${version}-x64.exe`));
-    pendingManualUpdate = null;
-    sendUpdateEvent('download-progress', {
-        progress: { percent: 0, transferred: 0, total: Number(installerAsset.size || 0) }
-    });
-    await downloadFileWithRedirects(installerAsset.browser_download_url, targetPath, (progress) => {
-        sendUpdateEvent('download-progress', { progress });
-    });
-    pendingManualUpdate = { installerPath: targetPath, version: String(version || '').trim(), source: 'github' };
-    sendUpdateEvent('downloaded', {
-        info: lastCheckedUpdateInfo,
-        message: '安装包已下载，点击“安装重启”启动安装程序'
-    });
-    return { success: true, path: targetPath, mode: 'manual-github' };
-}
-
-function configureAutoUpdater(source, token = '') {
-    if (!autoUpdater) return;
-    autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = false;
-    const useGenericFeed = source === 'object-storage';
-    autoUpdater.requestHeaders = useGenericFeed && token ? { Authorization: `Bearer ${token}` } : {};
-    lastUpdateSource = useGenericFeed ? 'object-storage' : 'github';
-    if (useGenericFeed) {
-        autoUpdater.setFeedURL({ provider: 'generic', url: TOOLS_UPDATE_GENERIC_URL });
-    } else {
-        autoUpdater.setFeedURL({ provider: 'github', owner: TOOLS_GITHUB_OWNER, repo: TOOLS_GITHUB_REPO });
-    }
-}
-
-async function checkForToolsUpdates() {
-    throw new Error('合并预览版尚未配置独立更新通道，请使用本地安装包。');
-    assertAutoUpdaterAvailable();
-    const token = readAccountToken();
-    const access = await fetchToolsAccess();
-    const preferredSource = access.authenticated && access.canDownloadUpdates ? 'object-storage' : 'github';
-    configureAutoUpdater(preferredSource, token);
-    const result = await autoUpdater.checkForUpdates();
-    lastCheckedUpdateInfo = toSerializable(result?.updateInfo || null);
-    pendingManualUpdate = null;
-    return {
-        success: true,
-        source: lastUpdateSource,
-        canDownloadUpdates: Boolean(access.canDownloadUpdates),
-        updateInfo: lastCheckedUpdateInfo
-    };
-}
-
-function bindAutoUpdaterEvents() {
-    if (!autoUpdater) return;
-    autoUpdater.on('checking-for-update', () => sendUpdateEvent('checking'));
-    autoUpdater.on('update-available', (info) => sendUpdateEvent('available', { info }));
-    autoUpdater.on('update-not-available', (info) => sendUpdateEvent('not-available', { info }));
-    autoUpdater.on('download-progress', (progress) => sendUpdateEvent('download-progress', { progress }));
-    autoUpdater.on('update-downloaded', (info) => sendUpdateEvent('downloaded', { info }));
-    autoUpdater.on('error', (error) => sendUpdateEvent('error', { message: error.message || String(error) }));
 }
 
 // 快捷搜索热键节流控制
@@ -3200,21 +2984,40 @@ ipcMain.handle('save-settings', (event, settings) => {
 ipcMain.handle('get-version', () => app.getVersion());
 
 ipcMain.handle('account:login', async () => {
+    if (accountLoggingOut) throw new Error('正在退出登录，请稍后再登录');
+    accountSessionSuppressed = false;
+    accountSnapshotGeneration++;
     openBuiltinBrowserWindow(SHOP_MEMBER_CENTER_URL);
     return { success: true, loginMode: 'browser', url: SHOP_MEMBER_CENTER_URL };
 });
 
 ipcMain.handle('account:logout', async () => {
-    await clearShopSession();
-    clearAccountToken();
-    cachedAccount = null;
-    sendRendererEvent('account:changed', { authenticated: false, canDownloadUpdates: false, user: null, reason: 'logout' });
-    return { authenticated: false, canDownloadUpdates: false, user: null };
+    if (accountLoggingOut) return toSerializable(cachedAccount);
+    // 先关闭认证通路，再异步删除 Cookie，避免清理事件或旧窗口把账号重新登录。
+    accountLoggingOut = true;
+    accountSessionSuppressed = true;
+    accountSnapshotGeneration++;
+    clearTimeout(accountRefreshTimer);
+    cachedAccount = { authenticated: false, canDownloadUpdates: false, user: null, access: {}, reason: 'logout' };
+    sendRendererEvent('account:changed', cachedAccount);
+    let cleanupFailed = false;
+    try {
+        try { clearAccountToken(); } catch (_) { cleanupFailed = true; }
+        try { await clearShopSession(); } catch (_) { cleanupFailed = true; }
+    } finally {
+        accountSnapshotGeneration++;
+        clearTimeout(accountRefreshTimer);
+        accountRefreshTimer = null;
+        accountLoggingOut = false;
+    }
+    cachedAccount = { ...cachedAccount, cleanupFailed,
+        ...(cleanupFailed ? { error: '已退出本地账号，但商店会话未完全清理，请重试退出。' } : {}) };
+    sendRendererEvent('account:changed', cachedAccount);
+    return toSerializable(cachedAccount);
 });
 
 ipcMain.handle('account:me', async () => {
-    cachedAccount = await loadAccountSnapshot();
-    return toSerializable(cachedAccount);
+    return toSerializable(await refreshAccountState());
 });
 
 ipcMain.handle('account:access', async () => {
@@ -3241,47 +3044,32 @@ ipcMain.handle('open-plugin-install-directory', async () => {
     return { success: true, path: pluginDir };
 });
 
-ipcMain.handle('update:check', async () => {
-    return checkForToolsUpdates();
-});
-
-ipcMain.handle('update:download', async () => {
-    throw new Error('合并预览版暂不支持在线更新');
-    assertAutoUpdaterAvailable();
-    if (lastUpdateSource === 'github') {
-        const version = String(lastCheckedUpdateInfo?.version || '').trim();
-        if (!version) {
-            throw new Error('尚未获得可下载的新版本，请先检查更新');
-        }
-        return downloadGithubReleaseInstaller(version);
-    }
-    pendingManualUpdate = null;
-    await autoUpdater.downloadUpdate();
-    return { success: true, mode: 'electron-updater' };
-});
-
-ipcMain.handle('update:install', async () => {
-    throw new Error('合并预览版暂不支持在线更新');
-    if (pendingManualUpdate?.installerPath) {
-        const installerPath = pendingManualUpdate.installerPath;
-        if (!fs.existsSync(installerPath)) {
-            pendingManualUpdate = null;
-            throw new Error('已下载的安装包不存在，请重新下载更新');
-        }
-        const child = spawn(installerPath, [], {
-            detached: true,
-            stdio: 'ignore',
-            windowsHide: false
-        });
-        child.unref();
-        pendingManualUpdate = null;
-        app.quit();
-        return { success: true, mode: 'manual-github' };
-    }
-    assertAutoUpdaterAvailable();
-    autoUpdater.quitAndInstall(false, true);
+ipcMain.handle('update:check', (event) => runUpdateAction(event, updater => updater.check()));
+ipcMain.handle('update:download', (event) => runUpdateAction(event, updater => updater.download()));
+ipcMain.handle('update:cancel', (event) => runUpdateAction(event, updater => {
+    updater.cancel();
     return { success: true };
-});
+}));
+ipcMain.handle('update:open-release', (event) => runUpdateAction(event, async () => {
+    await shell.openExternal(GITHUB_RELEASES_URL);
+    return { success: true };
+}));
+ipcMain.handle('update:install', (event) => runUpdateAction(event, async updater => {
+    const downloaded = await updater.verifyDownloaded();
+    if (downloaded.installAction === 'show-folder') {
+        shell.showItemInFolder(downloaded.path);
+        return { success: true, message: '已定位下载文件，请退出当前程序后按需替换 AppImage' };
+    }
+    const error = await shell.openPath(downloaded.path);
+    if (error) throw new Error(`无法打开安装包：${error}`);
+    if (downloaded.installAction === 'install') {
+        // 安装程序成功交给系统后才退出，避免启动失败时丢失工作窗口。
+        app.isQuiting = true;
+        app.quit();
+        return { success: true, message: '已启动安装程序，请按提示完成安装' };
+    }
+    return { success: true, message: '已打开 DMG，请退出当前程序后拖入“应用程序”完成更新' };
+}));
 
 // 隐藏搜索窗口
 ipcMain.handle('hide-search-window', async (event, options = {}) => {
@@ -4904,7 +4692,6 @@ app.whenReady().then(async () => {
         PluginManager = require(app.isPackaged
             ? path.join(process.resourcesPath, 'app', 'software_manager.js')
             : './app/software_manager.js');
-        bindAutoUpdaterEvents();
         bindBuiltinSessionEvents();
         preparePluginStore();
 

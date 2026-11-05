@@ -43,10 +43,12 @@ test('ZIP 判型、路径穿越、清单冲突和效率插件替换', async () =
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('主进程明确禁用旧更新通道和新 Python 默认不安装', () => {
+test('主进程使用独立正式版更新通道和新 Python 默认不安装', () => {
     const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
     assert.match(main, /pythonMode: 'none'/);
-    assert.match(main, /async function checkForToolsUpdates\(\) \{\s*throw new Error/);
+    assert.match(main, /new ReleaseUpdates\(/);
+    assert.doesNotMatch(main, /TOOLS_GITHUB_REPO|TOOLS_UPDATE_GENERIC_URL|合并预览版尚未配置/);
+    assert.match(fs.readFileSync(path.join(__dirname, '..', 'app', 'release-updates.js'), 'utf8'), /yuhanbo758\/sanrenjz/);
     assert.match(main, /app\.setPath\('userData'/);
     const pkg = require('../package.json');
     assert.equal(pkg.name, 'sanrenjz'); assert.equal(pkg.build.appId, 'com.sanrenjz.app');

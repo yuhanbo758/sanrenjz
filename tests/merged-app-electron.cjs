@@ -4,6 +4,8 @@ const path = require('path');
 const { app, BrowserWindow } = require('electron');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-ui-'));
 process.env.SANRENJZ_USER_DATA = path.join(temporary, 'profile');
+fs.mkdirSync(process.env.SANRENJZ_USER_DATA, { recursive: true });
+fs.writeFileSync(path.join(process.env.SANRENJZ_USER_DATA, 'settings.json'), JSON.stringify({ migrationPrompted: true }));
 process.env.SANRENJZ_ACCEPTANCE = '1';
 const report = { assertions: [], errors: [], navigation: [] };
 const navigationOutput = path.resolve(__dirname, '../dist/nav-compact-validation');
@@ -50,8 +52,7 @@ app.whenReady().then(async () => {
         assert(await win.webContents.executeJavaScript("document.getElementById('plugins').classList.contains('active') && document.getElementById('plugin-manager-engine').value==='python' && [...document.querySelectorAll('.plugin-management-item')].filter(row=>row.style.display!=='none').every(row=>row.dataset.engine==='python')"), 'Python 插件在统一管理页显示并筛选');
         const catalog = await win.webContents.executeJavaScript("require('electron').ipcRenderer.invoke('search-catalog-get')");
         assert(catalog.plugins.some(p => p.engine === 'python') && catalog.plugins.some(p => p.engine === 'tools'), '全局搜索聚合两类插件');
-        const forbidden = await win.webContents.executeJavaScript("require('electron').ipcRenderer.invoke('update:check').then(()=>false,()=>true)");
-        assert(forbidden, '旧产品在线更新已禁用');
+        assert(await win.webContents.executeJavaScript("Boolean(document.getElementById('update-release-btn') && document.getElementById('update-check-btn'))"), '提供独立正式版更新及发布页面入口（联网与下载由更新专用验收覆盖）');
         await win.webContents.executeJavaScript("document.getElementById('settings-modal').classList.remove('show');document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());true;");
         fs.mkdirSync(navigationOutput, { recursive: true });
         for (const [width, height] of [[900,650],[1000,680],[1180,760],[1500,900]]) {

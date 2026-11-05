@@ -204,6 +204,7 @@ async function runSmoke({ root = path.resolve(__dirname, '..'), platform, arch, 
         const profile = path.join(sandbox, 'profile');
         const pluginRoot = platform === 'win' ? path.join(sandbox, 'portable') : profile;
         fs.mkdirSync(profile); fs.mkdirSync(pluginRoot, { recursive: true });
+        fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ migrationPrompted: true }));
         const env = isolatedEnvironment(process.env, { platform, profile, pluginRoot });
         const args = runtimeArguments(platform);
         if (platform === 'linux') env.ELECTRON_ENABLE_STACK_DUMPING = '1';
@@ -267,6 +268,7 @@ async function runSmoke({ root = path.resolve(__dirname, '..'), platform, arch, 
             await evaluate("document.getElementById('python-logs-dialog').close();true");
             record(!(await evaluate("document.getElementById('python-logs-dialog').open")), 'unified-log-close');
             stage = 'settings';
+            record(await evaluate("Boolean(document.getElementById('migration-settings-tab') && document.getElementById('merge-migration') && document.getElementById('update-release-btn'))"), 'migration-and-stable-update-settings-entries');
             const settings = await evaluate("(async()=>{const ipc=require('electron').ipcRenderer;await ipc.invoke('save-settings',{rightClickDelay:421});return ipc.invoke('get-settings');})()");
             const diskSettings = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
             record(settings.rightClickDelay === 421 && diskSettings.rightClickDelay === 421 && settings.pythonMode === 'none' && settings.autoStart === false, 'isolated-settings-save-and-readback');

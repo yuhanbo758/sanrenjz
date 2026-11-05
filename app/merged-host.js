@@ -216,7 +216,7 @@ function createMergedHost({ app, ipcMain, dialog, shell, getWindow, getManager, 
         },
         'migration:inspect': (_e, options) => migration.inspect(options),
         'migration:choose': async () => {
-            const choice = await dialog.showOpenDialog(getWindow(), { title: '选择旧应用安装目录', properties: ['openDirectory'] });
+            const choice = await dialog.showOpenDialog(getWindow(), { title: '选择旧版效率工具或 Python 程序管理的安装、插件或数据目录', properties: ['openDirectory', 'multiSelections'] });
             return choice.canceled ? { canceled: true } : migration.inspect({ installationRoots: choice.filePaths });
         },
         'migration:run': (_e, options) => migration.migrate(options),

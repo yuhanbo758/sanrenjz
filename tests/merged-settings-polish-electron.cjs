@@ -9,6 +9,8 @@ const pythonModule = require('../app/python-manager');
 const environmentModule = require('../app/python-environment');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-设置优化 空格-'));
+process.env.APPDATA = path.join(root, 'isolated-legacy-profiles');
+require('../app/migration-manager').MigrationManager.prototype.detectInstallations = () => [];
 const profile = path.join(root, 'profile');
 const toolsDir = path.join(root, '效率插件');
 const pythonDir = path.join(root, 'Python 插件');
@@ -128,8 +130,8 @@ require('../main');
         check(await evaluate("document.getElementById('python-diagnose').disabled && document.getElementById('python-clear').disabled"), '未配置时禁用无效诊断与清除操作');
         check(counts.inspections === 0 && counts.discoveries === 0, '浏览 Python 设置不隐式检测环境');
         check(await evaluate("document.getElementById('save-settings-btn').textContent.trim()==='完成'"), '立即保存的环境页使用完成按钮');
-        const navigation = await evaluate("(() => {const states=[]; for(const [target,key] of [['merge-python','ArrowUp'],['plugins','Home'],['general','ArrowDown'],['shortcuts','End']]){const tab=document.querySelector(`.sidebar-item[data-target=\"${target}\"]`);tab.focus();tab.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true}));states.push(document.querySelector('.settings-tab-content.active').id);}return states;})()");
-        check(navigation.join(',') === 'plugins,general,shortcuts,merge-python', '设置侧边栏支持方向键与 Home/End 页面导航');
+        const navigation = await evaluate("(() => {const states=[]; for(const [target,key] of [['merge-python','ArrowUp'],['plugins','Home'],['general','ArrowDown'],['shortcuts','End'],['merge-migration','ArrowUp']]){const tab=document.querySelector(`.sidebar-item[data-target=\"${target}\"]`);tab.focus();tab.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true}));states.push(document.querySelector('.settings-tab-content.active').id);}return states;})()");
+        check(navigation.join(',') === 'plugins,general,shortcuts,merge-migration,merge-python', '设置侧边栏方向键与 Home/End 包含新增数据导入页');
 
         discoverMode = 'pending';
         await click('python-discover');

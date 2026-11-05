@@ -35,7 +35,12 @@ app.setLoginItemSettings = value => {
     if (failDisable && !value.openAtLogin) throw new Error('模拟系统自启动失败');
 };
 app.on('browser-window-created', (_event, win) => { win.show = () => {}; win.showInactive = () => {}; win.focus = () => {}; });
-app.whenReady().then(() => session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_details, callback) => callback({ cancel: true })));
+app.whenReady().then(() => {
+    // 设置副作用验收不依赖账号服务，默认与商店会话都必须隔离外网。
+    for (const targetSession of [session.defaultSession, session.fromPartition('persist:sanrenjz-shop')]) {
+        targetSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_details, callback) => callback({ cancel: true }));
+    }
+});
 const report = { assertions: [], errors: [], isolatedProfile: true, systemLoginMocked: true };
 const check = (value, label) => { assert(value, label); report.assertions.push(label); };
 const ready = new Promise(resolve => app.once('browser-window-created', (_event, win) => win.webContents.once('did-finish-load', () => resolve(win))));
