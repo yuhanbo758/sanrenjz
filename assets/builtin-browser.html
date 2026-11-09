@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+    <title>程序小店</title>
+    <link rel="stylesheet" href="builtin-browser.css">
+    <script src="builtin-browser.js" defer></script>
+</head>
+<body>
+    <header class="browser-toolbar" id="browser-toolbar" aria-label="内置浏览器导航">
+        <nav class="browser-controls" aria-label="页面导航">
+            <button id="browser-back" type="button" data-action="back" title="后退（Alt+←）" aria-label="后退，Alt 加左方向键" disabled>
+                <span class="button-icon" aria-hidden="true">←</span><span class="button-label">后退</span>
+            </button>
+            <button id="browser-forward" type="button" data-action="forward" title="前进（Alt+→）" aria-label="前进，Alt 加右方向键" disabled>
+                <span class="button-icon" aria-hidden="true">→</span><span class="button-label">前进</span>
+            </button>
+            <button id="browser-reload" type="button" data-action="reload" title="刷新（Ctrl+R / F5，macOS 使用 Command+R）" aria-label="刷新页面，Ctrl 加 R 或 F5">
+                <span class="button-icon reload-icon" aria-hidden="true">↻</span><span class="button-label">刷新</span>
+            </button>
+            <button id="browser-home" type="button" data-action="home" title="返回本窗口起始页" aria-label="返回本窗口起始页">
+                <span class="button-icon home-icon" aria-hidden="true">⌂</span><span class="button-label">起始页</span>
+            </button>
+        </nav>
+        <div class="browser-page-info">
+            <div id="browser-title" class="browser-title">程序小店</div>
+            <div class="browser-page-status">
+                <span id="browser-host" class="browser-host" hidden></span>
+                <span id="browser-status" class="browser-status" role="status" aria-live="polite">正在准备页面…</span>
+            </div>
+        </div>
+    </header>
+</body>
+</html>

@@ -15,7 +15,7 @@ childProcess.spawn = () => {
 };
 
 const storage = new Map([['settings', { model: 'gemini', geminiKey: 'test-key', textPostProcessEnabled: false }]]);
-window.__speechTest = { inserts: [], copies: [], storage, sharedCalls: [] };
+window.__speechTest = { inserts: [], copies: [], storage, sharedCalls: [], audioCalls: [], openaiCalls: [], savedOpenAIKey: '', failOpenAIKeySave: false };
 window.electronAPI = {
     storage: {
         get: key => storage.get(key),
@@ -31,6 +31,18 @@ window.electronAPI = {
         listModels: async () => [{ kind: 'text', providerId: 'opencode:openai', modelId: 'gpt-6-sol',
             label: 'OpenCode / GPT-6 Sol', selected: true }],
         processText: async request => { window.__speechTest.sharedCalls.push(request); return `共享处理：${request.text}`; }
+    },
+    openaiCompatible: {
+        transcribe: async request => { window.__speechTest.audioCalls.push(request); return 'OpenAI 转写文本'; }
+    },
+    openai: {
+        getStatus: async () => ({ hasKey: !!window.__speechTest.savedOpenAIKey, encryptionAvailable: true }),
+        saveKey: async key => {
+            if (window.__speechTest.failOpenAIKeySave) throw new Error('模拟安全存储失败');
+            window.__speechTest.savedOpenAIKey = key.trim();
+            return { success: true };
+        },
+        transcribe: async request => { window.__speechTest.openaiCalls.push(request); return 'OpenAI 官方转写文本'; }
     },
     dialog: { defaultDownloadDir: () => '', chooseDirectory: () => '' },
     lan: {

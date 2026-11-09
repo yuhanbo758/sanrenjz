@@ -298,6 +298,7 @@
                     <option value="gemini">Google Gemini</option>
                     <option value="qwen">阿里通义千问 (Qwen)</option>
                     <option value="siliconflow">硅基流动 (TeleSpeechASR)</option>
+                    <option value="openai">OpenAI 语音识别（官方 API）</option>
                     <option value="openai-compatible">OpenAI 兼容 / 自定义多模态</option>
                     <option value="shared-model">共享 AI 模型处理语音</option>
                     <option value="shared-audio">共享目录中的音频模型</option>
@@ -311,20 +312,36 @@
                 <select id="shared-speech-model"></select>
                 <label for="shared-asr-source" style="margin-top:12px;">语音识别来源</label>
                 <select id="shared-asr-source">
+                    <option value="openai">OpenAI 官方语音识别</option>
                     <option value="openai-compatible">现有 OpenAI 兼容语音配置</option>
                     <option value="gemini">现有 Gemini 语音配置</option>
                     <option value="qwen">现有 Qwen 语音配置</option>
                     <option value="siliconflow">现有硅基流动语音配置</option>
                 </select>
-                <div class="help-text">GPT-6 当前只声明文字和图片输入。录音先使用上方选择的已配置服务转写，再把文字交给 GPT-6；语音不会直接发送给 GPT-6。所需密钥请在对应语音配置中保存。</div>
+                <div class="help-text">录音先使用所选语音服务转写，再把文字交给共享模型。请在下方填写该语音服务的配置并保存；共享文本模型的登录与配置不包含语音转写服务。</div>
+                <div id="shared-asr-status" class="help-text" role="status" aria-live="polite"></div>
                 <button type="button" id="shared-model-refresh" class="btn-secondary" style="margin-top:8px;">刷新共享模型</button>
             </div>
 
             <div id="shared-audio-config" class="settings-section" style="display:none;">
                 <div class="section-title">共享音频模型</div>
                 <select id="shared-audio-model"></select>
-                <div class="help-text">仅显示共享目录中声明 audio 能力、采用 OpenAI 兼容接口的直连模型。OpenCode 模型的音频附件目前不会进入模型请求，因此不列入语音识别。</div>
+                <div class="help-text">这里复用共享配置中已添加的直连音频模型，并非全部可用语音模型。只显示声明音频输入且可通过当前接口调用的模型。使用 OpenAI API Key 时，可在上方直接选择“OpenAI 语音识别（官方 API）”。</div>
                 <button type="button" id="shared-audio-refresh" class="btn-secondary" style="margin-top:8px;">刷新共享模型</button>
+            </div>
+
+            <div id="openai-config" class="settings-section" style="display:none;">
+                <div class="section-title">OpenAI 官方语音识别</div>
+                <div class="form-group">
+                    <label for="openai-api-key">OpenAI API Key</label>
+                    <input type="password" id="openai-api-key" autocomplete="off" spellcheck="false" placeholder="填写 OpenAI API Key，保存后即可使用" />
+                    <div id="openai-key-status" class="help-text" role="status" aria-live="polite"></div>
+                </div>
+                <div class="form-group">
+                    <label for="openai-asr-model">转写模型</label>
+                    <input type="text" id="openai-asr-model" value="gpt-transcribe" placeholder="默认 gpt-transcribe" />
+                    <div class="help-text">已预设 OpenAI 官方接口，默认模型为 gpt-transcribe；只需填写 API Key 并点击“保存设置”。如需使用 GPT-6 Luna 润色，选择“共享 AI 模型处理语音”，并将语音识别来源设为“OpenAI 官方语音识别”。</div>
+                </div>
             </div>
 
             <div id="gemini-config">
@@ -466,8 +483,8 @@
                 </div>
                 <div class="form-group">
                     <label>语音/多模态模型</label>
-                    <input type="text" id="openai-compatible-audio-model" placeholder="例如: mimo-v2.5-asr / doubao-xxx / gpt-4o-audio-preview" />
-                    <div class="help-text">用于直接接收音频并转文字的模型。小米 MiMo 请填写 mimo-v2.5-asr；mimo-v2.5-pro 不能填在这里，只能作为文本处理模型。</div>
+                    <input type="text" id="openai-compatible-audio-model" placeholder="例如: gpt-transcribe / mimo-v2.5-asr" />
+                    <div class="help-text">OpenAI 文件转写可填写 gpt-transcribe，API 地址填写 https://api.openai.com/v1，并配置可调用该接口的 API Key。也支持小米 mimo-v2.5-asr 等音频模型；GPT-6 文本模型应选在上方“处理模型”中。</div>
                 </div>
                 <div class="form-group">
                     <label>音频格式策略</label>

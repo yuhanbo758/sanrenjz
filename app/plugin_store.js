@@ -125,31 +125,58 @@ function shouldReplacePlugin(sourcePlugin, targetPlugin) {
     return sourcePlugin.manifestMtime > targetPlugin.manifestMtime + 1000;
 }
 
-function replacePluginDirectory(sourceDir, targetDir) {
+function replacePluginDirectory(sourceDir, targetDir, { filter = () => true } = {}) {
     const parentDir = path.dirname(targetDir);
     const folderName = path.basename(targetDir);
     const stagingDir = uniqueDirectoryPath(parentDir, `.plugin-update-${folderName}`);
     const backupDir = uniqueDirectoryPath(parentDir, `.plugin-backup-${folderName}`);
     let backupCreated = false;
+    let runtimeMoved = false;
+    const runtimeName = '.runtime';
+    const oldRuntime = path.join(targetDir, runtimeName);
+    const stagedRuntime = path.join(stagingDir, runtimeName);
+    const backupRuntime = path.join(backupDir, runtimeName);
 
     try {
+        if (fs.existsSync(targetDir) && fs.lstatSync(targetDir).isSymbolicLink()) throw new Error('插件目标不能是符号链接');
+        // 保留本机运行资料，既不复制大缓存，也不接受更新包携带的登录会话。
+        if (fs.existsSync(oldRuntime)) {
+            const runtimeStat = fs.lstatSync(oldRuntime);
+            if (runtimeStat.isSymbolicLink() || !runtimeStat.isDirectory()) throw new Error('插件 .runtime 必须是本地目录');
+        }
         fs.cpSync(sourceDir, stagingDir, {
             recursive: true,
             force: false,
             errorOnExist: true,
-            preserveTimestamps: true
+            preserveTimestamps: true,
+            filter: candidate => path.relative(sourceDir, candidate).split(path.sep)[0].toLowerCase() !== runtimeName && filter(candidate)
         });
-        fs.renameSync(targetDir, backupDir);
-        backupCreated = true;
-        fs.renameSync(stagingDir, targetDir);
-        fs.rmSync(backupDir, { recursive: true, force: true });
-    } catch (error) {
-        fs.rmSync(stagingDir, { recursive: true, force: true });
-        if (backupCreated && fs.existsSync(backupDir) && !fs.existsSync(targetDir)) {
-            fs.renameSync(backupDir, targetDir);
+        if (fs.existsSync(targetDir)) {
+            fs.renameSync(targetDir, backupDir);
+            backupCreated = true;
+            if (fs.existsSync(backupRuntime)) {
+                fs.renameSync(backupRuntime, stagedRuntime);
+                runtimeMoved = true;
+            }
         }
+        fs.renameSync(stagingDir, targetDir);
+    } catch (error) {
+        try {
+            // 提交失败先放回运行资料，再恢复旧程序；回滚失败保留全部恢复材料。
+            if (runtimeMoved) fs.renameSync(stagedRuntime, backupRuntime);
+            if (backupCreated) fs.renameSync(backupDir, targetDir);
+        } catch (rollbackError) {
+            error.message += `；自动回滚未完成，恢复目录：${backupDir}、${stagingDir}（${rollbackError.message}）`;
+            error.recoveryPaths = [backupDir, stagingDir];
+            throw error;
+        }
+        try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch (_) { }
         throw error;
     }
+    // 新版与运行资料已提交成功；旧代码清理失败不能触发不完整回滚。
+    try { if (backupCreated) fs.rmSync(backupDir, { recursive: true, force: true }); }
+    catch (error) { return { cleanupWarning: `插件已更新，旧版本目录未清理：${error.message}`, backupPath: backupDir }; }
+    return {};
 }
 
 function copyMissingPlugins(sourceDir, targetDir, { updateExisting = false } = {}) {
@@ -162,7 +189,8 @@ function copyMissingPlugins(sourceDir, targetDir, { updateExisting = false } = {
         const existingPlugin = targetPlugins.get(plugin.identity);
         if (existingPlugin) {
             if (updateExisting && shouldReplacePlugin(plugin, existingPlugin)) {
-                replacePluginDirectory(plugin.sourcePath, existingPlugin.sourcePath);
+                const update = replacePluginDirectory(plugin.sourcePath, existingPlugin.sourcePath);
+                if (update.cleanupWarning) console.warn(update.cleanupWarning);
                 result.updated.push(plugin.pluginName);
                 targetPlugins.set(plugin.identity, readPluginEntry(
                     path.dirname(existingPlugin.sourcePath),
@@ -179,7 +207,9 @@ function copyMissingPlugins(sourceDir, targetDir, { updateExisting = false } = {
             recursive: true,
             force: false,
             errorOnExist: true,
-            preserveTimestamps: true
+            preserveTimestamps: true,
+            // 迁移用户插件保留运行资料；内置包首次安装不带入开发机的 .runtime。
+            filter: candidate => !updateExisting || path.relative(plugin.sourcePath, candidate).split(path.sep)[0].toLowerCase() !== '.runtime'
         });
         targetPlugins.set(plugin.identity, plugin);
         result.copied.push(plugin.pluginName);
@@ -233,6 +263,7 @@ module.exports = {
     initializePluginStore,
     listPluginEntries,
     normalizePluginIdentity,
+    replacePluginDirectory,
     shouldReplacePlugin,
     syncBundledPluginRuntime
 };

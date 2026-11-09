@@ -34,6 +34,48 @@ const DEFAULT_SETTINGS = {
     jevProvider: 'off'
 };
 
+const OPENAI_DEFAULT_MODELS = ['gpt-6-astra', 'gpt-6-luna', 'gpt-6-sol'].map(value => ({
+    value, label: value.replace('gpt-', 'GPT-').replace(/-(astra|luna|sol)$/, (_, name) => ` ${name[0].toUpperCase()}${name.slice(1)}`), provider: 'openai'
+}));
+
+async function getDirectOpenAISecret() {
+    const result = await ipcRenderer.invoke('plugin-secret-get', PLUGIN_NAME, 'direct-openai-api-key');
+    return result?.encryptionAvailable === true ? String(result.value || '') : '';
+}
+
+function openAITextStream(response, abortController, timer) {
+    const reader = response.body.getReader();
+    return new ReadableStream({
+        async start(controller) {
+            const decoder = new TextDecoder();
+            let pending = '';
+            const consume = line => {
+                if (!line.startsWith('data:')) return;
+                const text = line.slice(5).trim();
+                if (!text || text === '[DONE]') return;
+                const data = JSON.parse(text);
+                if (data.error) throw new Error('OpenAI 流式生成失败');
+                const token = data.choices?.[0]?.delta?.content;
+                if (token) controller.enqueue(token);
+            };
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    pending += decoder.decode(value, { stream: true });
+                    const lines = pending.split(/\r?\n/); pending = lines.pop();
+                    for (const line of lines) consume(line);
+                }
+                pending += decoder.decode();
+                if (pending.trim()) consume(pending);
+                controller.close();
+            } catch (error) { controller.error(abortController.signal.aborted ? new Error('OpenAI 请求已取消或超时') : error); }
+            finally { clearTimeout(timer); reader.releaseLock(); }
+        },
+        cancel() { abortController.abort(); }
+    });
+}
+
 // 内置模型列表
 const BUILT_IN_MODELS = [
     {value: 'deepseek-chat', label: 'DeepSeek V3', provider: 'deepseek'},
@@ -168,10 +210,25 @@ window.exports = {
 
 window.services = {
     // 获取内置模型列表
-    getBuiltInModels: () => [...getSharedModels(), ...BUILT_IN_MODELS],
+    getBuiltInModels: () => [...getSharedModels(), ...window.services.getLegacyModels()],
 
     // 获取旧版本地直连模型（不含共享目录模型），供界面单独分组展示
-    getLegacyModels: () => [...BUILT_IN_MODELS],
+    getLegacyModels: () => [...BUILT_IN_MODELS, ...(window.services.getSettings().openaiModels || OPENAI_DEFAULT_MODELS).map(model => ({ ...model, provider: 'openai' }))],
+
+    hasDirectOpenAIKey: async () => !!(await getDirectOpenAISecret()),
+    saveDirectOpenAIKey: async value => {
+        const key = String(value || '').trim();
+        if (!key) return;
+        const status = await ipcRenderer.invoke('plugin-secret-get', PLUGIN_NAME, 'direct-openai-api-key');
+        if (!status?.encryptionAvailable) throw new Error('系统加密存储不可用');
+        const result = await ipcRenderer.invoke('plugin-secret-set', PLUGIN_NAME, 'direct-openai-api-key', key);
+        if (!result?.success || !result?.encryptionAvailable) throw new Error('OpenAI 密钥加密保存失败');
+    },
+    loadOpenAIModels: async inputKey => {
+        const key = String(inputKey || '').trim() || await getDirectOpenAISecret();
+        const result = await aiRuntimeForCatalog.listProviderModels({ baseUrl: 'https://api.openai.com/v1', key });
+        return result.models.filter(model => model.capabilities?.includes('text')).map(model => ({ value: model.id, label: model.label || model.id, provider: 'openai' }));
+    },
 
     // 获取共享供应商分组：每个供应商一组，仅保留声明 text 能力的模型
     getSharedProviderGroups: async () => {
@@ -212,7 +269,7 @@ window.services = {
             config.selections = config.selections || {};
             config.selections.text = { providerId, modelId };
             await window.aiAPI.saveConfig(config);
-        } catch (_) {}
+        } catch (error) { throw error; }
     },
 
     // 获取设置
@@ -232,8 +289,7 @@ window.services = {
     // 保存设置
     saveSettings: (settings) => {
         try {
-            ipcRenderer.sendSync('plugin-storage-set', PLUGIN_NAME, 'ai-settings', settings);
-            return true;
+            return ipcRenderer.sendSync('plugin-storage-set', PLUGIN_NAME, 'ai-settings', settings) !== false;
         } catch (error) {
             console.error('保存设置失败:', error);
             return false;
@@ -547,6 +603,25 @@ window.services = {
                 // 图片处理逻辑依赖于提供商
                 imagePart = fileAttachment;
             }
+        }
+
+        if (modelInfo.provider === 'openai') {
+            const key = await getDirectOpenAISecret();
+            if (!key) throw new Error('请先在设置中填写并保存 OpenAI API Key');
+            const content = imagePart ? [{ type: 'text', text: userContent },
+                { type: 'image_url', image_url: { url: `data:${imagePart.mimeType};base64,${imagePart.content}` } }] : userContent;
+            messages.push({ role: 'user', content });
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 120000);
+            try {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST', signal: controller.signal,
+                    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: modelInfo.value, messages, stream: true })
+                });
+                if (!response.ok) throw new Error(`OpenAI 请求失败（HTTP ${response.status}），请检查密钥、模型权限与额度`);
+                return openAITextStream(response, controller, timer);
+            } catch (error) { clearTimeout(timer); throw error; }
         }
 
         // OpenRouter / DeepSeek (通常是 OpenAI 格式)

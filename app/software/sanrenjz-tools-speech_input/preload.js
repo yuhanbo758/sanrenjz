@@ -10,6 +10,13 @@ const os = require('os');
 const { createAiRuntime } = require('../../plugin_runtime/ai-runtime');
 const sharedAi = createAiRuntime('AI语音输入法');
 
+function canUseSharedAudio(provider, model) {
+    const managed = provider.transport === 'opencode' || /^opencode:\/\//i.test(provider.baseUrl || '');
+    return (model.capabilities || []).includes('audio') && !managed && (!model.apiStyle || model.apiStyle === 'openai')
+        && !(isXiaomiMimoTarget(provider.baseUrl) && !isXiaomiMimoAsrTarget(provider.baseUrl, model.id))
+        && !isMiniMaxM3Target(provider.baseUrl, model.id);
+}
+
 async function getSharedSpeechModels() {
     const config = await sharedAi.getConfig();
     const items = [];
@@ -19,8 +26,7 @@ async function getSharedSpeechModels() {
             if (capabilities.includes('text')) items.push({ kind: 'text', providerId: provider.id, modelId: model.id,
                 label: `${provider.name} / ${model.label || model.id}`,
                 selected: config.selections?.text?.providerId === provider.id && config.selections.text.modelId === model.id });
-            const managed = provider.transport === 'opencode' || /^opencode:\/\//i.test(provider.baseUrl || '');
-            if (capabilities.includes('audio') && !managed && (!model.apiStyle || model.apiStyle === 'openai')) {
+            if (canUseSharedAudio(provider, model)) {
                 items.push({ kind: 'audio', providerId: provider.id, modelId: model.id, label: `${provider.name} / ${model.label || model.id}` });
             }
         }
@@ -35,6 +41,7 @@ async function resolveSharedAudio(selection) {
     if (!provider || !model || !(model.capabilities || []).includes('audio')) throw new Error('共享音频模型已失效，请刷新后重新选择');
     if (provider.transport === 'opencode' || /^opencode:\/\//i.test(provider.baseUrl || '')) throw new Error('OpenCode 当前不传递音频附件，请使用直连音频模型');
     if (model.apiStyle && model.apiStyle !== 'openai') throw new Error('该音频模型不是 OpenAI 兼容接口');
+    if (!canUseSharedAudio(provider, model)) throw new Error('该共享模型不支持当前语音转写接口，请选择专用音频模型');
     const apiKey = await sharedAi.getProviderSecret(provider.id);
     if (!apiKey) throw new Error(`共享供应商“${provider.name}”尚未保存 API Key`);
     return { baseUrl: provider.baseUrl, apiKey, model: model.id };
@@ -42,24 +49,23 @@ async function resolveSharedAudio(selection) {
 
 async function transcribeSharedAudio(options) {
     const target = await resolveSharedAudio(options.selection);
-    if (/^(?:gpt-.*-transcribe(?:-.*)?|whisper-1)$/i.test(target.model)) {
-        const mimeType = String(options.mimeType || 'audio/webm');
-        const fileBuffer = base64ToBuffer(options.audioBase64);
-        if (!fileBuffer.length || fileBuffer.length > 25 * 1024 * 1024) throw new Error('音频文件须非空且不超过 25 MB');
-        const extension = mimeType.includes('wav') ? 'wav' : mimeType.includes('mp4') ? 'm4a'
-            : mimeType.includes('mpeg') ? 'mp3' : mimeType.includes('ogg') ? 'ogg' : 'webm';
-        const body = buildMultipartBody({ fields: { model: target.model }, fileFieldName: 'file',
-            fileName: `speech.${extension}`,
-            fileBuffer, fileContentType: mimeType });
-        const url = `${String(target.baseUrl).replace(/\/+$/, '').replace(/\/chat\/completions$/i, '')}/audio/transcriptions`;
-        const response = await fetchWithTimeout(url, { method: 'POST', headers: {
-            Authorization: `Bearer ${target.apiKey}`, 'Content-Type': body.contentType, 'Content-Length': String(body.body.length)
-        }, body: body.body }, 120000);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data?.error?.message || `语音识别 HTTP ${response.status}`);
-        return String(data?.text || '').trim();
-    }
     return window.electronAPI.openaiCompatible.transcribe({ ...target, audioBase64: options.audioBase64, mimeType: options.mimeType, prompt: options.prompt });
+}
+
+async function transcribeOpenAIFile({ baseUrl, apiKey, model, audioBase64, mimeType = 'audio/webm' }) {
+    const fileBuffer = base64ToBuffer(audioBase64);
+    if (!fileBuffer.length || fileBuffer.length > 25 * 1024 * 1024) throw new Error('音频文件须非空且不超过 25 MB');
+    const extension = audioMimeToFormat(mimeType);
+    const body = buildMultipartBody({ fields: { model }, fileFieldName: 'file',
+        fileName: `speech.${extension}`, fileBuffer, fileContentType: mimeType });
+    // 专用转写模型接收文件上传，不能按聊天模型发送 input_audio。
+    const url = normalizeOpenAIChatUrl(baseUrl).replace(/\/chat\/completions$/i, '/audio/transcriptions');
+    const response = await fetchWithTimeout(url, { method: 'POST', headers: {
+        Authorization: `Bearer ${apiKey}`, 'Content-Type': body.contentType, 'Content-Length': String(body.body.length)
+    }, body: body.body }, 120000);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message || `语音识别 HTTP ${response.status}`);
+    return String(data?.text || '').trim();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -494,6 +500,31 @@ function pushClipboardImage() {
 const PLUGIN_NAME = 'AI语音输入法';
 
 window.electronAPI = {
+    openai: {
+        getStatus: async () => {
+            const result = await ipcRenderer.invoke('plugin-secret-get', PLUGIN_NAME, 'openai-asr-api-key');
+            return { hasKey: !!result?.value && result?.encryptionAvailable === true,
+                encryptionAvailable: result?.encryptionAvailable === true };
+        },
+        saveKey: async value => {
+            const key = String(value || '').trim();
+            if (!key) throw new Error('OpenAI API Key 不能为空');
+            // 复用宿主加密存储；不可加密时不写入，避免密钥回落普通配置。
+            const status = await ipcRenderer.invoke('plugin-secret-get', PLUGIN_NAME, 'openai-asr-api-key');
+            if (!status?.encryptionAvailable) throw new Error('系统加密存储不可用，无法保存 OpenAI API Key');
+            const result = await ipcRenderer.invoke('plugin-secret-set', PLUGIN_NAME, 'openai-asr-api-key', key);
+            if (!result?.success || !result?.encryptionAvailable) throw new Error('OpenAI API Key 加密保存失败');
+            return { success: true };
+        },
+        transcribe: async ({ audioBase64, mimeType, model = 'gpt-transcribe' }) => {
+            const result = await ipcRenderer.invoke('plugin-secret-get', PLUGIN_NAME, 'openai-asr-api-key');
+            if (!result?.value || !result?.encryptionAvailable) throw new Error('请先填写 OpenAI API Key 并保存设置');
+            const pickedModel = String(model || 'gpt-transcribe').trim();
+            if (!/^(?:gpt-(?:.*-)?transcribe(?:-.*)?|whisper-1)$/i.test(pickedModel)) throw new Error('请输入 OpenAI 语音转写模型，例如 gpt-transcribe');
+            return transcribeOpenAIFile({ baseUrl: 'https://api.openai.com/v1', apiKey: result.value,
+                model: pickedModel, audioBase64, mimeType });
+        }
+    },
     sharedAi: {
         listModels: getSharedSpeechModels,
         transcribe: transcribeSharedAudio,
@@ -632,6 +663,9 @@ window.electronAPI = {
             if (!key) throw new Error('OpenAI 兼容 API Key 未配置');
             const pickedModel = String(model || '').trim();
             if (!pickedModel) throw new Error('OpenAI 兼容语音/多模态模型未配置');
+            if (/^(?:gpt-(?:.*-)?transcribe(?:-.*)?|whisper-1)$/i.test(pickedModel)) {
+                return transcribeOpenAIFile({ baseUrl, apiKey: key, model: pickedModel, audioBase64, mimeType });
+            }
             if (isMiniMaxM3Target(baseUrl, pickedModel)) {
                 throw new Error('MiniMax-M3 的 OpenAI 兼容接口目前不支持音频输入，只支持文本、图片和视频。请把 MiniMax-M3 用作“文本处理模型”，语音转文字请选择 Gemini、Qwen、SiliconFlow 或其它明确支持 input_audio 的 OpenAI 兼容音频模型。');
             }

@@ -140,6 +140,102 @@ async function listOpenCodeModels() {
   return ipcRenderer.invoke('ai-opencode-list-models');
 }
 
+function catalogModel(item, style) {
+  if (typeof item === 'string') item = { id: item };
+  const id = String(item?.id || item?.name || '').trim();
+  if (!id || /[\r\n|]/.test(id)) return null;
+  const unsupportedType = ['embedding', 'rerank', 'image_generation', 'video_generation', 'speech_generation'].includes(item.type);
+  const unsupportedId = /^(?:text-(?:embedding|moderation)|omni-moderation|tts-|dall-e|gpt-image|sora(?:-|$)|gpt-(?:live|realtime)|gpt-.*-realtime)/i.test(id);
+  if (unsupportedType || unsupportedId) return null;
+  const inputs = item.input_modalities || item.modalities?.input || item.architecture?.input_modalities;
+  const modalities = Array.isArray(inputs) ? inputs : [];
+  const outputs = item.output_modalities || item.architecture?.output_modalities;
+  if (Array.isArray(outputs) && outputs.length && !outputs.includes('text') && !modalities.includes('audio')) return null;
+  const capabilities = [];
+  const declared = Array.isArray(item.capabilities) ? item.capabilities : [];
+  const input = item.capabilities?.input || {};
+  if (modalities.includes('text') || declared.includes('text') || input.text === true) capabilities.push('text');
+  if (modalities.some(value => ['image', 'video', 'pdf'].includes(value)) || declared.includes('vision')
+    || input.image === true || item.capabilities?.image_input?.supported === true) capabilities.push('vision');
+  if (modalities.includes('audio') || declared.includes('audio') || input.audio === true) capabilities.push('audio');
+  if (style === 'anthropic' && !capabilities.includes('text')) capabilities.unshift('text');
+  // 普通 /models 往往只给 ID；不根据“多模态”名称推断视觉或音频能力。
+  if (!capabilities.length) capabilities.push(/(?:transcribe|whisper|[-_/]asr(?:$|[-_.]))/i.test(id) ? 'audio' : 'text');
+  const label = String(item.display_name || item.label || item.name || id).replace(/[\r\n|]/g, ' ').trim();
+  const model = { id, label: label || id, capabilities };
+  if (style !== 'openai') model.api = style;
+  return model;
+}
+
+async function listProviderModels(options = {}) {
+  const provider = options.providerId ? (await getConfig()).providers.find(item => item.id === options.providerId) : null;
+  if (isOpenCodeProvider(provider)) {
+    const imported = await listOpenCodeModels();
+    const target = imported.find(item => item.id === openCodeProviderId(provider));
+    if (!target?.models?.length) throw new Error('该 OpenCode 供应商未返回可用模型');
+    return { models: target.models };
+  }
+  const baseUrl = normalizeBaseUrl(options.baseUrl || provider?.baseUrl || '');
+  const url = new URL(baseUrl);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('请填写有效的 HTTP API Base URL');
+  let key = String(options.key || '').trim();
+  if (!key && provider) {
+    if (baseUrl !== normalizeBaseUrl(provider.baseUrl)) throw new Error('Base URL 已改变，请填写该地址对应的 API Key 后更新模型');
+    key = await getProviderSecret(provider.id);
+  }
+  if (!key) throw new Error('请填写 API Key，或先保存供应商密钥');
+  const existing = Array.isArray(options.models) ? options.models : (provider?.models || []);
+  const styles = [...new Set(existing.map(modelApiStyle))];
+  const anthropic = /(^|\.)anthropic\.com$/i.test(url.hostname) || /\/anthropic(?:\/|$)/i.test(url.pathname)
+    || (styles.length === 1 && styles[0] === 'anthropic');
+  const style = anthropic ? 'anthropic' : (styles.length === 1 ? styles[0] : 'openai');
+  const prefix = url.pathname.replace(/\/(?:chat\/completions|responses|messages|models)\/?$/i, '').replace(/\/+$/, '');
+  // 保留自定义网关的前缀；不把智谱、百炼等路径强制改写为 /v1。
+  url.pathname = `${prefix || '/v1'}/models`;
+  const headers = anthropic ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' }
+    : /(^|\.)xiaomimimo\.com$/i.test(url.hostname) ? { 'api-key': key } : { Authorization: `Bearer ${key}` };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.min(60000, Math.max(100, Number(options.timeoutMs) || 20000)));
+  const models = new Map(), visited = new Set();
+  let page = new URL(url);
+  try {
+    for (let count = 0; count < 30; count++) {
+      if (visited.has(page.href)) throw new Error('模型目录分页重复，请稍后重试');
+      visited.add(page.href);
+      const response = await fetch(page.href, { headers: { Accept: 'application/json', ...headers },
+        signal: controller.signal, redirect: 'error' });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) throw new Error(`模型目录鉴权失败（HTTP ${response.status}），请检查 API Key 与权限`);
+        if (response.status === 404 || response.status === 405) throw new Error(`供应商未提供此地址的模型目录（HTTP ${response.status}），请核对 Base URL；可继续手动维护模型`);
+        throw new Error(`模型目录请求失败（HTTP ${response.status}）`);
+      }
+      let data;
+      try { data = await response.json(); } catch (_) { throw new Error('供应商未返回有效的 JSON 模型目录'); }
+      const entries = Array.isArray(data) ? data : (data?.data || data?.models);
+      if (!Array.isArray(entries)) throw new Error('供应商返回的模型目录格式不受支持');
+      for (const item of entries) {
+        const model = catalogModel(item, style);
+        if (model) models.set(model.id, model);
+      }
+      if (models.size > 10000) throw new Error('模型目录超过数量上限，请缩小供应商目录范围');
+      if (!data.has_more) {
+        if (!models.size) throw new Error('供应商未返回可用模型，原模型列表已保留');
+        return { models: [...models.values()] };
+      }
+      const lastId = data.last_id || entries.at(-1)?.id;
+      if (!lastId) throw new Error('模型目录分页缺少游标，未更新列表');
+      page = new URL(url);
+      page.searchParams.set(anthropic ? 'after_id' : 'after', lastId);
+    }
+    throw new Error('模型目录分页超过上限，未更新列表');
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('获取模型目录超时，请稍后重试');
+    // 不把服务端原始正文或请求头带到页面，避免意外回显密钥。
+    if (error instanceof TypeError) throw new Error('无法获取供应商模型目录，请检查地址、网络或供应商是否开放目录接口');
+    throw error;
+  } finally { clearTimeout(timer); }
+}
+
 function resolveModel(config, capability, selection) {
   const chosen = selection || config.selections?.[capability] || config.selections?.text;
   const provider = config.providers.find(item => item.id === chosen?.providerId);
@@ -349,7 +445,7 @@ function cancel(requestId) {
 
 function createAiRuntime(pluginName, emitChunk) {
   return {
-    getConfig, saveConfig, saveProviderSecret, hasProviderSecret, getProviderSecret, testProvider, listOpenCodeModels,
+    getConfig, saveConfig, saveProviderSecret, hasProviderSecret, getProviderSecret, testProvider, listOpenCodeModels, listProviderModels,
     removeProviderSecret: providerId => ipcRenderer.invoke('plugin-secret-remove', STORAGE_NAME, `provider:${providerId}`),
     complete: request => complete(request, emitChunk), cancel,
     storage: {

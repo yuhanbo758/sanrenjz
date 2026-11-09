@@ -483,45 +483,21 @@ async function fetchToolsAccess() {
 
 async function loadAccountSnapshot() { return loadAccountSnapshotFromSession(); }
 
-function openBuiltinBrowserWindow(url) {
+function openBuiltinBrowserWindow(url, title = '程序小店') {
     bindBuiltinSessionEvents();
-    const browserWin = new BrowserWindow({
-        width: 1100,
-        height: 750,
-        minWidth: 640,
-        minHeight: 480,
-        title: '程序小店',
-        icon: getIconPath(),
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            session: getBuiltinSession()
-        }
-    });
-    browserWin.loadURL(url);
+    const { createBuiltinBrowserWindow } = require(app.isPackaged
+        ? path.join(process.resourcesPath, 'app', 'builtin-browser.js') : './app/builtin-browser');
+    const browserWin = createBuiltinBrowserWindow({ url, title, icon: getIconPath(), session: getBuiltinSession(),
+        toolbarFile: path.join(__dirname, 'assets', 'builtin-browser.html'), isDownloadUrl: isDirectPluginDownloadUrl,
+        isSameSite: isShopUrl, onNewWindow: target => openBuiltinBrowserWindow(target) });
+    const contents = browserWin.getBrowserView().webContents;
     const syncAccountState = () => {
-        syncAccountFromWebContents(browserWin.webContents).catch(() => { });
+        syncAccountFromWebContents(contents).catch(() => { });
     };
-    browserWin.webContents.on('did-finish-load', syncAccountState);
-    browserWin.webContents.on('did-navigate-in-page', syncAccountState);
-    browserWin.webContents.on('did-navigate', syncAccountState);
+    contents.on('did-finish-load', syncAccountState);
+    contents.on('did-navigate-in-page', syncAccountState);
+    contents.on('did-navigate', syncAccountState);
     browserWin.on('focus', syncAccountState);
-    browserWin.webContents.on('will-navigate', (event, targetUrl) => {
-        if (!isDirectPluginDownloadUrl(targetUrl)) return;
-        event.preventDefault();
-        browserWin.webContents.downloadURL(targetUrl);
-    });
-    browserWin.webContents.setWindowOpenHandler(({ url: newUrl }) => {
-        if (isDirectPluginDownloadUrl(newUrl)) {
-            browserWin.webContents.downloadURL(newUrl);
-            return { action: 'deny' };
-        }
-        openBuiltinBrowserWindow(newUrl);
-        return { action: 'deny' };
-    });
-    browserWin.webContents.on('page-title-updated', (_event, title) => {
-        browserWin.setTitle(title || '程序小店');
-    });
     return browserWin;
 }
 

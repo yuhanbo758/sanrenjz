@@ -9,8 +9,9 @@
 - package.name=sanrenjz，appId=com.sanrenjz.app，用户数据固定在 appData/sanrenjz；设置路径必须在各模块初始化前确定。
 - 默认无 Python；启动宿主、浏览插件和导入插件均不得安装 Python、依赖或启动业务任务。
 - 两种插件清单保持兼容：效率 plugin.json，Python settings.json；统一条目使用 tools:/python: 稳定 ID。
-- 效率插件目录 app/software，Python 插件目录 app/python-software；安装态分别为 plugins、python-plugins。用户配置、按需运行时不得放进插件源码或 resources。
-- config/public-plugins.json 是公开安装包允许清单。config/private-plugins.json 中的插件及专用开发文件只在本地保留，Git、默认安装包均排除；新增插件必须显式分类。
+- 效率插件目录 app/software，Python 插件目录 app/python-software；安装态分别为 plugins、python-plugins。用户配置和重要业务数据使用独立数据目录；程序代码、静态资源及可再生成运行文件优先随插件存放，运行生成内容使用可写插件目录的 .runtime，禁止纳入源码提交、分发包或只读 resources。
+- 效率插件更新须自动保留本机 .runtime，覆盖导入、商店 ZIP 和内置插件更新使用同一事务；更新包的 .runtime 不覆盖或合并本机资料，失败恢复旧程序及原运行目录，回滚失败保留恢复材料。
+- config/public-plugins.json 是 GitHub 和公开安装包允许清单。未明确要求开源的新插件默认私有，不加入公开清单；config/private-plugins.json 中的插件及专用开发文件不得进入 GitHub 或默认安装包，允许进入家庭 Gitea 私有备份。
 - 不得使用未锚定的 settings.json 忽略规则，公开 Python 清单必须纳入版本管理。
 - Python 解释器无效时不得静默换用别的解释器；所有 pip 操作必须绑定当前解释器，先展示依赖变更。
 - 继续支持 YUHANBOPY_PLUGIN_CONFIG_FILE/DIR 和既有 .enc 协议；不得记录密钥、配置内容或解密源码。
@@ -38,5 +39,14 @@
 - Release草稿以创建响应中的ID为准，上传、校验和公开均按该ID定位；不得假定按标签或列表立即可见。发布失败保留草稿和恢复材料，不为重试覆盖其他提交的版本。
 - 应用更新仅在用户主动操作时查询 yuhanbo758/sanrenjz 的正式 Release，不复用旧产品地址或商店会员权限；按平台和架构选包，下载及打开安装包前均验证大小和 SHA256，不能因检查更新自动下载或安装。
 - 商店账号查询使用内置商店分区的 HttpOnly Cookie 会话，只有服务明确返回未登录时才兼容旧 Bearer；不得仅凭页面展示或 HTTP 200 判断登录，权限查询失败不等于退出登录，两类会员权限继续分别查询。
+- 内置商店使用独立本地导航栏与远程内容视图，沿用原商店 Session 和 Chromium 浏览历史；店内新窗口商品链接进入当前历史。导航 IPC 只接受本地工具栏主 frame 的固定操作，远程页面不得获得 Node 或导航桥权限。
 - 头像在 Electron 内选择本机图片或恢复默认，仅保存到独立 userData/account-avatar 目录，不上传商店、不改应用设置和登录信息；登录状态变化不得覆盖本地头像。默认及失效回退均使用程序 logo。内联页面以自身 file URL 定位宿主资源，不能依赖 renderer 的 __dirname；读取 build 图标须兼容开发目录和安装态 resources/build，不能假定 extraResources 图标也在 ASAR 内。
 - DMG卸载重试仅限本次构建登记的镜像及其设备，且同时满足退出码16和Resource busy；有限重试后仍失败必须中止，不能修改系统索引、操作其他磁盘或忽略失败。
+
+## 双平台 Git 同步
+
+- 本项目后续 Git 同步默认同时处理 GitHub 公开源码与家庭 Gitea `sanrenjz` 私有源码备份，沿用此范围，无需用户重复声明平台差异；提交推送仍须当前任务授权。
+- GitHub 提交前扫描实际索引，推送前扫描待公开提交及最终树；隐私、未列入公开清单的插件或专用私有文件未通过时必须停止。使用 `.githooks`，新克隆后执行 `git config core.hooksPath .githooks`；不得通过跳过 hooks 绕过检查。
+- Gitea 包含公开、私有及未分类插件和专用开发资料，不使用 GitHub 插件白名单，不执行 GitHub 公开隐私门禁；排除可再生成的依赖、构建产物、运行数据及凭据文件。使用 `python -X utf8 scripts/gitea-private-sync.py --push`，推送前后必须确认目标仍为私有且 Actions 禁用。
+- 两平台必须使用独立 Git 对象库、索引和历史；Gitea 历史保存在本地 `.git/gitea-private.git`，不得合并或推送到 GitHub，也不得给公开仓库配置同时推送两个平台的 pushurl。不得强推覆盖其他设备提交。
+- GitHub Actions 对仅 `app/software`、`app/python-software`、文档及测试的变更不打包；有宿主变化才按流程构建，已有 Release 版本跳过重复打包，不自动修改版本、标签或发布资产。Gitea 禁用 Actions。

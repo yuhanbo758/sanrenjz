@@ -50,7 +50,15 @@ try {
         fs.writeFileSync(path.join(root, location, 'screenshot.png'), binaryPhoto);
     }
     const stage = path.join(root, 'stage-public');
+    const pluginRuntimeLocations = ['app/software/public-tool/.runtime', 'app/python-software/public-python/.runtime'];
+    for (const location of pluginRuntimeLocations) write(path.join(root, location, 'session.dat'), 'must-stay-local');
     createStage({ root, stage });
+    for (const location of pluginRuntimeLocations) {
+        assert(!fs.existsSync(path.join(stage, location)), '构建暂存必须排除插件本机运行资料');
+        assert.strictEqual(fs.readFileSync(path.join(root, location, 'session.dat'), 'utf8'), 'must-stay-local');
+    }
+    assert.strictEqual(auditEntries(pluginRuntimeLocations.map(location => location + '/session.dat'), { publicCatalog, privateCatalog }).length,
+        pluginRuntimeLocations.length, '公开产物审计独立拒绝 .runtime 中的任何文件');
     assert(!fs.existsSync(path.join(stage, 'app', 'software', 'private-tool')));
     assert(!fs.existsSync(path.join(stage, 'app', 'software', 'evil-unlisted')));
     assert(!fs.existsSync(path.join(stage, 'python')) && !fs.existsSync(path.join(stage, 'settings.json')));

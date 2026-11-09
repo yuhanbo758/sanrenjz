@@ -7,7 +7,9 @@ const { app, BrowserWindow, session, globalShortcut, safeStorage } = require('el
 const { PluginCatalog } = require('../app/plugin-catalog');
 const RealManager = require('../app/software_manager');
 const pythonModule = require('../app/python-manager');
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-account-'));
+const temporaryParent = fs.realpathSync(os.tmpdir());
+const root = process.env.SANRENJZ_SHOP_ACCOUNT_ROOT || fs.mkdtempSync(path.join(temporaryParent, 'sanrenjz-account-'));
+if (path.dirname(path.resolve(root)) !== temporaryParent || !path.basename(root).startsWith('sanrenjz-account-') || fs.lstatSync(root).isSymbolicLink()) throw new Error('隔离账号测试目录无效');
 const profile = path.join(root, 'profile'), tools = path.join(root, 'tools'), python = path.join(root, 'python');
 for (const dir of [profile, tools, python]) fs.mkdirSync(dir);
 const fixture = path.join(tools, 'safe-fixture'); fs.mkdirSync(fixture);
@@ -22,7 +24,7 @@ class FixtureManager extends RealManager { constructor(win, options) { super(win
 class FixturePython extends pythonModule.PythonManager { constructor(options) { super({ ...options, pluginDir: python }); } async run() { throw new Error('隔离测试不运行业务'); } }
 require.cache[require.resolve('../app/software_manager')].exports = FixtureManager;
 require.cache[require.resolve('../app/python-manager')].exports = { ...pythonModule, PythonManager: FixturePython };
-const report = { assertions: [], errors: [], isolatedProfile: true, electronVersion: process.versions.electron };
+const report = { runId: process.env.SANRENJZ_SHOP_ACCOUNT_RUN_ID, completed: false, assertions: [], errors: [], isolatedProfile: true, electronVersion: process.versions.electron };
 const check = (value, label) => { assert(value, label); report.assertions.push(label); };
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(fn, label) { for (let i = 0; i < 200; i++) { if (await fn()) return; await delay(25); } throw new Error(label); }
@@ -69,11 +71,14 @@ const ready = new Promise(resolve => app.once('browser-window-created', (_event,
         const first = await invoke('account:me'); check(!first.authenticated && !first.verificationFailed, '无会话明确显示未登录');
         await invoke('account:login');
         let browser;
-        await until(() => { browser = BrowserWindow.getAllWindows().find(candidate => candidate !== win && candidate.webContents.getURL().startsWith(origin)); return browser; }, '未创建隔离商店窗口');
-        await until(() => browser.webContents.executeJavaScript("Boolean(document.getElementById('fixture-login'))").catch(() => false), '隔离页面未就绪');
-        await browser.webContents.executeJavaScript("document.getElementById('fixture-login').click();true");
+        const content = candidate => candidate.getBrowserView()?.webContents || candidate.webContents;
+        await until(() => { browser = BrowserWindow.getAllWindows().find(candidate => candidate !== win && content(candidate).getURL().startsWith(origin)); return browser; }, '未创建隔离商店窗口');
+        const shopContents = content(browser);
+        await until(() => shopContents.executeJavaScript("Boolean(document.getElementById('fixture-login'))").catch(() => false), '隔离页面未就绪');
+        check(shopContents !== browser.webContents && shopContents.session === session.fromPartition('persist:sanrenjz-shop'), '远程商店通过独立BrowserView沿用原登录会话');
+        await shopContents.executeJavaScript("document.getElementById('fixture-login').click();true");
         await until(() => evaluate("accountState.authenticated && document.getElementById('account-name').textContent==='隔离用户'"), 'Cookie登录后宿主未自动同步');
-        check(await browser.webContents.executeJavaScript("!localStorage.getItem('token') && !document.cookie.includes('fixture-browser-session')"), '无localStorage令牌且HttpOnly Cookie对页面脚本不可见');
+        check(await shopContents.executeJavaScript("!localStorage.getItem('token') && !document.cookie.includes('fixture-browser-session')"), '无localStorage令牌且HttpOnly Cookie对页面脚本不可见');
         const loggedIn = await invoke('account:me');
         check(loggedIn.authenticated && loggedIn.access.tools.member && !loggedIn.access.python.member, '真实Electron网络请求使用商店分区Cookie，分别显示两类会员');
         check(!bearerSent && !fs.existsSync(path.join(profile, 'account-token.bin')), '新登录不复制Cookie或创建Bearer文件');
@@ -141,6 +146,7 @@ const ready = new Promise(resolve => app.once('browser-window-created', (_event,
         check(report.errors.length === 0, '无未处理认证错误'); report.success = true;
     } catch (error) { report.success = false; report.errors.push(error.stack || error.message); }
     finally {
+        report.completed = true;
         const output = path.resolve(__dirname, '../dist/shop-account-validation'); fs.mkdirSync(output, { recursive: true });
         fs.writeFileSync(path.join(output, 'electron-report.json'), JSON.stringify(report, null, 2));
         console.log(JSON.stringify(report)); server.close(); app.isQuiting = true; app.exit(report.success ? 0 : 1);

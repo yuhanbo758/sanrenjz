@@ -44,4 +44,25 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(merged.providers)), [
 assert.strictEqual(context.window.AIProviderManager.isOpenCodeProvider({ baseUrl: 'opencode://openai' }), true);
 assert.strictEqual(context.window.AIProviderManager.isOpenCodeProvider({ baseUrl: 'https://api.openai.com/v1' }), false);
 
+const catalog = context.window.AIProviderManager.mergeCatalogModels(
+  [{ id: 'kept', label: '自定义名称', capabilities: ['text', 'vision'], api: 'responses' }, { id: 'retired' }],
+  [{ id: 'kept', label: 'Remote', capabilities: ['text'] }, { id: 'latest', label: 'Latest', capabilities: ['audio'] }]
+);
+assert.deepStrictEqual(JSON.parse(JSON.stringify(catalog)), [
+  { id: 'kept', label: '自定义名称', capabilities: ['text', 'vision'], api: 'responses' },
+  { id: 'latest', label: 'Latest', capabilities: ['audio'] }
+]);
+
+const searchable = [
+  { providerId: 'a', providerName: 'OpenAI', modelId: 'gpt-6-luna', label: 'GPT-6 Luna' },
+  { providerId: 'b', providerName: 'DeepSeek', modelId: 'deepseek-flash', label: '闪电模型' }
+];
+assert.equal(context.window.AIProviderManager.filterModelEntries(searchable, ' OPENAI luna ').length, 1);
+assert.equal(context.window.AIProviderManager.filterModelEntries(searchable, '闪电').length, 1);
+assert.equal(context.window.AIProviderManager.filterModelEntries(searchable, 'gpt-6-luna').length, 1);
+assert.equal(context.window.AIProviderManager.filterModelEntries(searchable, 'OpenAI deepseek').length, 0);
+const unordered = [{ id: 'z', label: 'Zebra' }, { id: 'a10', label: 'Alpha 10' }, { id: 'a2', label: 'alpha 2' }];
+assert.equal(context.window.AIProviderManager.sortModels(unordered).map(model => model.id).join(','), 'a2,a10,z');
+assert.equal(unordered[0].id, 'z');
+
 console.log('AI provider manager tests passed: multi-provider parsing, managed OpenCode import, legacy route detection');

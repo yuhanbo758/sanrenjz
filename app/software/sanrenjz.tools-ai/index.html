@@ -856,7 +856,14 @@
             </p>
         </div>
 
-        <h3>旧版直连 API 密钥</h3>
+        <h3>直连 API 密钥</h3>
+        <div class="settings-item">
+            <label for="openaiKey">OpenAI API Key（官方直连）</label>
+            <input type="password" id="openaiKey" autocomplete="off" placeholder="填写新密钥；留空保留已保存密钥">
+            <button type="button" id="loadOpenAIModelsButton" onclick="loadDirectOpenAIModels()" class="settings-button" style="margin-top:8px;">加载模型</button>
+            <p class="settings-help" id="openaiKeyStatus"></p>
+            <p class="settings-help">加载模型会立即更新本插件的 OpenAI 模型列表并按名称排序；API Key 在点击“保存设置”后加密保存。官方地址已预设。</p>
+        </div>
         <div class="settings-item">
             <label>OpenRouter API Key</label>
             <input type="password" id="openrouterKey" placeholder="sk-...">
@@ -904,6 +911,7 @@
             <div class="settings-item">
                 <label>API 提供商</label>
                 <select id="modelProvider">
+                    <option value="openai">OpenAI 官方直连</option>
                     <option value="openrouter">OpenRouter</option>
                     <option value="gemini">Gemini</option>
                     <option value="deepseek">Deepseek</option>
@@ -1087,19 +1095,20 @@
         });
 
         // 顶部切换模型后，同步共享目录的文本模型选择（与其他 AI 插件行为一致）
-        document.getElementById('currentModel').addEventListener('change', async event => {
-            const option = event.target.options[event.target.selectedIndex];
+        async function persistCurrentModel(option) {
             if (!option || !option.dataset.provider) return;
             const settings = window.services.getSettings();
-            settings.defaultModel = option.value;
-            settings.defaultModelProvider = option.dataset.provider;
-            window.services.saveSettings(settings);
-            if (option.dataset.provider.startsWith('shared:')) {
-                await window.services.saveSharedTextSelection(
-                    option.dataset.provider.slice('shared:'.length),
-                    option.value
-                );
+            if (!window.services.saveSettings({ ...settings, defaultModel: option.value, defaultModelProvider: option.dataset.provider })) throw new Error('模型设置保存失败');
+            try {
+                if (option.dataset.provider.startsWith('shared:')) await window.services.saveSharedTextSelection(option.dataset.provider.slice('shared:'.length), option.value);
+            } catch (error) {
+                window.services.saveSettings(settings);
+                throw error;
             }
+        }
+        document.getElementById('currentModel').addEventListener('change', event => {
+            const option = event.target.options[event.target.selectedIndex];
+            persistCurrentModel(option).catch(error => window.services.showNotification(error.message));
         });
 
         // 初始化
@@ -1208,6 +1217,8 @@
             document.getElementById('openrouterKey').value = settings.openrouterApiKey || '';
             document.getElementById('geminiKey').value = settings.geminiApiKey || '';
             document.getElementById('deepseekKey').value = settings.deepseekApiKey || '';
+            const openaiSaved = await window.services.hasDirectOpenAIKey().catch(() => false);
+            document.getElementById('openaiKeyStatus').textContent = openaiSaved ? 'OpenAI 密钥已加密保存；留空保留。' : '尚未保存 OpenAI 密钥。';
             document.getElementById('savePath').value = settings.savePath || '';
             document.getElementById('promptsPath').value = settings.promptsPath || '';
             document.getElementById('commanderEnabled').checked = settings.commanderEnabled !== false;
@@ -1226,7 +1237,9 @@
             const defaultOption = defaultModelSelect.options[defaultModelSelect.selectedIndex];
             const jevProvider = document.getElementById('jevProvider').value;
             const jevKey = document.getElementById('jevApiKey').value.trim();
+            const openaiKey = document.getElementById('openaiKey').value.trim();
             try {
+                if (openaiKey) await window.services.saveDirectOpenAIKey(openaiKey);
                 if (jevProvider !== 'off') {
                     const existingKey = await window.services.hasDecisionKey(jevProvider);
                     const legacyOpenRouterKey = jevProvider === 'openrouter' && document.getElementById('openrouterKey').value.trim();
@@ -1237,7 +1250,7 @@
                     if (jevKey) await window.services.saveDecisionKey(jevProvider, jevKey);
                 }
             } catch (error) {
-                window.services.showNotification('保存 Jev 密钥失败: ' + error.message);
+                window.services.showNotification('保存密钥失败: ' + error.message);
                 return;
             }
             const newSettings = {
@@ -1255,6 +1268,8 @@
 
             if (window.services.saveSettings(newSettings)) {
                 document.getElementById('jevApiKey').value = '';
+                document.getElementById('openaiKey').value = '';
+                document.getElementById('openaiKeyStatus').textContent = await window.services.hasDirectOpenAIKey() ? 'OpenAI 密钥已加密保存；留空保留。' : '尚未保存 OpenAI 密钥。';
                 window.services.showNotification('设置已保存');
                 toggleSettings();
                 updateModelSelectors();
@@ -1351,6 +1366,21 @@
         };
 
         // 组装模型分组：共享供应商目录在前（按供应商分组），本插件直连与自定义模型在后
+        async function loadDirectOpenAIModels() {
+            const button = document.getElementById('loadOpenAIModelsButton');
+            if (button.disabled) return;
+            button.disabled = true; button.textContent = '加载中…';
+            try {
+                const models = AIProviderManager.sortModels(await window.services.loadOpenAIModels(document.getElementById('openaiKey').value));
+                if (!models.length) throw new Error('OpenAI 未返回可用文字模型，原列表已保留');
+                const settings = window.services.getSettings();
+                if (!window.services.saveSettings({ ...settings, openaiModels: models })) throw new Error('模型列表保存失败');
+                await updateModelSelectors();
+                window.services.showNotification(`已加载 ${models.length} 个 OpenAI 模型，按名称排序`);
+            } catch (error) { window.services.showNotification(`加载模型失败：${error.message}`); }
+            finally { button.disabled = false; button.textContent = '加载模型'; }
+        }
+
         async function getModelGroups() {
             const settings = window.services.getSettings();
             const groups = [];
@@ -1376,7 +1406,7 @@
             groups.forEach(group => {
                 const optgroup = document.createElement('optgroup');
                 optgroup.label = group.label;
-                group.models.forEach(model => {
+                AIProviderManager.sortModels(group.models).forEach(model => {
                     const option = document.createElement('option');
                     option.value = model.value;
                     option.text = model.label;
@@ -1397,11 +1427,13 @@
                 if (option.value !== value) continue;
                 if (!provider || option.dataset.provider === provider) {
                     select.selectedIndex = i;
+                    select.__aiSearchPicker?.refresh().catch(() => {});
                     return;
                 }
                 if (fallbackIndex === -1) fallbackIndex = i;
             }
-            if (fallbackIndex >= 0) select.selectedIndex = fallbackIndex;
+            if (!provider && fallbackIndex >= 0) select.selectedIndex = fallbackIndex;
+            select.__aiSearchPicker?.refresh().catch(() => {});
         }
 
         // 更新模型选择器（顶部当前模型、快捷指令、设置页默认模型共用同一分组数据）
@@ -1417,7 +1449,9 @@
 
             // 顶部当前模型优先跟随共享目录的文本模型选择（与其他 AI 插件一致）
             const sharedSelection = await window.services.getSharedTextSelection();
-            if (sharedSelection && sharedSelection.providerId) {
+            if (settings.defaultModelProvider && !settings.defaultModelProvider.startsWith('shared:')) {
+                selectModelByPair(currentModelSelect, settings.defaultModel, settings.defaultModelProvider);
+            } else if (sharedSelection && sharedSelection.providerId) {
                 selectModelByPair(
                     currentModelSelect,
                     sharedSelection.modelId,
@@ -1436,6 +1470,13 @@
                 selectModelByPair(select, settings.defaultModel, settings.defaultModelProvider);
                 if (select.selectedIndex === -1 && select.options.length) select.selectedIndex = 0;
             });
+            for (const select of [currentModelSelect, qcModelSelect, defaultModelSelect].filter(Boolean)) {
+                if (select.__aiSearchPicker) await select.__aiSearchPicker.refresh();
+                else await AIProviderManager.enhanceSelect(select, {
+                    notify: message => window.services.showNotification(message),
+                    onSelect: select === currentModelSelect ? persistCurrentModel : undefined
+                }).ready;
+            }
         }
 
         // 打开/关闭共享供应商目录抽屉；关闭后刷新模型下拉以应用供应商变更

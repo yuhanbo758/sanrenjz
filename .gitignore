@@ -192,3 +192,5 @@ security-review.md
 *.keystore
 *.jks
 /privacy-reports/
+# 插件本机运行会话、缓存与临时工作目录不得入库
+/app/software/*/.runtime/

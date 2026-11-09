@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { unzipSync } = require('fflate');
+const { replacePluginDirectory } = require('./plugin_store');
 
 function inside(root, candidate) {
     const relative = path.relative(root, candidate);
@@ -71,6 +72,7 @@ async function importTools(source, { toolsDir, manager, overwrite = false }) {
     if (!config || typeof config.pluginName !== 'string' || !config.pluginName.trim() || typeof config.main !== 'string') throw new Error('效率插件必须提供名称和 main 入口');
     const main = path.resolve(root, config.main);
     if (!inside(root, main) || !fs.existsSync(main) || !fs.statSync(main).isFile() || !inside(root, fs.realpathSync(main))) throw new Error('插件入口无效或越界');
+    if (path.relative(root, main).split(path.sep)[0].toLowerCase() === '.runtime') throw new Error('插件入口不能位于本机 .runtime 运行资料目录');
     const installed = await manager.getPluginList();
     const old = installed.find(p => p.name === config.pluginName);
     const target = old?.path || path.join(toolsDir, path.basename(source));
@@ -81,19 +83,10 @@ async function importTools(source, { toolsDir, manager, overwrite = false }) {
     if (occupant && occupant.name !== config.pluginName) throw new Error('目标文件夹属于另一个插件，请使用不同文件夹名称');
     if (old && (manager.pluginWindows.has(old.name) || manager.pluginProcesses.has(old.name))) throw new Error('插件正在运行，请关闭后再替换');
     if (fs.existsSync(target) && !overwrite) { const error = new Error(`插件 ${config.pluginName} 已存在`); error.code = 'PLUGIN_EXISTS'; throw error; }
-    const workspace = fs.mkdtempSync(path.join(toolsDir, '.import-'));
-    const staged = path.join(workspace, 'new'), backup = path.join(workspace, 'old');
-    try {
-        fs.cpSync(root, staged, { recursive: true, filter: p => !['.git', '.downloads', '__pycache__'].includes(path.basename(p)) });
-        if (fs.existsSync(target)) fs.renameSync(target, backup);
-        try { fs.renameSync(staged, target); }
-        catch (error) { if (fs.existsSync(backup)) fs.renameSync(backup, target); throw error; }
-        fs.rmSync(workspace, { recursive: true, force: true });
-        return { name: config.pluginName, path: target, engine: 'tools', action: old ? 'replaced' : 'added' };
-    } catch (error) {
-        if (!fs.existsSync(backup)) fs.rmSync(workspace, { recursive: true, force: true });
-        throw error;
-    }
+    const update = replacePluginDirectory(root, target, {
+        filter: p => !['.git', '.downloads', '__pycache__'].includes(path.basename(p))
+    });
+    return { name: config.pluginName, path: target, engine: 'tools', action: old ? 'replaced' : 'added', ...update };
 }
 
 module.exports = { inside, validateTree, extractZip, findRoots, importTools };

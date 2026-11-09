@@ -167,7 +167,8 @@
           "python-software/cos_downloader/**/*",
           "python-software/file_downloader/**/*",
           "python-software/github_downloader/**/*",
-          "python-software/terminal/**/*"
+          "python-software/terminal/**/*",
+          "!software/*/.runtime{,/**/*}"
         ]
       },
       {

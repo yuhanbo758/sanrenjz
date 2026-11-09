@@ -9,6 +9,7 @@ let isStartingRecording = false;
 let recordingCancelled = false;
 let recordingStartedAt = 0;
 let recordingTimer = null;
+let openaiKeyConfigured = false;
 
 const workspace = {
     card: document.querySelector('.workspace-card'),
@@ -154,6 +155,8 @@ const sharedSpeechModelSelect = document.getElementById('shared-speech-model');
 const sharedAsrSourceSelect = document.getElementById('shared-asr-source');
 const sharedTextModelSelect = document.getElementById('shared-text-model');
 const textModelSourceSelect = document.getElementById('text-model-source');
+const openaiApiKeyInput = document.getElementById('openai-api-key');
+const openaiAsrModelInput = document.getElementById('openai-asr-model');
 const workspaceStatus = document.getElementById('workspace-status');
 const workspaceResult = document.getElementById('workspace-result');
 const geminiKeyInput = document.getElementById('gemini-key');
@@ -408,6 +411,7 @@ function applyOpenAICompatibleProfileToInputs(profile) {
         openaiCompatibleTextModelInput.value = p.textModel || '';
         openaiCompatibleTextModelInput.disabled = !p.enablePostProcess;
     }
+    updateSharedAsrStatus();
 }
 
 function renderOpenAICompatibleProfiles(profiles, activeId) {
@@ -622,6 +626,11 @@ function loadSettings() {
     
     // Defaults
     modelSelect.value = settings.model || 'gemini';
+    if (openaiAsrModelInput) openaiAsrModelInput.value = settings.openaiAsrModel || 'gpt-transcribe';
+    refreshOpenAIKeyStatus().catch(error => {
+        const status = document.getElementById('openai-key-status');
+        if (status) status.textContent = `密钥状态读取失败：${error.message}`;
+    });
     if (sharedAsrSourceSelect) sharedAsrSourceSelect.value = settings.sharedAsrSource || 'openai-compatible';
     if (textModelSourceSelect) textModelSourceSelect.value = settings.textModelSource === 'shared' ? 'shared' : 'local';
     refreshSharedModels(settings).catch(error => { if (workspaceStatus) workspaceStatus.textContent = `共享模型读取失败：${error.message}`; });
@@ -874,32 +883,65 @@ function updateModelVisibility() {
     if (sharedAudioConfig) sharedAudioConfig.style.display = modelSelect.value === 'shared-audio' ? 'block' : 'none';
     const sharedModelConfig = document.getElementById('shared-model-config');
     if (sharedModelConfig) sharedModelConfig.style.display = modelSelect.value === 'shared-model' ? 'block' : 'none';
-    if (modelSelect.value === 'gemini') {
-        geminiConfig.style.display = 'block';
-        qwenConfig.style.display = 'none';
-        siliconflowConfig.style.display = 'none';
-        if (openaiCompatibleConfig) openaiCompatibleConfig.style.display = 'none';
-    } else if (modelSelect.value === 'qwen') {
-        geminiConfig.style.display = 'none';
-        qwenConfig.style.display = 'block';
-        siliconflowConfig.style.display = 'none';
-        if (openaiCompatibleConfig) openaiCompatibleConfig.style.display = 'none';
-    } else if (modelSelect.value === 'openai-compatible') {
-        geminiConfig.style.display = 'none';
-        qwenConfig.style.display = 'none';
-        siliconflowConfig.style.display = 'none';
-        if (openaiCompatibleConfig) openaiCompatibleConfig.style.display = 'block';
-    } else if (modelSelect.value === 'shared-audio' || modelSelect.value === 'shared-model') {
-        geminiConfig.style.display = 'none';
-        qwenConfig.style.display = 'none';
-        siliconflowConfig.style.display = 'none';
-        if (openaiCompatibleConfig) openaiCompatibleConfig.style.display = 'none';
-    } else {
-        geminiConfig.style.display = 'none';
-        qwenConfig.style.display = 'none';
-        siliconflowConfig.style.display = 'block';
-        if (openaiCompatibleConfig) openaiCompatibleConfig.style.display = 'none';
-    }
+    // 共享模型只处理转写文字，仍须显示第一步所用语音服务的配置。
+    const source = modelSelect.value === 'shared-model'
+        ? (sharedAsrSourceSelect?.value || 'openai-compatible') : modelSelect.value;
+    const openaiConfig = document.getElementById('openai-config');
+    if (openaiConfig) openaiConfig.style.display = source === 'openai' ? 'block' : 'none';
+    geminiConfig.style.display = source === 'gemini' ? 'block' : 'none';
+    qwenConfig.style.display = source === 'qwen' ? 'block' : 'none';
+    siliconflowConfig.style.display = source === 'siliconflow' ? 'block' : 'none';
+    if (openaiCompatibleConfig) openaiCompatibleConfig.style.display = source === 'openai-compatible' ? 'block' : 'none';
+    updateSharedAsrStatus();
+}
+
+function getSharedAsrConfigurationError(settings) {
+    const source = settings.sharedAsrSource || 'openai-compatible';
+    const missing = [];
+    const requireValue = (value, label) => { if (!String(value || '').trim()) missing.push(label); };
+    const labels = { openai: 'OpenAI 官方', 'openai-compatible': 'OpenAI 兼容', gemini: 'Gemini', qwen: 'Qwen', siliconflow: '硅基流动' };
+    if (source === 'openai') {
+        if (!openaiKeyConfigured) return '请先填写 OpenAI API Key 并保存设置。';
+    } else if (source === 'openai-compatible') {
+        const profile = getActiveOpenAICompatibleProfile(settings);
+        requireValue(profile.baseUrl, 'API 地址');
+        requireValue(profile.apiKey, 'API Key');
+        requireValue(profile.audioModel, '语音模型');
+    } else if (source === 'gemini') requireValue(settings.geminiKey, 'API Key');
+    else if (source === 'qwen') requireValue(settings.qwenKey, 'API Key');
+    else if (source === 'siliconflow') requireValue(settings.siliconflowKey, 'API Key');
+    else return '无效的语音识别来源，请重新选择并保存设置。';
+    return missing.length ? `${labels[source]} 语音配置尚未完成：缺少 ${missing.join('、')}。请在语音识别设置中补齐并保存；共享处理模型不会自动提供语音转写配置。` : '';
+}
+
+function getSpeechConfigurationError(settings) {
+    if (settings.model === 'openai') return getSharedAsrConfigurationError({ ...settings, sharedAsrSource: 'openai' });
+    if (settings.model !== 'shared-model') return '';
+    if (!settings.sharedSpeechSelection?.providerId || !settings.sharedSpeechSelection?.modelId) return '请先选择并保存共享 AI 模型。';
+    return getSharedAsrConfigurationError(settings);
+}
+
+async function refreshOpenAIKeyStatus() {
+    const status = await window.electronAPI.openai.getStatus();
+    openaiKeyConfigured = !!status.hasKey;
+    const message = document.getElementById('openai-key-status');
+    if (message) message.textContent = openaiKeyConfigured
+        ? 'API Key 已加密保存；输入框留空会保留原密钥。' : '尚未保存 API Key，请填写后保存设置。';
+    if (openaiApiKeyInput) openaiApiKeyInput.placeholder = openaiKeyConfigured ? '已保存；留空保留，填写新值可替换' : '填写 OpenAI API Key，保存后即可使用';
+    updateSharedAsrStatus();
+}
+
+function updateSharedAsrStatus() {
+    const status = document.getElementById('shared-asr-status');
+    if (!status || modelSelect.value !== 'shared-model') return;
+    const settings = {
+        sharedAsrSource: sharedAsrSourceSelect?.value || 'openai-compatible',
+        openaiCompatibleProfiles: [readOpenAICompatibleProfileFromInputs('preview')],
+        geminiKey: geminiKeyInput.value, qwenKey: qwenKeyInput.value, siliconflowKey: siliconflowKeyInput.value
+    };
+    const error = getSharedAsrConfigurationError(settings);
+    status.textContent = error || '语音配置已填写，请保存设置后使用。录音先转写，再交给上方共享模型处理文字。';
+    status.style.color = error ? '#b45309' : '';
 }
 
 function readSharedSelection(select) {
@@ -948,6 +990,10 @@ function updateTextModelSource() {
 function setupEventListeners() {
     // Settings
     modelSelect.addEventListener('change', updateModelVisibility);
+    sharedAsrSourceSelect?.addEventListener('change', updateModelVisibility);
+    for (const input of [openaiCompatibleUrlInput, openaiCompatibleKeyInput, openaiCompatibleAudioModelInput, geminiKeyInput, qwenKeyInput, siliconflowKeyInput]) {
+        input?.addEventListener('input', updateSharedAsrStatus);
+    }
     textModelSourceSelect?.addEventListener('change', updateTextModelSource);
     document.getElementById('shared-audio-refresh')?.addEventListener('click', () => refreshSharedModels().catch(showProcessingError));
     document.getElementById('shared-model-refresh')?.addEventListener('click', () => refreshSharedModels().catch(showProcessingError));
@@ -1194,11 +1240,26 @@ function setupEventListeners() {
         systemPromptInput.value = active.prompt || '';
     });
     
-    saveSettingsBtn.addEventListener('click', () => {
+    saveSettingsBtn.addEventListener('click', async () => {
+        if (openaiApiKeyInput?.value.trim()) {
+            saveSettingsBtn.disabled = true;
+            try {
+                await window.electronAPI.openai.saveKey(openaiApiKeyInput.value);
+                openaiApiKeyInput.value = '';
+                await refreshOpenAIKeyStatus();
+            } catch (error) {
+                setWorkspaceStatus(`OpenAI 密钥保存失败：${error.message}`, 'error');
+                alert(`OpenAI 密钥保存失败：${error.message}`);
+                return;
+            } finally {
+                saveSettingsBtn.disabled = false;
+            }
+        }
         persistOpenAICompatibleProfileFromInputs();
         const textProvider = persistTextProviderInputs();
         const settings = {
             model: modelSelect.value,
+            openaiAsrModel: openaiAsrModelInput?.value.trim() || 'gpt-transcribe',
             geminiKey: geminiKeyInput.value,
             geminiModel: geminiModelSelect.value,
             qwenKey: qwenKeyInput.value,
@@ -1229,7 +1290,10 @@ function setupEventListeners() {
             activePromptProfileId: activeId
         });
         
-        alert('设置已保存');
+        updateSharedAsrStatus();
+        const error = getSpeechConfigurationError(window.electronAPI.storage.get('settings') || {});
+        if (error) setWorkspaceStatus(error, 'error');
+        alert(error ? `设置已保存，但还不能识别语音：${error}` : '设置已保存');
     });
     const closeBtn = document.getElementById('close-btn');
     if (closeBtn) closeBtn.addEventListener('click', async () => {
@@ -1524,6 +1588,11 @@ function onRightCtrlUp() {
 
 async function startRecording(source = 'hotkey') {
     if (isRecording || isProcessing || isStartingRecording) return;
+    const configurationError = getSpeechConfigurationError(window.electronAPI.storage.get('settings') || {});
+    if (configurationError) {
+        setWorkspaceStatus(configurationError, 'error');
+        return;
+    }
     isStartingRecording = true;
     updateWorkspaceControls();
     setWorkspaceStatus('正在请求麦克风权限…');
@@ -1586,6 +1655,12 @@ function stopRecording() {
 async function processAudio(blob, { autoInsert = true } = {}) {
     if (isProcessing) return;
     const settings = window.electronAPI.storage.get('settings') || {};
+    const configurationError = getSpeechConfigurationError(settings);
+    if (configurationError) {
+        setSpeechState('ready');
+        setWorkspaceStatus(configurationError, 'error');
+        return;
+    }
     const model = settings.model || 'gemini';
     const activePrompt = getActivePrompt();
     const prompt = (activePrompt && activePrompt.prompt) ? activePrompt.prompt : 'Convert speech to text.';
@@ -1600,7 +1675,9 @@ async function processAudio(blob, { autoInsert = true } = {}) {
     let text = '';
     let postProcessError = null;
     try {
-        if (model === 'gemini') {
+        if (model === 'openai') {
+            text = await callOpenAITranscribe(blob, settings);
+        } else if (model === 'gemini') {
             text = await callGemini(blob, settings.geminiKey, settings.geminiModel || 'gemini-3-flash-preview', recognitionPrompt);
         } else if (model === 'qwen') {
             text = await callQwenTranscribe(blob, settings.qwenKey, settings.qwenModel, prompt);
@@ -1608,7 +1685,8 @@ async function processAudio(blob, { autoInsert = true } = {}) {
             const selection = settings.sharedSpeechSelection;
             if (!selection?.providerId || !selection?.modelId) throw new Error('请先选择并保存共享 AI 模型');
             const asrSource = settings.sharedAsrSource || 'openai-compatible';
-            if (asrSource === 'gemini') text = await callGemini(blob, settings.geminiKey, settings.geminiModel || 'gemini-3-flash-preview', recognitionPrompt);
+            if (asrSource === 'openai') text = await callOpenAITranscribe(blob, settings);
+            else if (asrSource === 'gemini') text = await callGemini(blob, settings.geminiKey, settings.geminiModel || 'gemini-3-flash-preview', recognitionPrompt);
             else if (asrSource === 'qwen') text = await callQwenTranscribe(blob, settings.qwenKey, settings.qwenModel, recognitionPrompt);
             else if (asrSource === 'siliconflow') text = await callSiliconFlowTranscribe(blob, settings.siliconflowKey, settings.siliconflowAsrModel || 'TeleAI/TeleSpeechASR');
             else if (asrSource === 'openai-compatible') {
@@ -1969,6 +2047,15 @@ async function callSiliconFlowTranscribe(blob, apiKey, model) {
         mimeType
     });
     return (out || '').trim();
+}
+
+async function callOpenAITranscribe(blob, settings) {
+    if (!blob?.size) throw new Error('录音数据为空');
+    const out = await window.electronAPI.openai.transcribe({
+        model: settings.openaiAsrModel || 'gpt-transcribe',
+        audioBase64: await blobToBase64(blob), mimeType: blob.type || 'audio/webm'
+    });
+    return String(out || '').trim();
 }
 
 async function callOpenAICompatibleTranscribe(blob, options) {

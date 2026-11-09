@@ -1,5 +1,6 @@
 (function (global) {
   const STYLE_ID = 'ai-provider-manager-style';
+  let pickerCounter = 0;
 
   function injectStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -7,8 +8,17 @@
     style.id = STYLE_ID;
     style.textContent = `
       .ai-model-picker{display:flex;align-items:center;gap:7px;white-space:nowrap}
-      .ai-model-picker select{width:min(230px,25vw);min-width:150px;border:1px solid var(--bd,#dbe2ea);border-radius:8px;background:var(--sf,#fff);color:var(--ink,#172033);padding:7px 10px;font:12px var(--sans,-apple-system,"Segoe UI",sans-serif);outline:none;cursor:pointer}
-      .ai-model-picker select:focus{border-color:var(--al,#8b5cf6)}
+      .ai-model-picker select[hidden]{display:none}
+      .ai-model-picker-native{width:100%;min-width:0}.ai-model-picker-native .ai-model-trigger{width:100%;min-width:0}
+      .ai-model-trigger{width:min(230px,25vw);min-width:150px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--bd,#dbe2ea);border-radius:8px;background:var(--sf,#fff);color:var(--ink,#172033);padding:7px 10px;font:12px var(--sans,-apple-system,"Segoe UI",sans-serif);cursor:pointer}
+      .ai-model-trigger:focus-visible{outline:2px solid var(--al,#8b5cf6);outline-offset:2px}
+      .ai-model-trigger:disabled{opacity:.65;cursor:default}.ai-model-trigger-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .ai-model-popup{position:fixed;z-index:9999;display:flex;flex-direction:column;border:1px solid var(--bd,#dbe2ea);border-radius:10px;background:var(--sf,#fff);color:var(--ink,#172033);box-shadow:0 8px 28px #0003;padding:8px;box-sizing:border-box;font:12px var(--sans,-apple-system,"Segoe UI",sans-serif)}
+      .ai-model-popup[hidden]{display:none}.ai-model-search{width:100%;min-height:34px;box-sizing:border-box;border:1px solid var(--bd,#dbe2ea);border-radius:7px;background:var(--s2,#f7f8fa);color:inherit;padding:7px 9px;font:inherit}
+      .ai-model-search:focus{outline:2px solid var(--al,#8b5cf6);outline-offset:-1px}.ai-model-results{overflow:auto;min-height:0;margin-top:5px;overscroll-behavior:contain}
+      .ai-model-group{padding:6px;color:var(--mt,#667085);font-size:11px;font-weight:600}.ai-model-option{padding:8px;border-radius:6px;cursor:pointer;overflow-wrap:anywhere}
+      .ai-model-option.active{background:var(--s2,#f0f2f5)}.ai-model-option[aria-selected="true"]{color:var(--a,#4f46e5);font-weight:600}
+      .ai-model-option small{display:block;color:var(--mt,#667085);font:10px/1.5 var(--mono,Consolas,monospace);font-weight:400}.ai-model-search-status{padding:6px;color:var(--mt,#667085);font-size:11px}
       .ai-provider-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-right:28px}
       .ai-provider-head h2{margin:0!important}
       .ai-provider-head-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
@@ -38,7 +48,7 @@
       .ai-provider-help{font-size:10px;color:var(--mt,#667085);margin-top:4px;line-height:1.5}
       .ai-provider-form-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
       .ai-provider-empty{padding:16px;text-align:center;color:var(--mt,#667085);font-size:12px;border:1px dashed var(--bd,#dbe2ea);border-radius:9px}
-      @media(max-width:1000px){.ai-model-picker label{display:none}.ai-model-picker select{width:170px;min-width:120px}}
+      @media(max-width:1000px){.ai-model-picker label{display:none}.ai-model-trigger{width:170px;min-width:120px}}
     `;
     document.head.appendChild(style);
   }
@@ -164,10 +174,29 @@
   }
 
   function serializeModels(models) {
-    return (models || []).map(model => {
+    return sortModels(models).map(model => {
       const line = `${model.id} | ${model.label || model.id} | ${(model.capabilities || ['text']).join(',')}`;
       return model.api && API_STYLES.includes(model.api) ? `${line} | ${model.api}` : line;
     }).join('\n');
+  }
+
+  function sortModels(models) {
+    const compare = (a, b) => String(a || '').localeCompare(String(b || ''), 'en', { sensitivity: 'base', numeric: true });
+    return [...(models || [])].sort((a, b) => compare(a.label || a.id || a.value, b.label || b.id || b.value)
+      || compare(a.id || a.value, b.id || b.value));
+  }
+
+  function mergeCatalogModels(existing, fetched) {
+    const saved = new Map((existing || []).map(model => [model.id, model]));
+    return (fetched || []).map(model => saved.has(model.id) ? { ...model, ...saved.get(model.id) } : model);
+  }
+
+  function filterModelEntries(entries, query) {
+    const words = [...new Set(String(query || '').toLocaleLowerCase().trim().split(/\s+/).filter(Boolean))];
+    return entries.filter(entry => {
+      const text = `${entry.label} ${entry.modelId} ${entry.providerName} ${entry.providerId}`.toLocaleLowerCase();
+      return words.every(word => text.includes(word));
+    });
   }
 
   function isOpenCodeProvider(provider) {
@@ -185,7 +214,7 @@
       source: 'opencode',
       transport: 'opencode',
       managed: true,
-      models: (provider.models || []).map(model => ({ ...model, sourceModelId: model.id }))
+      models: sortModels(provider.models).map(model => ({ ...model, sourceModelId: model.id }))
     }));
     return { providers: [...manual, ...managed], managed };
   }
@@ -195,11 +224,15 @@
     const capability = options.capability === 'vision' ? 'vision' : 'text';
     const drawer = document.querySelector(options.drawer || '#drawer');
     const overlay = document.querySelector(options.overlay || '#overlay');
-    const before = document.querySelector(options.before || '.gear');
+    const before = options.beforeElement || document.querySelector(options.before || '.gear');
     let config = null;
     let selection = null;
     let editingId = '';
     let modelSelect = null;
+    let editRevision = 0;
+    let pickerEntries = [], filteredEntries = [], activeIndex = -1;
+    let pickerTrigger, pickerLabel, pickerPopup, pickerSearch, pickerResults, pickerStatus;
+    let selectingModel = false, composingSearch = false;
 
     const notify = message => {
       if (typeof options.notify === 'function') options.notify(message);
@@ -224,7 +257,8 @@
           <div class="ai-provider-field"><label>Base URL</label><input data-ai-url placeholder="https://api.example.com/v1"></div>
           <div class="ai-provider-field"><label>模型列表</label><textarea data-ai-models placeholder="glm-4-flash | GLM-4 Flash | text\ndeepseek-chat | DeepSeek Chat | text"></textarea><div class="ai-provider-help">每行格式：模型 ID | 显示名称 | 能力。能力支持 text、vision、audio，多模态可组合（如 text,vision 或 text,vision,audio）；可选第四列接口类型 openai / anthropic / responses。</div></div>
           <div class="ai-provider-field"><label>API Key</label><input data-ai-key type="password" placeholder="留空则保留已有密钥"></div>
-          <div class="ai-provider-form-actions"><button class="ai-provider-save" type="submit">保存供应商</button><button class="ai-provider-secondary" type="button" data-ai-test>测试</button><button class="ai-provider-secondary" type="button" data-ai-cancel>取消编辑</button><button class="ai-provider-secondary" type="button" data-ai-remove-key style="display:none">清除密钥</button></div>
+          <div class="ai-provider-form-actions"><button class="ai-provider-save" type="submit">保存供应商</button><button class="ai-provider-secondary" type="button" data-ai-test>测试</button><button class="ai-provider-secondary" type="button" data-ai-update-models>更新模型</button><button class="ai-provider-secondary" type="button" data-ai-cancel>取消编辑</button><button class="ai-provider-secondary" type="button" data-ai-remove-key style="display:none">清除密钥</button></div>
+          <div class="ai-provider-help" data-ai-update-status role="status" aria-live="polite">更新模型会获取供应商当前返回的目录，核对后点击“保存供应商”生效。</div>
         </form>`;
       drawer.querySelector('[data-ai-close]').onclick = closeDrawer;
       drawer.querySelector('[data-ai-add]').onclick = () => editProvider('');
@@ -233,6 +267,7 @@
       drawer.querySelector('[data-ai-remove-key]').onclick = removeKey;
       drawer.querySelector('[data-ai-preset]').onchange = applyPreset;
       drawer.querySelector('[data-ai-test]').onclick = testConnection;
+      drawer.querySelector('[data-ai-update-models]').onclick = updateModels;
       drawer.querySelector('[data-ai-form]').onsubmit = saveProvider;
     }
 
@@ -240,13 +275,152 @@
       if (!before?.parentNode) return;
       const wrap = document.createElement('div');
       wrap.className = 'ai-model-picker';
+      if (options.nativeSelect) wrap.classList.add('ai-model-picker-native');
       const label = document.createElement('label');
       label.textContent = capability === 'vision' ? '视觉模型' : '当前模型';
+      if (options.nativeSelect) label.hidden = true;
       modelSelect = document.createElement('select');
       modelSelect.setAttribute('aria-label', label.textContent);
+      modelSelect.hidden = true;
       modelSelect.onchange = selectModel;
-      wrap.append(label, modelSelect);
+      const id = `ai-model-picker-${++pickerCounter}`;
+      pickerTrigger = document.createElement('button');
+      pickerTrigger.type = 'button';
+      pickerTrigger.className = 'ai-model-trigger';
+      pickerTrigger.setAttribute('aria-haspopup', 'listbox');
+      pickerTrigger.setAttribute('aria-expanded', 'false');
+      pickerTrigger.setAttribute('aria-controls', `${id}-results`);
+      pickerLabel = document.createElement('span');
+      pickerLabel.className = 'ai-model-trigger-name';
+      const arrow = document.createElement('span'); arrow.textContent = '▾'; arrow.setAttribute('aria-hidden', 'true');
+      pickerTrigger.append(pickerLabel, arrow);
+      pickerPopup = document.createElement('div');
+      pickerPopup.className = 'ai-model-popup'; pickerPopup.hidden = true;
+      pickerSearch = document.createElement('input');
+      pickerSearch.type = 'search'; pickerSearch.className = 'ai-model-search';
+      pickerSearch.placeholder = '搜索模型名称、ID 或供应商';
+      pickerSearch.setAttribute('aria-label', '搜索模型');
+      pickerSearch.setAttribute('role', 'combobox');
+      pickerSearch.setAttribute('aria-autocomplete', 'list');
+      pickerSearch.setAttribute('aria-expanded', 'false');
+      pickerSearch.setAttribute('aria-controls', `${id}-results`);
+      pickerResults = document.createElement('div'); pickerResults.id = `${id}-results`;
+      pickerResults.className = 'ai-model-results'; pickerResults.setAttribute('role', 'listbox');
+      pickerResults.setAttribute('aria-label', label.textContent);
+      pickerStatus = document.createElement('div'); pickerStatus.className = 'ai-model-search-status';
+      pickerStatus.setAttribute('role', 'status');
+      pickerPopup.append(pickerSearch, pickerResults, pickerStatus);
+      document.body.appendChild(pickerPopup);
+      pickerTrigger.onclick = () => pickerPopup.hidden ? openPicker() : closePicker();
+      pickerTrigger.onkeydown = event => {
+        if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
+          event.preventDefault(); event.stopPropagation(); if (!event.repeat) openPicker();
+        }
+      };
+      pickerSearch.oninput = () => { if (!composingSearch) renderSearchResults(); };
+      pickerSearch.addEventListener('compositionstart', () => { composingSearch = true; });
+      pickerSearch.addEventListener('compositionend', () => { composingSearch = false; renderSearchResults(); });
+      pickerSearch.onkeydown = event => {
+        event.stopPropagation();
+        if (event.isComposing || composingSearch || event.keyCode === 229) return;
+        if (event.key === 'Escape') { event.preventDefault(); closePicker(true); }
+        else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (filteredEntries.length) {
+            activeIndex = (activeIndex + (event.key === 'ArrowDown' ? 1 : -1) + filteredEntries.length) % filteredEntries.length;
+            updateActiveOption(true);
+          }
+        } else if (event.key === 'Enter' && !event.repeat) {
+          event.preventDefault(); chooseEntry(filteredEntries[activeIndex]);
+        } else if (event.key === 'Tab') closePicker();
+      };
+      pickerSearch.addEventListener('keyup', event => event.stopPropagation());
+      document.addEventListener('pointerdown', event => {
+        if (!wrap.contains(event.target) && !pickerPopup.contains(event.target)) closePicker();
+      });
+      global.addEventListener('resize', positionPicker);
+      document.addEventListener('scroll', event => { if (!pickerPopup.contains(event.target)) positionPicker(); }, true);
+      wrap.append(label, pickerTrigger, modelSelect);
       before.parentNode.insertBefore(wrap, before);
+    }
+
+    function positionPicker() {
+      if (!pickerPopup || pickerPopup.hidden) return;
+      const rect = pickerTrigger.getBoundingClientRect();
+      const width = Math.min(420, Math.max(300, rect.width), global.innerWidth - 16);
+      pickerPopup.style.width = `${width}px`;
+      pickerPopup.style.left = `${Math.max(8, Math.min(rect.left, global.innerWidth - width - 8))}px`;
+      const below = global.innerHeight - rect.bottom - 14;
+      const above = rect.top - 14;
+      const upwards = below < 260 && above > below;
+      const height = Math.max(80, Math.min(420, upwards ? above : below, global.innerHeight - 16));
+      pickerPopup.style.maxHeight = `${height}px`;
+      pickerPopup.style.top = `${upwards ? Math.max(8, rect.top - pickerPopup.getBoundingClientRect().height - 6) : rect.bottom + 6}px`;
+    }
+
+    function openPicker() {
+      if (selectingModel || !selection) return;
+      pickerPopup.hidden = false; pickerSearch.value = ''; composingSearch = false;
+      pickerTrigger.setAttribute('aria-expanded', 'true'); pickerSearch.setAttribute('aria-expanded', 'true');
+      renderSearchResults(); positionPicker(); pickerSearch.focus();
+    }
+
+    function closePicker(restoreFocus = false) {
+      if (!pickerPopup || pickerPopup.hidden) return;
+      pickerPopup.hidden = true;
+      pickerTrigger.setAttribute('aria-expanded', 'false'); pickerSearch.setAttribute('aria-expanded', 'false');
+      if (restoreFocus) pickerTrigger.focus();
+    }
+
+    function updateActiveOption(scroll = false) {
+      const options = pickerResults.querySelectorAll('[role="option"]');
+      options.forEach((option, index) => option.classList.toggle('active', index === activeIndex));
+      const active = options[activeIndex];
+      if (active) {
+        pickerSearch.setAttribute('aria-activedescendant', active.id);
+        if (scroll) active.scrollIntoView({ block: 'nearest' });
+      } else pickerSearch.removeAttribute('aria-activedescendant');
+    }
+
+    function renderSearchResults() {
+      if (!pickerResults) return;
+      filteredEntries = filterModelEntries(pickerEntries, pickerSearch.value);
+      activeIndex = Math.max(0, filteredEntries.findIndex(entry => entry.providerId === selection?.providerId && entry.modelId === selection?.modelId));
+      pickerResults.replaceChildren();
+      let provider = '';
+      filteredEntries.forEach((entry, index) => {
+        if (provider !== entry.providerId) {
+          const heading = document.createElement('div'); heading.className = 'ai-model-group'; heading.textContent = entry.providerName;
+          pickerResults.appendChild(heading); provider = entry.providerId;
+        }
+        const option = document.createElement('div'); option.className = 'ai-model-option';
+        option.id = `${pickerResults.id}-${index}`; option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(entry.providerId === selection?.providerId && entry.modelId === selection?.modelId));
+        const name = document.createElement('span'); name.textContent = entry.label;
+        const detail = document.createElement('small'); detail.textContent = entry.modelId;
+        option.append(name, detail);
+        option.onclick = () => chooseEntry(entry);
+        option.onpointermove = () => { activeIndex = index; updateActiveOption(); };
+        pickerResults.appendChild(option);
+      });
+      pickerStatus.textContent = filteredEntries.length ? `${filteredEntries.length} 个匹配模型 · ↑↓ 选择，回车确认，Esc 取消` : '没有匹配的模型，请更换关键词';
+      updateActiveOption();
+    }
+
+    function updatePickerLabel() {
+      if (!pickerTrigger) return;
+      const entry = pickerEntries.find(item => item.providerId === selection?.providerId && item.modelId === selection?.modelId);
+      pickerLabel.textContent = selectingModel ? '切换中…' : entry?.label || (capability === 'vision' ? '无可用视觉模型' : '无可用文本模型');
+      pickerTrigger.disabled = selectingModel || !entry;
+      pickerTrigger.title = entry ? `${entry.providerName} / ${entry.label} (${entry.modelId})` : pickerLabel.textContent;
+      pickerTrigger.setAttribute('aria-label', `${capability === 'vision' ? '视觉模型' : '当前模型'}：${pickerTrigger.title}`);
+      pickerPopup.setAttribute('aria-busy', String(selectingModel));
+    }
+
+    function chooseEntry(entry) {
+      if (!entry || selectingModel) return;
+      modelSelect.value = JSON.stringify({ providerId: entry.providerId, modelId: entry.modelId });
+      return selectModel();
     }
 
     async function loadConfig() {
@@ -276,7 +450,7 @@
         card.querySelector('.ai-provider-card-name').textContent = provider.name || provider.id;
         card.querySelector('.ai-provider-card-url').textContent = provider.baseUrl || '';
         const models = card.querySelector('.ai-provider-models');
-        (provider.models || []).forEach(model => {
+        sortModels(provider.models).forEach(model => {
           const chip = document.createElement('span');
           chip.className = 'ai-provider-model';
           chip.textContent = model.label || model.id;
@@ -324,9 +498,10 @@
     async function renderModels() {
       if (!modelSelect) return;
       modelSelect.innerHTML = '';
+      pickerEntries = [];
       const available = [];
       config.providers.forEach(provider => {
-        const models = (provider.models || []).filter(model => (model.capabilities || []).includes(capability));
+        const models = sortModels(provider.models).filter(model => (model.capabilities || []).includes(capability));
         if (!models.length) return;
         const group = document.createElement('optgroup');
         group.label = provider.name || provider.id;
@@ -336,12 +511,15 @@
           option.textContent = model.label || model.id;
           group.appendChild(option);
           available.push({ providerId: provider.id, modelId: model.id });
+          pickerEntries.push({ providerId: provider.id, providerName: provider.name || provider.id, modelId: model.id, label: model.label || model.id });
         });
         modelSelect.appendChild(group);
       });
       const stored = config.selections[capability];
       selection = available.find(item => item.providerId === stored?.providerId && item.modelId === stored?.modelId) || available[0] || null;
       modelSelect.disabled = !selection;
+      updatePickerLabel();
+      if (pickerPopup && !pickerPopup.hidden) renderSearchResults();
       if (!selection) {
         const option = document.createElement('option');
         option.textContent = capability === 'vision' ? '无可用视觉模型' : '无可用文本模型';
@@ -356,20 +534,56 @@
     }
 
     async function selectModel() {
-      if (!modelSelect.value) return;
-      selection = JSON.parse(modelSelect.value);
-      config.selections[capability] = { ...selection };
-      await api.saveConfig(config);
-      notify('已切换模型');
+      if (!modelSelect.value || selectingModel) return;
+      const next = JSON.parse(modelSelect.value);
+      const candidate = { ...config, selections: { ...config.selections, [capability]: next } };
+      selectingModel = true; updatePickerLabel();
+      try {
+        // 搜索只筛选候选；明确选择且保存成功后才改变当前模型。
+        if (await api.saveConfig(candidate) === false) throw new Error('设置保存失败');
+        config = candidate; selection = next;
+        closePicker(true); notify('已切换模型');
+      } catch (error) {
+        modelSelect.value = JSON.stringify(selection);
+        notify(`模型切换失败：${error instanceof Error ? error.message : String(error)}`);
+      } finally { selectingModel = false; updatePickerLabel(); renderSearchResults(); }
     }
 
     function applyPreset(event) {
+      editRevision++;
       const index = Number(event.target.value);
       const preset = PRESET_PROVIDERS[index];
       if (!preset) return;
       drawer.querySelector('[data-ai-name]').value = preset.name;
       drawer.querySelector('[data-ai-url]').value = preset.baseUrl;
       drawer.querySelector('[data-ai-models]').value = serializeModels(preset.models);
+    }
+
+    async function updateModels() {
+      const button = drawer.querySelector('[data-ai-update-models]');
+      if (button.disabled) return;
+      const field = name => drawer.querySelector(`[data-ai-${name}]`);
+      const snapshot = { revision: editRevision, id: editingId, url: field('url').value, key: field('key').value,
+        models: field('models').value, name: field('name').value };
+      const unchanged = () => snapshot.revision === editRevision && snapshot.id === editingId
+        && snapshot.url === field('url').value && snapshot.key === field('key').value
+        && snapshot.models === field('models').value && snapshot.name === field('name').value;
+      const status = drawer.querySelector('[data-ai-update-status]');
+      button.disabled = true; button.textContent = '更新中…';
+      try {
+        if (typeof api.listProviderModels !== 'function') throw new Error('当前共享运行时不支持模型更新，请重新打开插件或更新程序');
+        if (!snapshot.url.trim()) throw new Error('请先选择供应商预设或填写 Base URL');
+        const result = await api.listProviderModels({ providerId: editingId || undefined, baseUrl: snapshot.url.trim(),
+          key: snapshot.key.trim(), models: parseModels(snapshot.models) });
+        if (!unchanged()) { notify('编辑内容已变化，获取结果未覆盖当前输入，请重新更新模型'); return; }
+        if (!Array.isArray(result?.models) || !result.models.length) throw new Error('供应商未返回可用模型');
+        const models = mergeCatalogModels(parseModels(snapshot.models), result.models);
+        field('models').value = serializeModels(models);
+        status.textContent = `已获取 ${models.length} 个模型，待保存。相同 ID 的自定义名称、能力和接口类型已保留；新模型未声明能力时按文本处理，请核对后保存。目录可见不代表所有模型均可调用，可使用“测试”检查。`;
+        notify(`已获取 ${models.length} 个模型，请核对后保存供应商`);
+      } catch (error) {
+        if (unchanged()) { status.textContent = `更新模型失败：${error instanceof Error ? error.message : String(error)}。原列表已保留。`; notify(status.textContent); }
+      } finally { button.disabled = false; button.textContent = '更新模型'; }
     }
 
     async function testConnection() {
@@ -399,6 +613,8 @@
     }
 
     function editProvider(id) {
+      if (!drawer) return;
+      editRevision++;
       editingId = id;
       const provider = config?.providers.find(item => item.id === id);
       if (isOpenCodeProvider(provider)) {
@@ -411,6 +627,7 @@
       drawer.querySelector('[data-ai-url]').value = provider?.baseUrl || '';
       drawer.querySelector('[data-ai-models]').value = serializeModels(provider?.models || []);
       drawer.querySelector('[data-ai-key]').value = '';
+      drawer.querySelector('[data-ai-update-status]').textContent = '更新模型会获取供应商当前返回的目录，核对后点击“保存供应商”生效。';
       drawer.querySelector('[data-ai-remove-key]').style.display = provider ? '' : 'none';
       drawer.querySelector('[data-ai-name]').focus();
     }
@@ -477,5 +694,43 @@
     };
   }
 
-  global.AIProviderManager = { create, parseModels, mergeOpenCodeProviders, isOpenCodeProvider };
+  function enhanceSelect(select, options = {}) {
+    if (select.__aiSearchPicker) return select.__aiSearchPicker;
+    const manager = create({
+      getConfig: async () => {
+        const providers = new Map();
+        for (const option of select.options) {
+          const providerId = option.dataset.provider || option.parentElement.label || 'local';
+          const directNames = { openai: 'OpenAI', openrouter: 'OpenRouter', gemini: 'Gemini', deepseek: 'DeepSeek' };
+          const groupLabel = option.parentElement.label;
+          const name = providerId.startsWith('shared:') ? groupLabel || '共享供应商'
+            : groupLabel ? `${groupLabel} · ${directNames[providerId] || providerId}` : directNames[providerId] || providerId;
+          if (!providers.has(providerId)) providers.set(providerId, { id: providerId, name, models: [] });
+          providers.get(providerId).models.push({ id: option.value, label: option.textContent, capabilities: ['text'] });
+        }
+        const selected = select.options[select.selectedIndex];
+        return { providers: [...providers.values()], selections: { text: selected ? {
+          providerId: selected.dataset.provider || selected.parentElement.label || 'local', modelId: selected.value
+        } : null } };
+      },
+      saveConfig: async config => {
+        const selected = config.selections.text;
+        const index = Array.from(select.options).findIndex(option => option.value === selected.modelId
+          && (option.dataset.provider || option.parentElement.label || 'local') === selected.providerId);
+        if (index < 0) throw new Error('模型已变化，请刷新后重新选择');
+        const previous = select.selectedIndex;
+        select.selectedIndex = index;
+        try {
+          if (options.onSelect) await options.onSelect(select.options[index]);
+          else select.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (error) { select.selectedIndex = previous; throw error; }
+        return config;
+      }
+    }, { beforeElement: select, nativeSelect: true, drawer: '#ai-native-picker-no-drawer', notify: options.notify });
+    select.hidden = true; select.style.display = 'none';
+    select.__aiSearchPicker = manager;
+    return manager;
+  }
+
+  global.AIProviderManager = { create, enhanceSelect, sortModels, parseModels, mergeOpenCodeProviders, mergeCatalogModels, filterModelEntries, isOpenCodeProvider };
 })(window);

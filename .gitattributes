@@ -1,1 +1,2 @@
 *.plist text eol=lf
+.githooks/* text eol=lf
