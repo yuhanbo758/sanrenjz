@@ -48,7 +48,7 @@ jobs:
       - name: 确认发布版本
         id: version
         run: node scripts/preview-version.cjs
-      - name: 已发布版本跳过重复构建
+      - name: 检查发布版本与来源提交
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,8 +64,13 @@ jobs:
             if python -c 'import json,sys; sys.exit(0 if json.load(open("release-state.json"))["draft"] else 1)'; then
               echo 'build=true' >> "$GITHUB_OUTPUT"
             else
-              echo 'build=false' >> "$GITHUB_OUTPUT"
-              echo '当前版本已有正式发布的 Release；仅同步源码。发布新版本须显式更新版本号。'
+              if python -c 'import json,os,sys; sys.exit(0 if json.load(open("release-state.json"))["target_commitish"] == os.environ["GITHUB_SHA"] else 1)'; then
+                echo 'build=false' >> "$GITHUB_OUTPUT"
+                echo '本提交已完成发布，无需重复构建。'
+              else
+                echo '::error::此版本已发布其他提交；宿主发生变更，必须使用新的版本号打包，不能跳过发布。'
+                exit 1
+              fi
             fi
           else
             echo "查询 Release 失败，HTTP $status" >&2

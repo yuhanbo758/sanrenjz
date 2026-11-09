@@ -49,4 +49,4 @@
 - GitHub 提交前扫描实际索引，推送前扫描待公开提交及最终树；隐私、未列入公开清单的插件或专用私有文件未通过时必须停止。使用 `.githooks`，新克隆后执行 `git config core.hooksPath .githooks`；不得通过跳过 hooks 绕过检查。
 - Gitea 包含公开、私有及未分类插件和专用开发资料，不使用 GitHub 插件白名单，不执行 GitHub 公开隐私门禁；排除可再生成的依赖、构建产物、运行数据及凭据文件。使用 `python -X utf8 scripts/gitea-private-sync.py --push`，推送前后必须确认目标仍为私有且 Actions 禁用。
 - 两平台必须使用独立 Git 对象库、索引和历史；Gitea 历史保存在本地 `.git/gitea-private.git`，不得合并或推送到 GitHub，也不得给公开仓库配置同时推送两个平台的 pushurl。不得强推覆盖其他设备提交。
-- GitHub Actions 对仅 `app/software`、`app/python-software`、文档及测试的变更不打包；有宿主变化才按流程构建，已有 Release 版本跳过重复打包，不自动修改版本、标签或发布资产。Gitea 禁用 Actions。
+- GitHub Actions 对仅 `app/software`、`app/python-software`、文档及测试的变更不打包；主程序代码、图标、宿主资源或构建配置变化时必须安排新版本打包，不能因旧版本已发布而降级为仅同步源码。按当前发布任务授权更新版本号，禁止覆盖既有标签和资产；仅同一提交已经发布时可跳过重复构建。Gitea 禁用 Actions。
