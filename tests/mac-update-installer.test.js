@@ -267,7 +267,8 @@ test('macOS原生：签名应用DMG、只读挂载复制、真实Electron助手�
         const job = checkedJob(pending.jobFile);
         assert.equal(JSON.parse(fs.readFileSync(job.ready)).workerPid, helper.pid);
         assert.equal(fs.readFileSync(path.join(f.installed, 'Contents', 'Resources', 'version.txt'), 'utf8'), '0.1.11');
-        await new Promise(resolve => { helper.once('exit', resolve); helper.kill(); });
+        // 生产握手会 unref 助手；测试须重新持有句柄，确保退出后才清理临时目录。
+        await new Promise(resolve => { helper.ref(); helper.once('exit', resolve); helper.kill(); });
         helper = null;
         assert.equal(await replaceAndRestart(job, { run: async (file, args, options) => {
             assert.equal(file, '/usr/bin/open'); assert.deepEqual(args, ['-n', f.installed]); return { stdout: '', stderr: '' };
@@ -278,6 +279,6 @@ test('macOS原生：签名应用DMG、只读挂载复制、真实Electron助手�
         await checkBundle(f.installed, downloaded);
         assert.equal(JSON.parse(fs.readFileSync(job.status)).state, 'success');
     } finally {
-        if (helper && helper.exitCode === null && helper.signalCode === null) await new Promise(resolve => { helper.once('exit', resolve); helper.kill(); });
+        if (helper && helper.exitCode === null && helper.signalCode === null) await new Promise(resolve => { helper.ref(); helper.once('exit', resolve); helper.kill(); });
     }
 });
