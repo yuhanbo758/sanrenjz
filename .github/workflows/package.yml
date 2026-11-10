@@ -164,7 +164,7 @@ jobs:
           node tests/account-avatar-electron.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 构建公开安装包
-        run: node scripts/package-local.js --${{ matrix.platform }} --${{ matrix.arch }}
+        run: node scripts/package-local.js --${{ matrix.platform }} --${{ matrix.arch }} --publish never
       - name: 检查本次公开暂存内容
         run: |
           $taskStages = @(Get-ChildItem -LiteralPath dist -Directory | Where-Object { $_.Name -match '^public-stage-\d+-\d+$' })

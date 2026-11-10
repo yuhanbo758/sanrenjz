@@ -62,7 +62,12 @@ const { getInstalledAppRoot } = require(app.isPackaged
 const { MacTextInsertion } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'mac-text-insertion.js')
     : './app/mac-text-insertion');
-const macTextInsertion = process.platform === 'darwin' ? new MacTextInsertion() : null;
+const macTextInsertion = process.platform === 'darwin' ? new MacTextInsertion({
+    onDiagnostic: diagnostic => mergedHost?.recordToolLog({
+        id: 'tools:host-text-insertion', name: '文本插入（主程序）',
+        stream: 'system', message: JSON.stringify(diagnostic)
+    })
+}) : null;
 
 const { ReleaseUpdates, GITHUB_RELEASES_URL } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'release-updates.js')
@@ -1542,16 +1547,19 @@ function createSearchWindow() {
     }
 
     // 失去焦点时关闭窗口（除非被钉住）
-    searchWindow.on('blur', () => {
-        if (searchWindow && !searchWindow.isDestroyed() && !isPinned && !macTextInsertion?.isInserting) {
+    const createdSearchWindow = searchWindow;
+    createdSearchWindow.on('blur', () => {
+        if (searchWindow === createdSearchWindow && !createdSearchWindow.isDestroyed() && !isPinned && !macTextInsertion?.isInserting) {
             console.log('搜索窗口失去焦点，自动关闭');
             restoreFocusToLastActiveWindow();
-            searchWindow.close();
+            createdSearchWindow.close();
         }
     });
 
     // 监听窗口关闭
-    searchWindow.on('closed', () => {
+    createdSearchWindow.on('closed', () => {
+        // 旧原生窗口的排队事件不能清空下一次呼出创建的新窗口。
+        if (searchWindow !== createdSearchWindow) return;
         searchWindow = null;
         isPinned = false; // 重置钉住状态
     });
