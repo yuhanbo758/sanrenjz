@@ -239,8 +239,9 @@ test('macOS原生：签名应用DMG、只读挂载复制、真实Electron助手�
     const arch = process.arch;
     const nativeArch = arch === 'x64' ? 'x86_64' : 'arm64';
     for (const [directory, version] of [[f.installed, '0.1.11'], [f.incoming, '0.1.12']]) {
-        // Apple 严格签名要求应用根目录只保留标准结构，测试标记也必须放在 Contents 内。
-        fs.renameSync(path.join(directory, 'version.txt'), path.join(directory, 'Contents', 'version.txt'));
+        // 标准应用资源归入 Contents/Resources，不能作为未签名代码放在 Contents 顶层。
+        fs.mkdirSync(path.join(directory, 'Contents', 'Resources'));
+        fs.renameSync(path.join(directory, 'version.txt'), path.join(directory, 'Contents', 'Resources', 'version.txt'));
         const plist = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string><key>CFBundleExecutable</key><string>fixture</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>`;
         fs.writeFileSync(path.join(directory, 'Contents', 'Info.plist'), plist);
         await runCommand('/usr/bin/clang', ['-arch', nativeArch, source, '-o', path.join(directory, 'Contents', 'MacOS', 'fixture')], { timeout: 30000 });
@@ -259,7 +260,7 @@ test('macOS原生：签名应用DMG、只读挂载复制、真实Electron助手�
         const pending = JSON.parse(fs.readFileSync(installer.pendingFile));
         const job = checkedJob(pending.jobFile);
         assert.equal(JSON.parse(fs.readFileSync(job.ready)).workerPid, helper.pid);
-        assert.equal(fs.readFileSync(path.join(f.installed, 'Contents', 'version.txt'), 'utf8'), '0.1.11');
+        assert.equal(fs.readFileSync(path.join(f.installed, 'Contents', 'Resources', 'version.txt'), 'utf8'), '0.1.11');
         await new Promise(resolve => { helper.once('exit', resolve); helper.kill(); });
         helper = null;
         assert.equal(await replaceAndRestart(job, { run: async (file, args, options) => {
