@@ -639,7 +639,7 @@
         window.addEventListener('blur', () => {
             // 延迟隐藏，防止点击结果时立即隐藏
             setTimeout(() => {
-                if (!isPinned) {
+                if (!isPinned && !isExecuting && !document.hasFocus()) {
                     hideWindow();
                 }
             }, 200);

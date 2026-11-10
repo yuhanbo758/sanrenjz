@@ -59,6 +59,11 @@ const { getInstalledAppRoot } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'install-root.js')
     : './app/install-root');
 
+const { MacTextInsertion } = require(app.isPackaged
+    ? path.join(process.resourcesPath, 'app', 'mac-text-insertion.js')
+    : './app/mac-text-insertion');
+const macTextInsertion = process.platform === 'darwin' ? new MacTextInsertion() : null;
+
 const { ReleaseUpdates, GITHUB_RELEASES_URL } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'release-updates.js')
     : './app/release-updates');
@@ -1522,7 +1527,7 @@ function createSearchWindow() {
 
     // 失去焦点时关闭窗口（除非被钉住）
     searchWindow.on('blur', () => {
-        if (searchWindow && !searchWindow.isDestroyed() && !isPinned) {
+        if (searchWindow && !searchWindow.isDestroyed() && !isPinned && !macTextInsertion?.isInserting) {
             console.log('搜索窗口失去焦点，自动关闭');
             restoreFocusToLastActiveWindow();
             searchWindow.close();
@@ -1607,6 +1612,8 @@ function showSearchWindow() {
 
 // 记录当前活动窗口 (同步)
 function recordActiveWindow() {
+    if (macTextInsertion) return macTextInsertion.capture();
+    if (process.platform !== 'win32') return;
     const os = require('os');
     const fs = require('fs');
     const path = require('path');
@@ -1691,6 +1698,12 @@ function recordActiveWindow() {
  * - 同时记录 focusHandle 以便在恢复焦点和 WM_PASTE 时作为回退依据
  */
 function recordActiveWindowWithInputStatusAsync() {
+    if (macTextInsertion) {
+        macTextInsertion.capture();
+        wasTextInputBeforeSearch = false;
+        return;
+    }
+    if (process.platform !== 'win32') return;
     const { exec } = require('child_process');
     const os = require('os');
     const fs = require('fs');
@@ -1804,6 +1817,10 @@ function recordActiveWindowWithInputStatusAsync() {
  * - 将窗口置顶并尝试前台激活，确保后续按键或 WM_PASTE 能落到目标窗体
  */
 function restoreFocusToLastActiveWindow() {
+    if (macTextInsertion) {
+        return macTextInsertion.restore().catch(error => console.warn('macOS 焦点恢复失败:', error.message));
+    }
+    if (process.platform !== 'win32') return;
     try {
         if (!lastActiveWindow || (!lastActiveWindow.handle && !lastActiveWindow.focusHandle)) {
             console.log('没有可恢复焦点的窗口句柄');
@@ -2790,6 +2807,7 @@ ipcMain.handle('insert-content', async (event, content) => {
 
         const { clipboard } = require('electron');
 
+        if (macTextInsertion?.isInserting) return { success: false, error: '正在插入片段，请稍候。' };
         clipboard.writeText(content.content || '');
 
         const directInsert = content && content.directInsert === true;
@@ -2811,6 +2829,27 @@ ipcMain.handle('insert-content', async (event, content) => {
             }
 
             return { success: true, message: '文本片段已复制到剪贴板' };
+        }
+
+        if (macTextInsertion) {
+            const senderWindow = BrowserWindow.fromWebContents(event.sender);
+            const visibleWindows = [...new Set([searchWindow, senderWindow])]
+                .filter(win => win && win !== mainWindow && !win.isDestroyed() && win.isVisible());
+            try {
+                await macTextInsertion.insert(() => {
+                    // 暂时隐藏而非销毁，系统权限或焦点失败时仍可显示错误并重试。
+                    for (const win of visibleWindows) win.hide();
+                    lastSearchHotkeyTime = Date.now();
+                });
+                if (searchWindow && !searchWindow.isDestroyed()) searchWindow.close();
+                return { success: true, message: '已向原目标应用发送粘贴快捷键' };
+            } catch (error) {
+                for (const win of visibleWindows) if (!win.isDestroyed()) win.show();
+                throw error;
+            }
+        }
+        if (process.platform !== 'win32') {
+            return { success: false, error: '当前系统暂不支持自动插入，内容已复制，请手动粘贴。' };
         }
 
         if (searchWindow && !searchWindow.isDestroyed() && searchWindow.isVisible()) {
