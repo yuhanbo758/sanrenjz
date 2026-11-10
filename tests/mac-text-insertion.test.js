@@ -4,25 +4,31 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
-const { execFileSync } = require('node:child_process');
+const { spawnSync } = require('node:child_process');
 const { MacTextInsertion, ACTION_SCRIPT } = require('../app/mac-text-insertion');
 
 test('macOS 原生 JXA 桥接可编译实际脚本并创建/释放 Command+V 事件，不发送按键', { skip: process.platform !== 'darwin' }, () => {
     const script = `
+        console.log('native: imports');
         ObjC.import('AppKit');
         ObjC.import('ApplicationServices');
+        console.log('native: compile');
         new Function(${JSON.stringify(ACTION_SCRIPT)});
         if (typeof $.AXIsProcessTrusted !== 'function' || typeof $.CGEventPost !== 'function') throw new Error('Missing native API');
+        console.log('native: create event');
         var event = $.CGEventCreateKeyboardEvent($(), 9, true);
         try {
             $.CGEventSetFlags(event, $.kCGEventFlagMaskCommand);
             if (Number($.CGEventGetFlags(event)) !== 1048576) throw new Error('Invalid Command flag');
-        } finally { $.CFRelease(event); }
+        } finally { console.log('native: release event'); $.CFRelease(event); }
+        console.log('native: finished');
         'native-bridge-ok';
     `;
-    assert.equal(execFileSync('/usr/bin/osascript', ['-l', 'JavaScript', '-e', script], {
+    const result = spawnSync('/usr/bin/osascript', ['-l', 'JavaScript', '-e', script], {
         encoding: 'utf8', timeout: 5000, maxBuffer: 8192
-    }).trim(), 'native-bridge-ok');
+    });
+    assert.equal(result.status, 0, `原生 JXA 桥接失败：status=${result.status}, signal=${result.signal}, ${result.stderr || result.error || '未知错误'}`);
+    assert.equal(result.stdout.trim(), 'native-bridge-ok');
 });
 
 test('搜索显示前记录外部 PID，自身、无效结果和采样失败清除旧目标', () => {
