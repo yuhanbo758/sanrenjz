@@ -4,8 +4,17 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
-const { promisify } = require('util');
-const runCommand = promisify(execFile);
+function runCommand(file, args, { input, ...options } = {}) {
+    return new Promise((resolve, reject) => {
+        const child = execFile(file, args, options, (error, stdout, stderr) => {
+            if (error) { error.stdout = stdout; error.stderr = stderr; reject(error); }
+            else resolve({ stdout, stderr });
+        });
+        // execFile 不支持 options.input；显式结束 stdin，避免 plutil 等待输入直到超时。
+        child.stdin.on('error', () => {});
+        child.stdin.end(input);
+    });
+}
 const BUNDLE_ID = 'com.sanrenjz.app';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const inside = (root, file) => { const relative = path.relative(root, file); return !path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`); };

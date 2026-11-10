@@ -91,7 +91,7 @@ class MacUpdateInstaller {
                 catch (_) { throw new Error('更新镜像卸载失败，旧程序保持运行，请稍后重试；本次恢复材料已保留'); }
             }
             if (/^(请先把应用安装|当前应用安装目录无效|应用安装目录不可写|更新包已发生变化|更新镜像|更新应用|应用目录无效|应用包包含越界|更新任务|更新助手|更新恢复目录)/.test(error.message || '')) throw error;
-            throw new Error('准备安装失败，旧程序保持运行；请检查磁盘空间与安装目录权限后重试');
+            throw new Error('准备安装失败，旧程序保持运行；请检查磁盘空间与安装目录权限后重试', { cause: error });
         }
     }
 

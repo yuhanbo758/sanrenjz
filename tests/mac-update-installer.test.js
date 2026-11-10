@@ -59,6 +59,12 @@ function fixture(t) {
     return { root, installed, incoming, updatesDir, imageRoot, downloaded, installer, calls, run, validate, bundle, get job() { return job; } };
 }
 
+test('原生命令收到完整标准输入和结束信号，非零退出保留错误', async () => {
+    const result = await runCommand(process.execPath, ['-e', "let text='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>text+=x);process.stdin.on('end',()=>process.stdout.write(text));"], { input: '中文 plist 输入', timeout: 5000 });
+    assert.equal(result.stdout, '中文 plist 输入');
+    await assert.rejects(runCommand(process.execPath, ['-e', "process.stderr.write('fixture failure');process.exit(7)"], { timeout: 5000 }), error => error.code === 7 && error.stderr === 'fixture failure');
+});
+
 test('准备阶段仅暂存应用，核验并卸载镜像后才启动助手，旧程序不变', async t => {
     const f = fixture(t);
     assert.equal((await f.installer.start(f.downloaded)).success, true);
