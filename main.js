@@ -69,6 +69,19 @@ const { ReleaseUpdates, GITHUB_RELEASES_URL } = require(app.isPackaged
     : './app/release-updates');
 let releaseUpdates;
 
+const { MacUpdateInstaller } = require(app.isPackaged
+    ? path.join(process.resourcesPath, 'app', 'mac-update-installer.js')
+    : './app/mac-update-installer');
+let macUpdateInstaller;
+function getMacUpdateInstaller() {
+    if (process.platform !== 'darwin' || !app.isPackaged) throw new Error('一键更新需要已安装的 macOS 应用');
+    if (!macUpdateInstaller) macUpdateInstaller = new MacUpdateInstaller({
+        updatesDir: path.join(app.getPath('userData'), 'updates'), version: app.getVersion(),
+        emit: payload => sendRendererEvent('update:status', payload)
+    });
+    return macUpdateInstaller;
+}
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
     app.quit();
@@ -520,7 +533,10 @@ async function runUpdateAction(event, action) {
     if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) {
         return { success: false, message: '请从主界面的应用更新窗口操作' };
     }
-    try { return await action(getReleaseUpdates()); }
+    try {
+        if (macUpdateInstaller?.busy) throw new Error('正在准备安装更新，请稍候');
+        return await action(getReleaseUpdates());
+    }
     catch (error) {
         const message = String(error?.message || '更新失败，请稍后重试').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
         return { success: false, message };
@@ -1910,6 +1926,10 @@ function createWindow() {
             }
         });
 
+        if (process.platform === 'darwin' && app.isPackaged && !mergedAcceptance) {
+            mainWindow.webContents.once('dom-ready', () => getMacUpdateInstaller().acknowledgeStartup());
+        }
+
         // 启用remote模块
         if (remoteMain) {
             remoteMain.enable(mainWindow.webContents);
@@ -3085,10 +3105,17 @@ ipcMain.handle('update:open-release', (event) => runUpdateAction(event, async ()
 }));
 ipcMain.handle('update:install', (event) => runUpdateAction(event, async updater => {
     const downloaded = await updater.verifyDownloaded();
+    if (downloaded.installAction === 'install-macos') {
+        const result = await getMacUpdateInstaller().start(downloaded);
+        app.isQuiting = true;
+        app.quit();
+        return result;
+    }
     if (downloaded.installAction === 'show-folder') {
         shell.showItemInFolder(downloaded.path);
         return { success: true, message: '已定位下载文件，请退出当前程序后按需替换 AppImage' };
     }
+    if (downloaded.installAction !== 'install') throw new Error('当前更新安装方式无效，请重新检查更新');
     const error = await shell.openPath(downloaded.path);
     if (error) throw new Error(`无法打开安装包：${error}`);
     if (downloaded.installAction === 'install') {
@@ -3097,7 +3124,6 @@ ipcMain.handle('update:install', (event) => runUpdateAction(event, async updater
         app.quit();
         return { success: true, message: '已启动安装程序，请按提示完成安装' };
     }
-    return { success: true, message: '已打开 DMG，请退出当前程序后拖入“应用程序”完成更新' };
 }));
 
 // 隐藏搜索窗口

@@ -220,7 +220,7 @@ class ReleaseUpdates {
             try { parseVersion(version, true); } catch (_) { throw updateError('官方更新信息不是有效正式版，请前往 Releases 查看'); }
             if (release.draft !== false || release.prerelease !== false || release.html_url !== `https://github.com/${REPOSITORY}/releases/tag/v${version}`) throw updateError('官方更新来源或发布状态无效');
             const available = newerThanStable(version, this.currentVersion);
-            const info = { version, releaseUrl: release.html_url, platform: this.platform, arch: this.arch, installAction: this.platform === 'win32' ? 'install' : this.platform === 'darwin' ? 'open-package' : 'show-folder' };
+            const info = { version, releaseUrl: release.html_url, platform: this.platform, arch: this.arch, installAction: this.platform === 'win32' ? 'install' : this.platform === 'darwin' ? 'install-macos' : 'show-folder' };
             if (available) {
                 let name;
                 try { name = installerName(version, this.platform, this.arch); } catch (error) { throw updateError(error.message); }
@@ -282,7 +282,7 @@ class ReleaseUpdates {
                 fs.renameSync(temporaryPath, finalPath);
                 this.downloaded = { ...candidate, path: finalPath };
                 const { url, sha256, ...info } = candidate;
-                this.event('downloaded', { info, installAction: candidate.installAction, message: this.platform === 'win32' ? '安装包已下载并通过 SHA256 校验，点击“安装更新”继续' : this.platform === 'darwin' ? '安装包已下载并通过 SHA256 校验，请打开安装包完成更新' : '安装包已下载并通过 SHA256 校验，请打开下载目录完成更新' });
+                this.event('downloaded', { info, installAction: candidate.installAction, message: this.platform === 'win32' ? '安装包已下载并通过 SHA256 校验，点击“安装更新”继续' : this.platform === 'darwin' ? '更新包已通过 SHA256 校验，点击“安装并重启”自动完成更新' : '安装包已下载并通过 SHA256 校验，请打开下载目录完成更新' });
                 return { success: true, path: finalPath, mode: 'manual-github', installAction: candidate.installAction, updateInfo: info };
             } catch (error) {
                 try { fs.unlinkSync(temporaryPath); } catch (_) { }
@@ -297,7 +297,7 @@ class ReleaseUpdates {
         try {
             // 点击安装时重新核对文件，不能信任先前下载完成状态。
             await this.verifyFile(this.downloaded.path, this.downloaded);
-            return { path: this.downloaded.path, version: this.downloaded.version, platform: this.platform, arch: this.arch, installAction: this.downloaded.installAction };
+            return { path: this.downloaded.path, version: this.downloaded.version, platform: this.platform, arch: this.arch, installAction: this.downloaded.installAction, bytes: this.downloaded.bytes, sha256: this.downloaded.sha256 };
         } catch (error) {
             this.downloaded = null;
             throw error?.updateMessage ? error : updateError('更新包不存在或无法读取，请重新下载');

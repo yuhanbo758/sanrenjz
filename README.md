@@ -2,7 +2,7 @@
 
 效率工具与 Python 程序管理的合并应用。以原效率工具为主框架，保留全局搜索、超级面板、窗口管理、插件存储和程序小店，增加独立的 Python 管理模块。
 
-当前配置版本为 **0.1.9**，公开仓库为 [yuhanbo758/sanrenjz](https://github.com/yuhanbo758/sanrenjz)，正式版安装包入口为 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases)。只有对应的多平台构建及检查全部通过才会发布。两个来源项目保持独立；仓库修复是否包含在已发布包中，以 Release 来源提交为准。
+当前配置版本为 **0.1.12**，公开仓库为 [yuhanbo758/sanrenjz](https://github.com/yuhanbo758/sanrenjz)，正式版安装包入口为 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases)。只有对应的多平台构建及检查全部通过才会发布。两个来源项目保持独立；仓库修复是否包含在已发布包中，以 Release 来源提交为准。
 
 ## 使用
 
@@ -18,7 +18,7 @@
 - 日志可以从 Python 卡片或环境设置打开。分享日志前检查程序自身输出是否包含个人信息。
 - 顶部“日志”在两类页面常显，统一查看效率插件和 Python 程序的当前会话日志，支持类型与插件筛选、实时追加、刷新和导出当前筛选。
 - “设置 → 数据导入”支持从旧效率工具和 Python 程序管理导入插件、配置及插件偏好，可自动检测或手动选择旧版目录。先备份、只补缺少项，保留现有配置并列出冲突；不迁移登录状态、全局快捷键或旧自启动设置，也不复制整套 Python 环境。
-- 头像菜单中的“检查更新”只检查本项目的正式 Release，按系统和架构选择安装包，下载及打开安装前均校验大小与 SHA256；检查不会自动下载或安装。Windows 显式启动安装，macOS 打开 DMG，Linux 定位 AppImage，由用户完成替换。
+- 头像菜单中的“检查更新”只检查本项目的正式 Release，按系统和架构选择安装包，下载及打开安装前均校验大小与 SHA256；检查不会自动下载或安装。Windows 显式启动安装；macOS 点击“安装并重启”后校验、准备并自动替换应用，安装目录须可写，用户数据保持独立；Linux 定位 AppImage，由用户完成替换。0.1.11 及更早版本首次升级到 0.1.12 仍需手动安装一次，后续才能使用新流程。
 - 程序小店与主界面共用内置商店会话，支持 HttpOnly Cookie 登录；两类会员独立查询。服务暂时不可用时显示待确认并支持刷新，避免将网络故障当成退出登录。
 
 快捷键录入支持直接点击 `Alt+Space` 预设；保存时检查组合键占用，失败保留原设置。Windows 启动器会设置当前控制台 UTF-8。
@@ -81,3 +81,43 @@ macOS/Linux 保留手动解释器支持，不提供一键安装 Python。四目�
 0.1.8 增加独立正式版更新检查、HttpOnly Cookie 登录同步，以及“设置 → 数据导入”；实现及本地修复边界见 [修复记录](docs/更新登录与数据导入修复-2026-11-05.md)，发布范围见 [0.1.8 发布说明](docs/发布说明-0.1.8.md)。
 
 0.1.9 修复默认头像资源与重启后的显示，支持在客户端选择本机头像、恢复程序 logo；完善旧插件程序识别和导入，支持用户自行安装的非开源插件。数据和图片仅留在用户本机，公开安装包继续排除私有插件及 Python 运行时，详见 [0.1.9 发布说明](docs/发布说明-0.1.9.md)。
+
+0.1.12 增加 macOS“安装并重启”，保留失败恢复材料并确认新版宿主启动，详见 [Mac 一键更新](docs/macos-one-click-update-20261110.md)。
+
+<!-- sanrenjz-promotion:start -->
+## 👨‍💻 作者信息
+
+**余汉波** - 编程爱好者-量化交易和效率工具开发
+
+- **GitHub**: [@yuhanbo758](https://github.com/yuhanbo758)
+
+- **Email**: yuhanbo@sanrenjz.com
+
+- **Website**: [三人聚智](https://www.sanrenjz.com)
+
+## 🌐 相关链接
+
+- 🏠 [项目主页](https://www.sanrenjz.com)
+
+- 📚 [在线文档](https://docs.sanrenjz.com)（财经、代码和库文档等）
+
+- 🛒 [插件商店](https://shop.sanrenjz.com)（个人开发的所有程序，包括开源和不开源）
+
+
+## 联系我们
+
+[联系我们 - 三人聚智-余汉波](https://www.sanrenjz.com/contact_us/)
+
+三人聚智：[sanrenjz - 三人聚智-余汉波](https://www.sanrenjz.com/sanrenjz/)
+
+![三码合一](https://gdsx.sanrenjz.com/image/sanrenjz_yuhanbolh_yuhanbo758.png?imageSlim&t=1ab9b82c-e220-8022-beff-e265a194292a)
+
+![余汉波打赏码](https://gdsx.sanrenjz.com/image/%E6%89%93%E8%B5%8F%E7%A0%81%E5%90%88%E4%B8%80.png?imageSlim)
+
+## 🙏 致谢
+
+感谢所有为本项目贡献代码和想法的开发者们！
+
+---
+**⭐ 如果这个项目对您有帮助，请给它一个 Star！**
+<!-- sanrenjz-promotion:end -->

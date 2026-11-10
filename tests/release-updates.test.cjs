@@ -122,6 +122,18 @@ test('流式下载经大小及 SHA256 核验才成为可安装文件；不执行
     assert.equal(f.manager.downloaded, null);
 });
 
+test('Mac下载完成只允许用户主动安装并重启，安装前传递复核所需的大小和SHA256', async t => {
+    const f = fixture(t, release('0.1.8', 'darwin', 'arm64'), { platform: 'darwin', arch: 'arm64' });
+    assert.equal((await f.manager.check()).updateInfo.installAction, 'install-macos');
+    const downloaded = await f.manager.download();
+    assert.equal(downloaded.installAction, 'install-macos');
+    assert.match(f.events.at(-1).message, /安装并重启/);
+    const verified = await f.manager.verifyDownloaded();
+    assert.equal(verified.bytes, bytes.length);
+    assert.equal(verified.sha256, sha(bytes));
+    assert.equal(verified.arch, 'arm64');
+});
+
 test('损坏与截断下载不覆盖已有文件，不留下 part 或可安装状态', async t => {
     for (const body of [Buffer.alloc(bytes.length, 3), bytes.subarray(0, 5), Buffer.concat([bytes, bytes])]) {
         const f = fixture(t); await f.manager.check();

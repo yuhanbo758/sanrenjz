@@ -1582,7 +1582,7 @@
             document.getElementById('update-download-btn').disabled = busy || !updateState.available || updateState.downloaded;
             const install = document.getElementById('update-install-btn');
             install.disabled = busy || !updateState.downloaded;
-            install.textContent = { install: '安装更新', 'open-package': '打开安装包', 'show-folder': '打开下载目录' }[updateState.info?.installAction] || '安装更新';
+            install.textContent = { install: '安装更新', 'install-macos': '安装并重启', 'open-package': '打开安装包', 'show-folder': '打开下载目录' }[updateState.info?.installAction] || '安装更新';
             document.getElementById('update-cancel-btn').hidden = updateState.busy !== 'downloading';
         }
 
@@ -1673,13 +1673,14 @@
         async function installUpdate() {
             if (updateState.busy || !updateState.downloaded) return;
             updateState.busy = 'installing';
+            updateState.message = updateState.info?.installAction === 'install-macos' ? '正在准备安装更新，完成后将自动重新打开…' : '正在启动安装程序…';
             updateUpdateUI();
             try {
                 const result = await invokeUpdate('update:install');
                 updateState.message = result.message || '已打开安装包';
             } catch (error) {
-                updateState.message = error.message || '打开安装包失败';
-                updateState.downloaded = false;
+                updateState.message = error.message || '安装更新失败';
+                if (/SHA256|损坏|重新下载|尚未下载|不存在/.test(updateState.message)) updateState.downloaded = false;
                 showNotification('安装更新失败', updateState.message, 'error');
             } finally { updateState.busy = ''; updateUpdateUI(); }
         }

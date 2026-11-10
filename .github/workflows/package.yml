@@ -143,7 +143,7 @@ jobs:
         run: |
           node scripts/prepare-build-assets.cjs --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node --test tests/mac-text-insertion.test.js
+          node --test tests/mac-text-insertion.test.js tests/mac-update-installer.test.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --test tests/build-assets.test.cjs tests/ci-artifacts.test.cjs tests/preview-release.test.cjs tests/packaged-runtime-probe.test.cjs tests/dmg-detach-retry.test.cjs tests/release-updates.test.cjs tests/shop-account.test.js tests/migration-manager.test.js tests/account-avatar.test.js tests/account-avatar-store.test.js tests/migration-plugin-import.test.js
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
