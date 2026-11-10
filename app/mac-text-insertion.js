@@ -33,15 +33,11 @@ function run(argv) {
     }
     var down = $.CGEventCreateKeyboardEvent($(), 9, true);
     var up = $.CGEventCreateKeyboardEvent($(), 9, false);
-    try {
-        $.CGEventSetFlags(down, $.kCGEventFlagMaskCommand);
-        $.CGEventSetFlags(up, $.kCGEventFlagMaskCommand);
-        $.CGEventPost($.kCGHIDEventTap, down);
-        $.CGEventPost($.kCGHIDEventTap, up);
-    } finally {
-        $.CFRelease(down);
-        $.CFRelease(up);
-    }
+    // JXA 的 CFRelease 桥接会使 osascript 崩溃；两个事件随本次短进程退出回收。
+    $.CGEventSetFlags(down, $.kCGEventFlagMaskCommand);
+    $.CGEventSetFlags(up, $.kCGEventFlagMaskCommand);
+    $.CGEventPost($.kCGHIDEventTap, down);
+    $.CGEventPost($.kCGHIDEventTap, up);
     return 'sent';
 }
 `;

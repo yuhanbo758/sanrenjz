@@ -7,7 +7,7 @@ const { EventEmitter } = require('node:events');
 const { spawnSync } = require('node:child_process');
 const { MacTextInsertion, ACTION_SCRIPT } = require('../app/mac-text-insertion');
 
-test('macOS 原生 JXA 桥接可编译实际脚本并创建/释放 Command+V 事件，不发送按键', { skip: process.platform !== 'darwin' }, () => {
+test('macOS 原生 JXA 桥接可编译实际脚本、创建 Command+V 事件并正常退出，不发送按键', { skip: process.platform !== 'darwin' }, () => {
     const script = `
         console.log('native: imports');
         ObjC.import('AppKit');
@@ -15,12 +15,17 @@ test('macOS 原生 JXA 桥接可编译实际脚本并创建/释放 Command+V 事
         console.log('native: compile');
         new Function(${JSON.stringify(ACTION_SCRIPT)});
         if (typeof $.AXIsProcessTrusted !== 'function' || typeof $.CGEventPost !== 'function') throw new Error('Missing native API');
+        $.AXIsProcessTrusted();
+        var front = $.NSWorkspace.sharedWorkspace.frontmostApplication;
+        if (front && !front.isNil()) {
+            var target = $.NSRunningApplication.runningApplicationWithProcessIdentifier(front.processIdentifier);
+            if (target.isNil()) throw new Error('Invalid frontmost application');
+            Boolean(target.terminated);
+        }
         console.log('native: create event');
         var event = $.CGEventCreateKeyboardEvent($(), 9, true);
-        try {
-            $.CGEventSetFlags(event, $.kCGEventFlagMaskCommand);
-            if (Number($.CGEventGetFlags(event)) !== 1048576) throw new Error('Invalid Command flag');
-        } finally { console.log('native: release event'); $.CFRelease(event); }
+        $.CGEventSetFlags(event, $.kCGEventFlagMaskCommand);
+        if (Number($.CGEventGetFlags(event)) !== 1048576) throw new Error('Invalid Command flag');
         console.log('native: finished');
         'native-bridge-ok';
     `;
@@ -88,7 +93,7 @@ test('权限拒绝、目标退出、焦点失败与异常输出均反馈失败�
 });
 
 function nativeFixture({ trusted = true, gone = false, switchFocus = false, activate = true } = {}) {
-    const events = [], released = [];
+    const events = [];
     let frontPid = 123;
     const target = { isNil: () => gone, terminated: gone, activateWithOptions(value) {
         assert.equal(value, 2);
@@ -105,11 +110,11 @@ function nativeFixture({ trusted = true, gone = false, switchFocus = false, acti
         CGEventCreateKeyboardEvent: (_source, key, down) => ({ key, down }),
         CGEventSetFlags: (event, flags) => { event.flags = flags; },
         CGEventPost: (_tap, event) => { assert.equal(frontPid, 321); events.push(event); },
-        CFRelease: event => released.push(event), kCGEventFlagMaskCommand: 1048576, kCGHIDEventTap: 0
+        CFRelease: () => assert.fail('JXA 不得手动调用 CFRelease'), kCGEventFlagMaskCommand: 1048576, kCGHIDEventTap: 0
     });
     const context = vm.createContext({ $, ObjC: { import() {} } });
     vm.runInContext(ACTION_SCRIPT, context);
-    return { run: mode => context.run(['321', mode]), events, released };
+    return { run: mode => context.run(['321', mode]), events };
 }
 
 test('实际 JXA 脚本先确认权限和目标焦点，再发 Command+V 的按下/释放', () => {
@@ -118,7 +123,6 @@ test('实际 JXA 脚本先确认权限和目标焦点，再发 Command+V 的按�
     assert.deepEqual(native.events, [
         { key: 9, down: true, flags: 1048576 }, { key: 9, down: false, flags: 1048576 }
     ]);
-    assert.equal(native.released.length, 2);
     const focusOnly = nativeFixture({ trusted: false });
     assert.equal(focusOnly.run('focus'), 'focused');
     assert.equal(focusOnly.events.length, 0);
