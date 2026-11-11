@@ -104,6 +104,7 @@ function createFixture({ perMachine = false } = {}) {
     const binaries = new Map();
     let succeeded = false;
     const owned = new Set();
+    const installationRoots = new Set();
 
     function build(name, include, scenario = {}) {
         const version = name === 'old' ? '1.0.0' : '2.0.0';
@@ -154,6 +155,13 @@ function createFixture({ perMachine = false } = {}) {
     }
 
     async function execute(executable, args = [], environment = {}, timeout = 30000) {
+        for (const argument of args) {
+            if (argument.startsWith('/D=')) {
+                const installed = path.resolve(argument.slice(3));
+                assert(installed.startsWith(sandbox + path.sep));
+                installationRoots.add(installed);
+            }
+        }
         return new Promise((resolve, reject) => {
             const child = spawn(executable, args, { windowsHide: true, stdio: 'ignore', env: { ...process.env, ...environment } });
             owned.add(child);
@@ -186,7 +194,19 @@ function createFixture({ perMachine = false } = {}) {
         assert.equal(path.dirname(sandbox), fixtureParent);
         assert(path.basename(sandbox).startsWith('sanrenjz-full-upgrade-'));
         if (succeeded) fs.rmSync(sandbox, { recursive: true, force: true });
-        else console.error('NSIS integration failure materials: ' + sandbox);
+        else {
+            console.error('NSIS integration failure materials: ' + sandbox);
+            // 失败时只打印本次 synthetic fixture 的安装事务日志，不读取状态快照或用户文件。
+            const logs = [path.join(sandbox, 'helper-results.log'), path.join(sandbox, 'legacy-uninstall-result.txt'),
+                ...[...installationRoots].flatMap(installed => ['transaction.log', 'legacy-recovery.log']
+                    .map(filename => path.join(installed + backupSuffix, filename)))];
+            for (const file of logs) {
+                if (!fs.existsSync(file)) continue;
+                const bytes = fs.readFileSync(file);
+                const encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? 'utf16le' : 'utf8';
+                console.error(`NSIS_DIAGNOSTIC ${file}\n${bytes.toString(encoding).slice(-8000)}`);
+            }
+        }
     }
 
     function unregister() {

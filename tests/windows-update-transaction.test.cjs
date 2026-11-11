@@ -17,7 +17,9 @@ const delay = milliseconds => new Promise(resolve => setTimeout(resolve, millise
 const readJSON = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 
 function fixture(t, { registered = true, validApplication = true } = {}) {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-transaction-test-'));
+    // 与 .NET GetFullPath 使用同一目录身份，展开 CI TEMP 的 RUNNER~1 等 8.3 别名。
+    const temporaryParent = fs.realpathSync.native(os.tmpdir());
+    const root = fs.mkdtempSync(path.join(temporaryParent, 'sanrenjz-transaction-test-'));
     const install = path.join(root, '应用 程序');
     const backup = install + backupSuffix;
     const active = path.join(backup, 'active');
@@ -115,7 +117,7 @@ $base.Dispose();ConvertTo-Json -InputObject @($result) -Depth 8 -Compress`);
         for (const item of locks) { write(item.release, 'release'); await item.close; }
         assert(/^[a-f0-9-]{36}$/.test(guid) && appId.startsWith('test.sanrenjz.transaction.'));
         for (const key of [registryKey, uninstallKey]) spawnSync('reg.exe', ['delete', 'HKCU\\' + key, '/f', '/reg:64'], { windowsHide: true, stdio: 'ignore' });
-        assert.equal(path.dirname(root), os.tmpdir());
+        assert.equal(path.dirname(root), temporaryParent);
         assert(path.basename(root).startsWith('sanrenjz-transaction-test-'));
         fs.rmSync(root, { recursive: true, force: true });
     });
