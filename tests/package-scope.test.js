@@ -103,7 +103,12 @@ try {
     assert.deepStrictEqual(parseBuildOptions(['--linux', '--x64', '--dir']), { platform: 'linux', architecture: 'x64' });
     assert.deepStrictEqual(parseBuildOptions(['--mac', '--arm64', '--stage-only']), { platform: 'mac', architecture: 'arm64' });
     assert.throws(() => parseBuildOptions(['--win', '--linux']), /一次/);
-    assert.throws(() => parseBuildOptions(['--publish', 'always']), /不支持/);
+    for (const args of [['--publish'], ['--publish', 'always'], ['--publish', 'onTag'], ['--publish=never'], ['--publish', '--win']]) {
+        assert.throws(() => parseBuildOptions(args), /不支持/);
+    }
+    for (const [platform, architecture] of [['win', 'x64'], ['mac', 'x64'], ['mac', 'arm64'], ['linux', 'x64']]) {
+        assert.deepStrictEqual(parseBuildOptions([`--${platform}`, `--${architecture}`, '--stage-only', '--publish', 'never']), { platform, architecture });
+    }
     assert.throws(() => parseBuildOptions(['--win', '--arm64']), /x64/);
     const originalEnvironment = { CI: 'true', USE_HARD_LINKS: 'true', KEEP: 'fixture' };
     const isolatedEnvironment = builderEnvironment(originalEnvironment);

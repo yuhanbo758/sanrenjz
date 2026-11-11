@@ -32,6 +32,10 @@ function parseSelections(argv, privateCatalog) {
 function parseBuildOptions(argv) {
     const switches = new Set(['--stage-only', '--dir', '--personal', '--win', '--mac', '--linux', '--x64', '--arm64']);
     for (let index = 0; index < argv.length; index++) {
+        if (argv[index] === '--publish') {
+            if (argv[index + 1] !== 'never') throw new Error('不支持发布，本地构建仅允许 --publish never');
+            index++; continue;
+        }
         if (argv[index] === '--include') {
             if (!argv[index + 1] || argv[index + 1].startsWith('--')) throw new Error('--include缺少插件列表');
             index++; continue;
