@@ -100,11 +100,16 @@ $base.Dispose();ConvertTo-Json -InputObject @($result) -Depth 8 -Compress`);
         assert(!fs.readdirSync(root).some(name => name.startsWith(path.basename(backup) + '.previous-')));
         assert(fs.readdirSync(root).filter(name => name.endsWith(backupSuffix)).length <= 1);
     }
-    async function lock(file) {
+    function noBackup() {
+        assert(!fs.existsSync(backup), '成功升级必须清理整个固定备份目录');
+        noScatteredBackup();
+    }
+    async function lock(file, { directory = false } = {}) {
         const ready = path.join(root, 'lock-ready-' + crypto.randomUUID());
         const release = ready + '.release';
-        const script = `$ErrorActionPreference='Stop';$stream=[IO.File]::Open(${psQuote(file)},[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None);try{[IO.File]::WriteAllText(${psQuote(ready)},'ready');while(![IO.File]::Exists(${psQuote(release)})){Start-Sleep -Milliseconds 30}}finally{$stream.Dispose()}`;
-        const child = spawn(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { windowsHide: true, stdio: 'ignore', cwd: root });
+        const acquire = directory ? `[Environment]::CurrentDirectory=${psQuote(file)};` : `$stream=[IO.File]::Open(${psQuote(file)},[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None);`;
+        const script = `$ErrorActionPreference='Stop';${acquire}try{[IO.File]::WriteAllText(${psQuote(ready)},'ready');while(![IO.File]::Exists(${psQuote(release)})){Start-Sleep -Milliseconds 30}}finally{${directory ? '' : '$stream.Dispose()'}}`;
+        const child = spawn(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { windowsHide: true, stdio: 'ignore', cwd: directory ? file : root });
         const close = new Promise(resolve => child.once('close', resolve));
         const item = { child, release, close };
         locks.add(item);
@@ -122,7 +127,7 @@ $base.Dispose();ConvertTo-Json -InputObject @($result) -Depth 8 -Compress`);
         fs.rmSync(root, { recursive: true, force: true });
     });
     if (registered) register();
-    return { root, install, backup, active, old, stateFile, appId, uninstaller, data, run, payload, register, registry, saveState, assertData, noScatteredBackup, lock };
+    return { root, install, backup, active, old, stateFile, appId, uninstaller, data, run, payload, register, registry, saveState, assertData, noScatteredBackup, noBackup, lock };
 }
 
 const options = { skip: process.platform !== 'win32', timeout: 90000 };
@@ -136,6 +141,7 @@ test('Windows helper：prepare → rollback 恢复文件与原注册表类型', 
     f.assertData();
     assert.equal(fs.readFileSync(path.join(f.install, 'Fixture.exe'), 'utf8'), 'old executable marker, never executed');
     assert.deepEqual(f.registry(), original, '回滚必须恢复 DWORD、MultiString、Binary 和原有键值集合');
+    assert(fs.existsSync(f.stateFile), '失败回滚保留同一事务供重试');
     f.noScatteredBackup();
 });
 
@@ -147,8 +153,9 @@ test('Windows helper：部分恢复移动后崩溃，按同一日志继续恢复
     f.saveState(state);
     f.run('restore'); f.assertData();
     assert.equal(fs.readFileSync(path.join(f.install, 'Fixture.exe'), 'utf8'), 'new executable marker, never executed');
-    assert(!fs.existsSync(f.active));
-    f.noScatteredBackup();
+    assert.equal(readJSON(f.stateFile).Stage, 'committed', '先提交成功，再单独清理历史');
+    f.run('cleanup');
+    f.noBackup();
 });
 
 test('Windows helper：原目录已恢复但标记未更新，可继续回滚并恢复注册表', options, t => {
@@ -167,7 +174,7 @@ test('Windows helper：committed 清理中断保留标记，下次 prepare 真�
     const f = fixture(t); f.run('prepare'); f.payload(); f.register('0.2.2', false);
     const unlock = await f.lock(path.join(f.old, 'resources/old.bin'));
     try {
-        f.run('restore', 1);
+        f.run('restore'); f.run('cleanup', 10);
         assert.equal(readJSON(f.stateFile).Stage, 'committed', '失败清理不能先删除提交标记');
         f.assertData();
     } finally { await unlock(); }
@@ -176,6 +183,21 @@ test('Windows helper：committed 清理中断保留标记，下次 prepare 真�
     assert.equal(fs.readFileSync(path.join(f.old, 'Fixture.exe'), 'utf8'), 'new executable marker, never executed');
     assert(!fs.existsSync(path.join(f.install, 'Fixture.exe')));
     f.assertData(f.old); f.noScatteredBackup(); f.run('rollback');
+});
+
+test('Windows helper：committed 清理中断后独立 cleanup 重试，不回退已安装的新程序', options, async t => {
+    const f = fixture(t); f.run('prepare'); f.payload(); f.register('0.2.2', false);
+    const unlock = await f.lock(path.join(f.old, 'resources/old.bin'));
+    try {
+        f.run('restore'); f.run('cleanup', 10);
+        assert.equal(readJSON(f.stateFile).Stage, 'committed');
+        f.assertData();
+        assert.equal(fs.readFileSync(path.join(f.install, 'Fixture.exe'), 'utf8'), 'new executable marker, never executed');
+    } finally { await unlock(); }
+    f.run('cleanup'); f.noBackup(); f.assertData();
+    f.run('cleanup'); f.noBackup();
+    f.run('prepare'); f.payload('next'); f.run('restore'); f.run('cleanup'); f.noBackup(); f.assertData();
+    assert.equal(fs.readFileSync(path.join(f.install, 'Fixture.exe'), 'utf8'), 'next executable marker, never executed');
 });
 
 test('Windows helper：两次失败的 partial 分别收纳，不覆盖或删除旧恢复材料', options, t => {
@@ -189,19 +211,50 @@ test('Windows helper：两次失败的 partial 分别收纳，不覆盖或删除
     f.noScatteredBackup();
 });
 
+test('Windows helper：失败载荷的独有资料只保留在历史，不复活旧文件或阻止后续升级', options, t => {
+    const f = fixture(t);
+    for (const label of ['first', 'second']) {
+        f.run('prepare'); f.payload(label);
+        write(path.join(f.install, 'user-notes', label + '.txt'), label + ' personal note');
+        f.run('rollback'); f.assertData();
+        assert(fs.existsSync(path.join(f.backup, 'recovery')), '失败后独有资料仍在恢复材料内');
+    }
+    f.run('prepare'); f.payload(); f.register('0.2.2', false); f.run('restore');
+    const removedPlugin = path.join(f.backup, 'legacy/from-fixed-backup-99/plugins/removed-tool/.runtime/keep.txt');
+    write(removedPlugin, 'historical removed plugin data');
+    f.run('cleanup', 10); f.assertData();
+    assert(!fs.existsSync(path.join(f.install, 'user-notes')), '不能自动补回旧失败载荷中的独有文件');
+    const history = path.join(f.backup, 'recovery');
+    const notes = fs.readdirSync(history).flatMap(name => {
+        const directory = path.join(history, name, 'user-notes');
+        return fs.existsSync(directory) ? fs.readdirSync(directory).map(file => fs.readFileSync(path.join(directory, file), 'utf8')) : [];
+    }).sort();
+    assert.deepEqual(notes, ['first personal note', 'second personal note']);
+    assert(!fs.existsSync(path.join(f.install, 'plugins/removed-tool')), '清理不能复活已删除的旧插件');
+    assert.equal(fs.readFileSync(removedPlugin, 'utf8'), 'historical removed plugin data');
+    f.run('prepare'); f.payload('next'); f.run('restore'); f.run('cleanup', 10);
+    assert.equal(fs.readFileSync(path.join(f.install, 'Fixture.exe'), 'utf8'), 'next executable marker, never executed');
+    assert(!fs.existsSync(path.join(f.install, 'user-notes')));
+    assert(!fs.existsSync(path.join(f.install, 'plugins/removed-tool')));
+    assert.equal(fs.readFileSync(removedPlugin, 'utf8'), 'historical removed plugin data');
+    assert(fs.existsSync(history), '后续升级成功也不删除未核对的独有资料');
+});
+
 test('Windows helper：旧 legacy 仅本次补缺，后续不会复活已删除插件', options, t => {
     const f = fixture(t);
     write(path.join(f.backup, 'plugins/recovered/keep.txt'), 'legacy data');
     f.run('prepare');
     assert.equal(fs.readFileSync(path.join(f.old, 'plugins/recovered/keep.txt'), 'utf8'), 'legacy data');
     f.payload(); f.register('0.2.2', false); f.run('restore');
+    f.run('cleanup');
+    f.noBackup();
     fs.rmSync(path.join(f.install, 'plugins/recovered'), { recursive: true });
     f.run('prepare');
     assert(!fs.existsSync(path.join(f.old, 'plugins/recovered')), '历史备份不能在后续普通升级时补回用户删除的插件');
     f.payload('next'); f.run('restore');
+    f.run('cleanup');
     assert(!fs.existsSync(path.join(f.install, 'plugins/recovered')));
-    assert.equal(fs.readFileSync(path.join(f.backup, 'legacy/from-fixed-backup/plugins/recovered/keep.txt'), 'utf8'), 'legacy data');
-    f.noScatteredBackup();
+    f.noBackup();
 });
 
 test('Windows helper：未注册的非应用非空目录必须保持原样并拒绝暂存', options, t => {
@@ -249,7 +302,7 @@ test('Windows helper：跨版本恢复 created 事务和按原事务版本回滚
 test('Windows helper：legacy 收纳中断继续同一 import 批次并恢复两类缺少项', options, t => {
     const f = fixture(t);
     write(path.join(f.backup, 'plugins/legacy-tool/keep.txt'), 'tool recovery');
-    write(path.join(f.backup, 'plugins/fixture/.runtime/keep.bin'), 'stale copy must not overwrite current data');
+    write(path.join(f.backup, 'plugins/fixture/.runtime/keep.bin'), f.data);
     write(path.join(f.backup, 'python-plugins/legacy-python/keep.txt'), 'python recovery');
     const legacy = path.join(f.backup, 'legacy');
     const batch = path.join(legacy, 'from-fixed-backup');
@@ -271,7 +324,62 @@ test('Windows helper：legacy 收纳中断继续同一 import 批次并恢复两
     f.payload(); f.run('restore'); f.assertData();
     assert.equal(fs.readFileSync(path.join(f.install, 'plugins/legacy-tool/keep.txt'), 'utf8'), 'tool recovery');
     assert.equal(fs.readFileSync(path.join(f.install, 'python-plugins/legacy-python/keep.txt'), 'utf8'), 'python recovery');
-    assert.equal(fs.readFileSync(path.join(batch, 'plugins/legacy-tool/keep.txt'), 'utf8'), 'tool recovery');
-    assert.equal(fs.readFileSync(path.join(batch, 'python-plugins/legacy-python/keep.txt'), 'utf8'), 'python recovery');
-    f.noScatteredBackup();
+    f.run('cleanup'); f.noBackup();
+});
+
+test('Windows helper：历史资料冲突只拒绝清理，保留新程序、当前文件与不同副本', options, t => {
+    const f = fixture(t);
+    const relative = 'plugins/fixture/.runtime/keep.bin';
+    const different = Buffer.from('different legacy personal data');
+    write(path.join(f.backup, relative), different);
+    f.run('prepare'); f.payload(); f.register('0.2.2', false);
+    f.run('restore'); f.run('cleanup', 10);
+    f.assertData();
+    const legacyCopy = path.join(f.backup, 'legacy/from-fixed-backup', relative);
+    assert.deepEqual(fs.readFileSync(legacyCopy), different, '不能删除或覆盖内容不同的历史副本');
+    assert.equal(readJSON(f.stateFile).Stage, 'committed', '清理警告不能回退已提交的新程序');
+    // 模拟用户核对后处理本fixture的冲突副本，再验证同一事务可以继续清理。
+    fs.unlinkSync(legacyCopy);
+    f.run('cleanup'); f.noBackup(); f.assertData();
+});
+
+test('Windows helper：清理历史中的目录联接时拒绝跟随并保留外部资料', options, t => {
+    const f = fixture(t); f.run('prepare'); f.payload(); f.run('restore');
+    const external = path.join(f.root, 'external-data');
+    const sentinel = path.join(external, 'keep.bin');
+    write(sentinel, Buffer.from('external personal data'));
+    const link = path.join(f.backup, 'recovery/interrupted-link/user-link');
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.symlinkSync(external, link, 'junction');
+    try {
+        f.run('cleanup', 10);
+        assert.deepEqual(fs.readFileSync(sentinel), Buffer.from('external personal data'));
+        assert(fs.lstatSync(link).isSymbolicLink(), '拒绝后保留原链接作为恢复材料');
+        assert(fs.existsSync(f.backup));
+        f.assertData();
+    } finally { if (fs.existsSync(link)) fs.unlinkSync(link); }
+});
+
+test('Windows helper：没有应用身份的历史 resources 目录按用户资料保护', options, t => {
+    const f = fixture(t); f.run('prepare'); f.payload(); f.run('restore');
+    const retained = path.join(f.backup, 'legacy/from-fixed-backup-99/resources/custom.txt');
+    write(retained, 'unidentified resources personal data');
+    f.run('cleanup', 10);
+    assert.equal(fs.readFileSync(retained, 'utf8'), 'unidentified resources personal data');
+    assert(!fs.existsSync(path.join(f.install, 'resources/custom.txt')), '不能自动导入或删除未识别历史根中的用户资料');
+    assert.equal(readJSON(f.stateFile).Stage, 'committed');
+    f.assertData();
+});
+
+test('Windows helper：最终空备份目录被占用时不重建日志，释放后 cleanup 可完成', options, async t => {
+    const f = fixture(t); f.run('prepare'); f.payload(); f.run('restore');
+    const unlock = await f.lock(f.backup, { directory: true });
+    try {
+        f.run('cleanup', 10);
+        assert(!fs.existsSync(f.stateFile), '已经完成文件清理，提交标记已删除');
+        assert(!fs.existsSync(path.join(f.backup, 'transaction.log')), '尾部目录删除失败不能重新生成无状态日志');
+        assert.deepEqual(fs.readdirSync(f.backup), [], '只留下被占用的空壳，不产生无法重试的恢复材料');
+        f.assertData();
+    } finally { await unlock(); }
+    f.run('cleanup'); f.noBackup(); f.assertData();
 });

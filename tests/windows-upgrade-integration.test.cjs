@@ -144,7 +144,7 @@ function createFixture({ perMachine = false } = {}) {
                     createDesktopShortcut: false, createStartMenuShortcut: false, runAfterFinish: false, deleteAppDataOnUninstall: false,
                     artifactName: 'fixture-${version}.exe', ...(include ? { include } : {}) } } };
         fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify(pkg, null, 2));
-        write(path.join(payload, 'payload-version.txt'), version);
+        write(path.join(payload, 'resources/payload-version.txt'), version);
         const result = spawnSync(process.execPath, [builder, '--projectDir', project, '--prepackaged', payload, '--win', '--x64', '--publish', 'never',
             `--config.directories.output=${output}`], { cwd: repository, encoding: 'utf8', windowsHide: true, timeout: 120000,
             env: { ...process.env, USE_HARD_LINKS: 'false', CSC_IDENTITY_AUTO_DISCOVERY: 'false' } });
@@ -237,6 +237,10 @@ function canaries(installed, longPath) {
     return files;
 }
 
+function assertNoBackup(installed) {
+    assert(!fs.existsSync(installed + backupSuffix), '成功安装必须清理整个固定备份目录，不累积 active、legacy、recovery 或日志');
+}
+
 function crossVolumeTemporaryRoot(sandbox) {
     const configured = path.join(process.env.LOCALAPPDATA || '', 'Temp');
     if (!fs.existsSync(configured)) return null;
@@ -275,16 +279,19 @@ test('真实 NSIS 长路径覆盖升级：旧卸载器、中文宿主关闭及�
 
     const completed = await fixture.execute(current, ['/S', `/D=${installed}`], originalEnvironment, 120000);
     assert.equal(completed.code, 0, '新安装器真实调用旧卸载器并恢复数据');
+    assertNoBackup(installed);
     for (const file of files) assert.deepEqual(fs.readFileSync(path.join(installed, file)), Buffer.from([0, 3, 255, 128, 10, 13, 17]), file);
-    assert.equal(fs.readFileSync(path.join(installed, 'payload-version.txt'), 'utf8'), '2.0.0');
+    assert.equal(fs.readFileSync(path.join(installed, 'resources/payload-version.txt'), 'utf8'), '2.0.0');
     t.diagnostic('生产事务已真实调用旧卸载器，长路径资料与新版载荷均已验证');
 
     const host = await fixture.startApplication(installed);
     const interrupted = await fixture.execute(aborted, ['/S', `/D=${installed}`], originalEnvironment, 120000);
     assert.notEqual(interrupted.code, 0, 'prepare 后的失败必须返回失败');
+    assert(fs.existsSync(installed + backupSuffix), '失败回滚保留可重试的恢复材料');
     assert.notEqual(host.exitCode, null, '真实 CHECK_APP_RUNNING 已关闭本次中文名隔离宿主');
     for (const file of files) assert.deepEqual(fs.readFileSync(path.join(installed, file)), Buffer.from([0, 3, 255, 128, 10, 13, 17]), '失败回滚保留资料');
     assert.equal((await fixture.execute(current, ['/S', `/D=${installed}`], originalEnvironment, 120000)).code, 0, '同一固定事务目录可以失败后重试');
+    assertNoBackup(installed);
     const siblingNames = fs.readdirSync(path.dirname(installed));
     assert(!siblingNames.some(name => name.startsWith(fixture.productName + backupSuffix + '.previous-')), '不产生新散落备份');
     assert(fs.readFileSync(path.join(fixture.sandbox, 'prepared-temp.txt'), 'utf8').endsWith('\\active\\temp'), '旧卸载器的 TEMP 使用同盘固定事务目录');
@@ -350,11 +357,13 @@ test('真实解包后失败回滚：旧程序、HKCU 注册表和未知顶层资
         write(path.join(installed, file), Buffer.from([0, 3, 255, 128, 10, 13, 17])); files.push(file);
     }
     assert.notEqual((await fixture.execute(failure, ['/S', `/D=${installed}`], environment, 120000)).code, 0);
-    assert.equal(fs.readFileSync(path.join(installed, 'payload-version.txt'), 'utf8'), '1.0.0', '新版解包后的失败回滚旧程序');
+    assert(fs.existsSync(installed + backupSuffix), '真实解包后失败保留恢复材料');
+    assert.equal(fs.readFileSync(path.join(installed, 'resources/payload-version.txt'), 'utf8'), '1.0.0', '新版解包后的失败回滚旧程序');
     for (const file of files) assert.deepEqual(fs.readFileSync(path.join(installed, file)), Buffer.from([0, 3, 255, 128, 10, 13, 17]));
     assert(command('reg.exe', ['query', fixture.registries[1], '/v', 'DisplayVersion', '/reg:64']).includes('1.0.0'));
     assert.equal((await fixture.execute(current, ['/S', `/D=${installed}`], environment, 120000)).code, 0);
-    assert.equal(fs.readFileSync(path.join(installed, 'payload-version.txt'), 'utf8'), '2.0.0');
+    assertNoBackup(installed);
+    assert.equal(fs.readFileSync(path.join(installed, 'resources/payload-version.txt'), 'utf8'), '2.0.0');
     t.diagnostic('新版解包/写注册表后失败已回滚旧载荷及注册信息，并可重新升级');
     fixture.pass();
 });
@@ -367,7 +376,8 @@ test('真实初始化退出与全新安装：不预先创建备份', { skip: pro
     assert.notEqual((await fixture.execute(cancelled, ['/S', `/D=${installed}`])).code, 0);
     assert(!fs.existsSync(installed + backupSuffix), '初始化退出不产生升级事务，不宣称 UI 手动取消');
     assert.equal((await fixture.execute(current, ['/S', `/D=${installed}`], {}, 120000)).code, 0);
-    assert.equal(fs.readFileSync(path.join(installed, 'payload-version.txt'), 'utf8'), '2.0.0');
+    assertNoBackup(installed);
+    assert.equal(fs.readFileSync(path.join(installed, 'resources/payload-version.txt'), 'utf8'), '2.0.0');
     fixture.pass();
 });
 
@@ -387,6 +397,7 @@ test('真实跨盘 TEMP 覆盖升级：旧卸载器与固定同盘事务', { ski
         const before = await fixture.execute(baseline, ['/S', `/D=${installed}`], environment);
         assert.equal(before.code, 0, '原生 NSIS 逐文件跨盘移动本身可成功，不能误当必现根因');
         assert.equal((await fixture.execute(current, ['/S', `/D=${installed}`], environment, 120000)).code, 0);
+        assertNoBackup(installed);
         for (const file of files) assert.deepEqual(fs.readFileSync(path.join(installed, file)), Buffer.from([0, 3, 255, 128, 10, 13, 17]));
         t.diagnostic('TEMP 跨盘下原生旧链路实际可完成；生产固定同盘事务也已成功升级');
     } finally {
@@ -413,11 +424,13 @@ test('真实 all-users 升级及回滚：独立 HKLM GUID、长路径资料和�
     const files = canaries(installed, true);
     write(path.join(installed, 'custom-data/keep.bin'), Buffer.from([0, 3, 255, 128, 10, 13, 17])); files.push('custom-data/keep.bin');
     assert.notEqual((await fixture.execute(failure, ['/S', `/D=${installed}`], environment, 120000)).code, 0);
-    assert.equal(fs.readFileSync(path.join(installed, 'payload-version.txt'), 'utf8'), '1.0.0');
+    assert(fs.existsSync(installed + backupSuffix), '全用户安装失败也保留恢复材料');
+    assert.equal(fs.readFileSync(path.join(installed, 'resources/payload-version.txt'), 'utf8'), '1.0.0');
     assert(command('reg.exe', ['query', fixture.registries[1], '/v', 'DisplayVersion', '/reg:64']).includes('1.0.0'), '失败后恢复旧 HKLM 注册信息');
     for (const file of files) assert.deepEqual(fs.readFileSync(path.join(installed, file)), Buffer.from([0, 3, 255, 128, 10, 13, 17]));
     assert.equal((await fixture.execute(current, ['/S', `/D=${installed}`], environment, 120000)).code, 0);
-    assert.equal(fs.readFileSync(path.join(installed, 'payload-version.txt'), 'utf8'), '2.0.0');
+    assertNoBackup(installed);
+    assert.equal(fs.readFileSync(path.join(installed, 'resources/payload-version.txt'), 'utf8'), '2.0.0');
     assert(command('reg.exe', ['query', fixture.registries[1], '/v', 'DisplayVersion', '/reg:64']).includes('2.0.0'));
     for (const file of files) assert.deepEqual(fs.readFileSync(path.join(installed, file)), Buffer.from([0, 3, 255, 128, 10, 13, 17]));
     t.diagnostic('真实 HKLM all-users 旧安装、解包后回滚及重试升级均通过，所有资料字节一致');
@@ -445,19 +458,18 @@ test('真实新卸载器关闭中文宿主：升级拒绝异目录冲突，独�
     assert(guardHost.kill(), '只结束本fixture启动的独立宿主以继续全新安装');
     await stopped;
     assert.equal((await fixture.execute(current, ['/S', `/D=${installed}`], environment, 120000)).code, 0);
+    assertNoBackup(installed);
     // 原生卸载器从安装目录之外执行，_?= 指定实际目录并让父进程等待完整卸载结果。
     const uninstaller = path.join(fixture.sandbox, 'native-uninstaller.exe');
     fs.copyFileSync(path.join(installed, `Uninstall ${fixture.productName}.exe`), uninstaller);
-    const transactionLog = path.join(installed + backupSuffix, 'transaction.log');
-    const previousLog = fs.readFileSync(transactionLog);
     const host = await fixture.startApplication(installed);
     const otherHost = await fixture.startApplication(otherInstalled);
     assert.notEqual((await fixture.execute(current, ['/S', `/D=${installed}`], environment, 120000)).code, 0, '新安装器拒绝可能被旧卸载器误关的异目录同名进程');
     assert.equal(host.exitCode, null, '升级预检查拒绝时不关闭目标宿主');
     assert.equal(otherHost.exitCode, null, '升级预检查拒绝时不关闭另一安装');
-    assert.deepEqual(fs.readFileSync(transactionLog), previousLog, '升级预检查拒绝不启动或记录安装事务');
+    assertNoBackup(installed);
     assert(!fs.existsSync(path.join(installed + backupSuffix, 'active')), '升级预检查拒绝不暂存旧程序');
-    assert.equal(fs.readFileSync(path.join(installed, 'payload-version.txt'), 'utf8'), '2.0.0');
+    assert.equal(fs.readFileSync(path.join(installed, 'resources/payload-version.txt'), 'utf8'), '2.0.0');
 
     // NSIS 的 _?= 读取命令行剩余原文，必须置于最后且不加 Windows 的整参引号。
     assert.equal((await fixture.execute(uninstaller, ['/S', '/currentuser', `_?=${installed}`], environment, 120000, true)).code, 0, '完整原生卸载器成功返回');
@@ -469,5 +481,33 @@ test('真实新卸载器关闭中文宿主：升级拒绝异目录冲突，独�
     assert.deepEqual(fs.readFileSync(untouched), Buffer.from([0, 3, 255, 128, 10, 13, 17]), '另一安装目录文件保持原样');
     assert.notEqual(spawnSync('reg.exe', ['query', fixture.registries[1], '/reg:64'], { windowsHide: true, stdio: 'ignore' }).status, 0, '原生卸载已删除本fixture注册表');
     t.diagnostic('新安装器冲突预检查保持两份宿主；新原生卸载器仅关闭并卸载精确目标目录');
+    fixture.pass();
+});
+
+test('真实升级清理警告：独有历史材料保留，新程序成功且后续升级不回滚', { skip: process.platform !== 'win32', timeout: 180000 }, async t => {
+    const fixture = createFixture(); t.after(() => fixture.cleanup());
+    const old = fixture.build('old');
+    const current = fixture.build('current', productionInclude);
+    const installed = path.join(fixture.sandbox, '清理 警告安装');
+    const temp = path.join(fixture.sandbox, '中文 临时目录'); fs.mkdirSync(temp);
+    const environment = { TEMP: temp, TMP: temp };
+    assert.equal((await fixture.execute(old, ['/S', `/D=${installed}`], environment)).code, 0);
+    const files = canaries(installed, false);
+    const retained = [
+        ['legacy/from-fixed-backup-99/plugins/removed-tool/.runtime/keep.txt', 'historical removed plugin data'],
+        ['recovery/interrupted-history/local-note.txt', 'unique failed personal data']
+    ];
+    for (const [relative, content] of retained) write(path.join(installed + backupSuffix, relative), content);
+    for (let attempt = 0; attempt < 2; attempt++) {
+        assert.equal((await fixture.execute(current, ['/S', `/D=${installed}`], environment, 120000)).code, 0, '独立 cleanup 警告不能变成安装失败或触发回滚');
+        assert.equal(fs.readFileSync(path.join(installed, 'resources/payload-version.txt'), 'utf8'), '2.0.0');
+        for (const file of files) assert.deepEqual(fs.readFileSync(path.join(installed, file)), Buffer.from([0, 3, 255, 128, 10, 13, 17]));
+        assert(!fs.existsSync(path.join(installed, 'plugins/removed-tool')), '清理不能补回已删除的历史插件');
+        assert(!fs.existsSync(path.join(installed, 'local-note.txt')), '清理不能自动导入独有历史资料');
+        for (const [relative, content] of retained) assert.equal(fs.readFileSync(path.join(installed + backupSuffix, relative), 'utf8'), content, '未核对历史材料完整保留');
+        assert.equal(JSON.parse(fs.readFileSync(path.join(installed + backupSuffix, 'active/state.json'), 'utf8')).Stage, 'committed');
+    }
+    assert.match(fs.readFileSync(path.join(fixture.sandbox, 'helper-results.log'), 'utf8'), /cleanup exit=10/, '真实安装器将清理保留作为独立阶段处理');
+    t.diagnostic('历史独有资料触发清理警告，但新程序与后续升级均成功；未复活旧插件或覆盖用户文件');
     fixture.pass();
 });

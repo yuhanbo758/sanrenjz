@@ -1,5 +1,5 @@
 ﻿param(
-    [Parameter(Mandatory=$true)][ValidateSet('prepare','restore','rollback','consolidate','close-app')][string]$Phase,
+    [Parameter(Mandatory=$true)][ValidateSet('prepare','restore','rollback','consolidate','close-app','cleanup')][string]$Phase,
     [Parameter(Mandatory=$true)][string]$InstallDir,
     [Parameter(Mandatory=$true)][string]$UninstallerName,
     [Parameter(Mandatory=$true)][string]$Version,
@@ -207,6 +207,113 @@ function CleanupCommitted {
     RemoveSafe $stateFile
     if (![SanrenjzUpdateNative]::RemoveDirectory((Extended $active))) { throw 'Cannot remove empty completed transaction directory' }
 }
+function AssertTreePlain([string]$path) {
+    $attributes = [IO.File]::GetAttributes((Extended $path))
+    if (($attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Cleanup retained a directory link or symbolic link: $path" }
+    if (($attributes -band [IO.FileAttributes]::Directory) -ne 0) {
+        foreach ($entry in [IO.Directory]::EnumerateFileSystemEntries((Extended $path))) { AssertTreePlain $entry }
+    }
+}
+function AssertMatchingData([string]$source, [string]$target) {
+    AssertPlain $target
+    if (!(Exists $target)) { throw "Cleanup retained historical data missing from the current installation: $source" }
+    $sourceAttributes = [IO.File]::GetAttributes((Extended $source))
+    $targetAttributes = [IO.File]::GetAttributes((Extended $target))
+    $sourceDirectory = ($sourceAttributes -band [IO.FileAttributes]::Directory) -ne 0
+    $targetDirectory = ($targetAttributes -band [IO.FileAttributes]::Directory) -ne 0
+    if ($sourceDirectory -ne $targetDirectory) { throw "Cleanup retained a historical file/directory conflict: $source" }
+    if ($sourceDirectory) {
+        foreach ($entry in [IO.Directory]::EnumerateFileSystemEntries((Extended $source))) {
+            AssertMatchingData $entry ([IO.Path]::Combine($target, [IO.Path]::GetFileName($entry)))
+        }
+    } else {
+        if ([IO.FileInfo]::new((Extended $source)).Length -ne [IO.FileInfo]::new((Extended $target)).Length -or (FileDigest $source) -ne (FileDigest $target)) {
+            throw "Cleanup retained historical data with different content: $source"
+        }
+    }
+}
+function IsPayloadEntry([string]$name) {
+    $mainName = $UninstallerName -replace '^Uninstall ',''
+    return $name -in @($mainName,$UninstallerName,'resources','locales','chrome_100_percent.pak','chrome_200_percent.pak',
+        'd3dcompiler_47.dll','dxcompiler.dll','dxil.dll','ffmpeg.dll','icudtl.dat','libEGL.dll','libGLESv2.dll',
+        'LICENSE.electron.txt','LICENSES.chromium.html','resources.pak','snapshot_blob.bin','v8_context_snapshot.bin',
+        'vk_swiftshader.dll','vk_swiftshader_icd.json','vulkan-1.dll')
+}
+function AssertHistoricalApplication([string]$path, [bool]$legacyLogs, [bool]$knownApplication = $false) {
+    $mainName = $UninstallerName -replace '^Uninstall ',''
+    $applicationRoot = $knownApplication -or ([IO.File]::Exists((Extended ([IO.Path]::Combine($path,$mainName)))) -and [IO.File]::Exists((Extended ([IO.Path]::Combine($path,$UninstallerName)))) -and [IO.Directory]::Exists((Extended ([IO.Path]::Combine($path,'resources')))))
+    foreach ($entry in [IO.Directory]::EnumerateFileSystemEntries((Extended $path))) {
+        $name = [IO.Path]::GetFileName($entry)
+        if ($applicationRoot -and (IsPayloadEntry $name)) { continue }
+        if ($legacyLogs -and ($name -like 'backup-*.log' -or $name -like 'restore-*.log')) {
+            if (![IO.File]::Exists((Extended $entry))) { throw "Cleanup retained a non-file historical log entry: $entry" }
+            continue
+        }
+        AssertMatchingData $entry ([IO.Path]::Combine($install,$name))
+    }
+}
+function CleanupAllCommitted {
+    if (!(Exists $backup)) { return }
+    AssertTreePlain $backup
+    AssertPlain $install
+    if ($null -eq $script:state) {
+        # 最后删日志与提交标记；随后中断只会留下空目录，重试可幂等收尾。
+        foreach ($entry in [IO.Directory]::EnumerateFileSystemEntries((Extended $backup))) {
+            if ([IO.Path]::GetFileName($entry) -ne 'active' -or ![IO.Directory]::Exists((Extended $entry)) -or @([IO.Directory]::EnumerateFileSystemEntries((Extended $entry))).Count -ne 0) {
+                throw 'Cleanup retained materials without a committed transaction journal'
+            }
+        }
+        if (Exists $active) {
+            if (![SanrenjzUpdateNative]::RemoveDirectory((Extended $active))) { throw 'Cannot remove the empty completed transaction directory' }
+        }
+        if (![SanrenjzUpdateNative]::RemoveDirectory((Extended $backup))) { throw 'Cannot remove the empty completed backup directory' }
+        return
+    }
+    if ($script:state.Stage -ne 'committed') { throw 'Cleanup requires a committed installation; recovery materials retained' }
+    # 旧历史只核验，不补回已卸载插件、不覆盖当前数据，也不另建一份积累目录。
+    $cleanupEntries = @([IO.Directory]::EnumerateFileSystemEntries((Extended $backup)))
+    foreach ($entry in $cleanupEntries) {
+        $name = [IO.Path]::GetFileName($entry)
+        switch ($name) {
+            active {
+                foreach ($item in [IO.Directory]::EnumerateFileSystemEntries((Extended $entry))) {
+                    $itemName = [IO.Path]::GetFileName($item)
+                    if ($itemName -in @('state.json','state.json.tmp','temp')) { continue }
+                    if ($itemName -ne 'app') { throw "Cleanup retained unknown transaction material: $item" }
+                    AssertHistoricalApplication $item $false $true
+                }
+            }
+            legacy {
+                foreach ($batch in [IO.Directory]::EnumerateFileSystemEntries((Extended $entry))) {
+                    $batchName = [IO.Path]::GetFileName($batch)
+                    $previousPrefix = [IO.Path]::GetFileName($backup) + '.previous-'
+                    if (![IO.Directory]::Exists((Extended $batch)) -or ($batchName -notmatch '^from-fixed-backup(?:-\d+)?$' -and !$batchName.StartsWith($previousPrefix,[StringComparison]::OrdinalIgnoreCase))) {
+                        throw "Cleanup retained unknown legacy material: $batch"
+                    }
+                    AssertHistoricalApplication $batch $true
+                }
+            }
+            recovery {
+                foreach ($batch in [IO.Directory]::EnumerateFileSystemEntries((Extended $entry))) {
+                    if (![IO.Directory]::Exists((Extended $batch)) -or ![IO.Path]::GetFileName($batch).StartsWith('interrupted-',[StringComparison]::OrdinalIgnoreCase)) { throw "Cleanup retained unknown recovery material: $batch" }
+                    AssertHistoricalApplication $batch $false
+                }
+            }
+            default {
+                if ($name -in @('transaction.log','legacy-recovery.log') -or $name -like 'backup-*.log' -or $name -like 'restore-*.log') {
+                    if (![IO.File]::Exists((Extended $entry))) { throw "Cleanup retained a non-file log entry: $entry" }
+                } elseif ($name -in $persistent) { AssertMatchingData $entry ([IO.Path]::Combine($install,$name)) }
+                else { throw "Cleanup retained unknown backup material: $entry" }
+            }
+        }
+    }
+    # 完整核验通过后才删除；提交日志最后删除，文件占用或中断后仍可重试 cleanup。
+    foreach ($entry in $cleanupEntries) {
+        if ([IO.Path]::GetFileName($entry) -ne 'active') { RemoveSafe $entry }
+    }
+    CleanupCommitted
+    if (![SanrenjzUpdateNative]::RemoveDirectory((Extended $backup))) { throw 'Cannot remove the empty completed backup directory' }
+}
 function RegistryLocations {
     if (!$RegistryKey -and !$UninstallRegistryKey) { return @() }
     if ($RegistryKey -notmatch '^Software\\([a-fA-F0-9-]{36})$') { throw 'Invalid product registry key' }
@@ -388,7 +495,7 @@ function PreservePartialRoot {
 }
 function Restore {
     if ($null -eq $script:state) { throw 'No prepared update transaction' }
-    if ($script:state.Stage -eq 'committed') { CleanupCommitted; return }
+    if ($script:state.Stage -eq 'committed') { return }
     if ($script:state.Stage -notin @('staged','restoring')) { throw 'Update transaction is not ready to restore' }
     EnsureDir $install
     if ($script:state.Stage -eq 'staged') {
@@ -411,8 +518,7 @@ function Restore {
         else { throw "Conflicting or missing recovery entry: $name" }
     }
     $script:state.Stage='committed'; SaveState
-    Log 'New payload installed; preserved data restored successfully'
-    CleanupCommitted
+    try { Log 'New payload installed; preserved data restored successfully' } catch { }
 }
 function Rollback {
     if ($null -eq $script:state) { return }
@@ -445,6 +551,7 @@ function Rollback {
 try {
     # 进程预检不得创建事务目录、日志或注册表项，重试与取消保持用户文件原样。
     if ($Phase -eq 'close-app') { CloseApp; exit 0 }
+    if ($Phase -in @('cleanup','rollback') -and !(Exists $backup)) { exit 0 }
     AssertPlain $backup; EnsureDir $backup; AssertPlain $active
     if ([IO.File]::Exists((Extended $stateFile))) {
         AssertPlain $stateFile
@@ -457,10 +564,18 @@ try {
         restore { Restore }
         rollback { Rollback }
         consolidate { [void](ConsolidateLegacy); Log 'Legacy backups consolidated without moving the installation' }
+        cleanup { CleanupAllCommitted }
     }
     exit 0
 } catch {
     if ($Phase -eq 'close-app') { [Console]::Error.WriteLine('Cannot close application: ' + $_.Exception.Message); exit 1 }
+    if ($Phase -eq 'cleanup') {
+        $cleanupError = $_.Exception.Message
+        # 提交标记已删后的空壳收尾失败不再重建日志，避免成功清理后重新产生备份。
+        if ([IO.File]::Exists((Extended $stateFile))) { try { AssertPlain $backup; AssertPlain $logFile; Log ('cleanup: ' + $cleanupError) } catch { } }
+        [Console]::Error.WriteLine('Installation is committed; backup cleanup is incomplete: ' + $cleanupError + '. Retained materials: ' + $backup)
+        exit 10
+    }
     try { Log ($Phase + ': ' + $_.Exception.Message) } catch { }
     [Console]::Error.WriteLine('Update transaction failed. Recovery materials and details: ' + $logFile)
     exit 1

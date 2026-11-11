@@ -259,6 +259,17 @@ update_restore_retry:
   MessageBox MB_RETRYCANCEL|MB_ICONSTOP "新版程序已解包，用户目录尚未完整恢复。恢复材料继续保留，重试将使用同一事务：$updateTransactionDir$\r$\n详情见 transaction.log；返回：$updateHelperExit" /SD IDCANCEL IDRETRY update_restore_retry
   Abort
 update_restore_done:
+  ; 数据已提交，退出回调不能再回滚或重新创建已清理的备份目录。
+  StrCpy $updatePrepareAttempted "0"
   ; 用户在同一安装窗口重试成功后，不遗留先前失败的进程退出码。
+  SetErrorLevel 0
+update_cleanup_retry:
+  StrCpy $updateHelperPhase cleanup
+  Call SanrenjzRunUpdateHelper
+  StrCmp $updateHelperExit "0" update_cleanup_done
+  DetailPrint "新版与用户资料已恢复成功，旧恢复材料尚未清理：$updateTransactionDir；返回：$updateHelperExit"
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "新版程序与用户资料已恢复成功，旧恢复材料尚未清理。可以重试清理，或取消清理并完成安装。$\r$\n保留位置：$updateTransactionDir$\r$\n返回：$updateHelperExit$\r$\n详情：$updateHelperOutput" /SD IDCANCEL IDRETRY update_cleanup_retry
+update_cleanup_done:
+  ; 清理失败不等于安装失败，未核验的恢复材料继续保留。
   SetErrorLevel 0
 !macroend

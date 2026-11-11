@@ -2,7 +2,7 @@
 
 效率工具与 Python 程序管理的合并应用。以原效率工具为主框架，保留全局搜索、超级面板、窗口管理、插件存储和程序小店，增加独立的 Python 管理模块。
 
-当前配置版本为 **0.1.12**，公开仓库为 [yuhanbo758/sanrenjz](https://github.com/yuhanbo758/sanrenjz)，正式版安装包入口为 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases)。只有对应的多平台构建及检查全部通过才会发布。两个来源项目保持独立；仓库修复是否包含在已发布包中，以 Release 来源提交为准。
+当前配置版本为 **0.2.3**，公开仓库为 [yuhanbo758/sanrenjz](https://github.com/yuhanbo758/sanrenjz)，正式版安装包入口为 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases)。只有对应的多平台构建及检查全部通过才会发布。两个来源项目保持独立；仓库修复是否包含在已发布包中，以 Release 来源提交为准。
 
 ## 使用
 
@@ -64,7 +64,7 @@ macOS/Linux 保留手动解释器支持，不提供一键安装 Python。四目�
 - 效率插件开发目录 `app/software`，Python 插件开发目录 `app/python-software`；Windows 安装态继续使用安装目录下的 `plugins` 和 `python-plugins`，macOS/Linux 使用新应用用户数据目录下的同名目录，避免修改应用签名内容或 AppImage 只读挂载。
 - 效率插件数据默认在用户数据目录的 `plugin-data`；Python 配置默认在 `python-plugin-configs`，也可选择其他独立目录。
 - 保留 `plugin.json`、Python `settings.json`、旧 Python 配置环境变量及 `.enc` 格式。标准 Windows VBS 启动器读取新应用所选环境；自定义启动器不会被静默覆盖，迁移报告会明确提示。
-- NSIS 升级保留两类插件、旧配置目录和按需安装的 Python，失败时保留升级备份。
+- Windows NSIS 升级保留两类插件、.runtime、旧配置目录和按需安装的 Python；成功恢复资料并提交后，独立清理整个固定备份目录。安装失败保留恢复材料；清理未完成会提示保留位置并允许重试，不回滚或阻塞已完成的安装。macOS 继续使用独立的 DMG 校验与应用替换流程。
 
 来源记录在本地 `docs/merge-baseline.json`；架构说明见 [合并架构](docs/合并架构.md)，验证证据见 [验收报告](docs/验收报告.md)。
 
@@ -92,7 +92,10 @@ macOS/Linux 保留手动解释器支持，不提供一键安装 Python。四目�
 
 0.2.2 将 Windows 覆盖升级改为固定目录事务，旧卸载器不再遍历用户深层目录；重试复用原事务，取消或失败恢复旧程序及安装记录，历史备份集中收纳，详见 [0.2.2 发布说明](docs/发布说明-0.2.2.md)。
 
+0.2.3 在 Windows 资料恢复成功后独立核验并清理整个固定备份目录，失败或发现历史独有、冲突资料时保留材料；清理警告不回滚或阻塞已完成安装。Mac 更新流程继续独立维护，详见 [0.2.3 发布说明](docs/发布说明-0.2.3.md)。
+
 <!-- sanrenjz-promotion:start -->
+
 ## 👨‍💻 作者信息
 
 **余汉波** - 编程爱好者-量化交易和效率工具开发
@@ -128,4 +131,5 @@ macOS/Linux 保留手动解释器支持，不提供一键安装 Python。四目�
 
 ---
 **⭐ 如果这个项目对您有帮助，请给它一个 Star！**
+
 <!-- sanrenjz-promotion:end -->
