@@ -1,171 +1,207 @@
 !ifndef BUILD_UNINSTALLER
-  Var preservedDataDir
-  Var previousDataDir
-  Var backupSuffix
-  Var directoryCopyExit
-  Var directoryCopyOutput
-  Var unsafePreservedPath
+!define /ifndef SANRENJZ_UPDATE_HELPER "${__FILEDIR__}\windows-update-transaction.ps1"
+!define MUI_CUSTOMFUNCTION_ABORT SanrenjzUpdateOnUserAbort
 
-Function SanrenjzExtendedPath
-  Exch $0
-  Push $1
-  StrCpy $1 $0 4
-  StrCmp $1 "\\?\" extended_path_done
-  StrCpy $1 $0 2
-  StrCmp $1 "\\" 0 extended_path_local
-  StrCpy $0 $0 "" 2
-  StrCpy $0 "\\?\UNC\$0"
-  Goto extended_path_done
-extended_path_local:
-  StrCpy $0 "\\?\$0"
-extended_path_done:
-  Pop $1
-  Exch $0
+Var updateTransactionDir
+Var updateRegisteredDir
+Var updateSecondaryRegisteredDir
+Var updateRegisteredArgument
+Var updateHelperPhase
+Var updateHelperExit
+Var updateHelperOutput
+Var updateUninstallerName
+Var updateProductVersion
+Var updateProductAppId
+Var updateRegistryKey
+Var updateUninstallRegistryKey
+Var updateRegistryHive
+Var updateTempActive
+Var updateTempReady
+Var updateOldTemp
+Var updateOldTmp
+Var updateOldTempExists
+Var updateOldTmpExists
+Var updateUninstallExit
+Var updateUninstallFailed
+
+Function SanrenjzRunUpdateHelper
+  StrCpy $updateRegisteredArgument ""
+  StrCmp $updateRegisteredDir "" update_helper_run
+  StrCpy $updateRegisteredArgument '-RegisteredInstallDir "$updateRegisteredDir"'
+update_helper_run:
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\windows-update-transaction.ps1" -Phase $updateHelperPhase -InstallDir "$INSTDIR" -UninstallerName "$updateUninstallerName" -Version "$updateProductVersion" -AppId "$updateProductAppId" -RegistryKey "$updateRegistryKey" -UninstallRegistryKey "$updateUninstallRegistryKey" -RegistryHive "$updateRegistryHive" -RegistryView "Registry64" $updateRegisteredArgument'
+  Pop $updateHelperExit
+  Pop $updateHelperOutput
 FunctionEnd
 
-Function SanrenjzCheckPreservedLinks
-  Exch $R0
-  Push $R1
-  Push $R2
-  Push $R3
-  Push $R4
-  System::Call 'kernel32::GetFileAttributesW(w "$R0") i .s'
-  Pop $R4
-  IntOp $R4 $R4 & 0x400
-  StrCmp $R4 0 check_preserved_entries
-  StrCpy $unsafePreservedPath $R0
-  Goto check_preserved_return
-check_preserved_entries:
-  FindFirst $R1 $R2 "$R0\*"
-  IfErrors check_preserved_return
-check_preserved_next:
-  StrCmp $R2 "." check_preserved_advance
-  StrCmp $R2 ".." check_preserved_advance
-  StrCpy $R3 "$R0\$R2"
-  System::Call 'kernel32::GetFileAttributesW(w "$R3") i .s'
-  Pop $R4
-  IntOp $R4 $R4 & 0x400
-  StrCmp $R4 0 check_preserved_directory
-  StrCpy $unsafePreservedPath $R3
-  Goto check_preserved_close
-check_preserved_directory:
-  IfFileExists "$R3\." 0 check_preserved_advance
-  Push $R3
-  Call SanrenjzCheckPreservedLinks
-  StrCmp $unsafePreservedPath "" check_preserved_advance check_preserved_close
-check_preserved_advance:
-  FindNext $R1 $R2
-  IfErrors check_preserved_close check_preserved_next
-check_preserved_close:
-  FindClose $R1
-check_preserved_return:
-  Pop $R4
-  Pop $R3
-  Pop $R2
-  Pop $R1
-  Pop $R0
+Function SanrenjzRestoreChildTemp
+  Push $0
+  StrCmp $updateTempActive "1" 0 update_temp_restored
+  StrCmp $updateOldTempExists "1" 0 update_temp_remove_original
+  System::Call 'kernel32::SetEnvironmentVariableW(w "TEMP", w "$updateOldTemp") i .r0'
+  Goto update_tmp_restore
+update_temp_remove_original:
+  System::Call 'kernel32::SetEnvironmentVariableW(w "TEMP", p 0) i .r0'
+update_tmp_restore:
+  StrCmp $updateOldTmpExists "1" 0 update_tmp_remove_original
+  System::Call 'kernel32::SetEnvironmentVariableW(w "TMP", w "$updateOldTmp") i .r0'
+  Goto update_temp_restore_done
+update_tmp_remove_original:
+  System::Call 'kernel32::SetEnvironmentVariableW(w "TMP", p 0) i .r0'
+update_temp_restore_done:
+  StrCpy $updateTempActive "0"
+update_temp_restored:
+  Pop $0
+FunctionEnd
+
+Function SanrenjzUseChildTemp
+  Push $0
+  StrCpy $updateTempReady "0"
+  ClearErrors
+  ReadEnvStr $updateOldTemp TEMP
+  StrCpy $updateOldTempExists "1"
+  IfErrors 0 +2
+  StrCpy $updateOldTempExists "0"
+  ClearErrors
+  ReadEnvStr $updateOldTmp TMP
+  StrCpy $updateOldTmpExists "1"
+  IfErrors 0 +2
+  StrCpy $updateOldTmpExists "0"
+  ClearErrors
+  CreateDirectory "$updateTransactionDir\active\temp"
+  IfErrors update_temp_setup_done
+  ; 只修改安装器进程环境。旧卸载器的逐文件 Rename 必须在安装目录同盘完成。
+  StrCpy $updateTempActive "1"
+  System::Call 'kernel32::SetEnvironmentVariableW(w "TEMP", w "$updateTransactionDir\active\temp") i .r0'
+  StrCmp $0 0 update_temp_setup_failed
+  System::Call 'kernel32::SetEnvironmentVariableW(w "TMP", w "$updateTransactionDir\active\temp") i .r0'
+  StrCmp $0 0 update_temp_setup_failed
+  StrCpy $updateTempReady "1"
+  Goto update_temp_setup_done
+update_temp_setup_failed:
+  Call SanrenjzRestoreChildTemp
+update_temp_setup_done:
+  Pop $0
+FunctionEnd
+
+Function SanrenjzRollbackUpdate
+  Call SanrenjzRestoreChildTemp
+  StrCmp $updateTransactionDir "" update_rollback_done
+  IfFileExists "$PLUGINSDIR\windows-update-transaction.ps1" 0 update_rollback_done
+  ; 主安装节会再次进入 INSTDIR，回滚整目录前同样必须释放当前目录句柄。
+  SetOutPath "$PLUGINSDIR"
+  StrCpy $updateHelperPhase rollback
+  Call SanrenjzRunUpdateHelper
+  StrCmp $updateHelperExit "0" update_rollback_done
+  SetErrorLevel 2
+  MessageBox MB_ICONSTOP "安装未完成，自动恢复旧程序也未完成。请保留以下恢复材料并查看 transaction.log：$updateTransactionDir" /SD IDOK
+update_rollback_done:
+FunctionEnd
+
+Function SanrenjzUpdateOnUserAbort
+  Call SanrenjzRollbackUpdate
+FunctionEnd
+
+Function .onInstFailed
+  Call SanrenjzRollbackUpdate
+FunctionEnd
+
+Function .onGUIEnd
+  Call SanrenjzRollbackUpdate
 FunctionEnd
 !endif
 
-!macro copyDirectoryLongPath source destination log
-  ; Shell CopyFiles 在目标路径超过 MAX_PATH 时失败；Robocopy 原生支持长路径。
-  ; 不使用 /MIR、/MOVE 或 /256；保留空目录和属性，链接按链接复制，不遍历外部目标。
-  nsExec::ExecToStack '"$SYSDIR\robocopy.exe" "${source}" "${destination}" /E /COPY:DAT /DCOPY:DAT /SL /SJ /R:1 /W:1 /NP /NFL /NDL /UNILOG:"${log}"'
-  Pop $directoryCopyExit
-  Pop $directoryCopyOutput
-!macroend
-
-!macro preserveDirectory source name
-  IfFileExists "${source}\." 0 preserve_${name}_done
-  ; 旧 NSIS 卸载器会沿目录联接递归删除，必须在卸载前拒绝，不能只跳过复制。
-  StrCpy $unsafePreservedPath ""
-  Push "${source}"
-  Call SanrenjzExtendedPath
-  Call SanrenjzCheckPreservedLinks
-  StrCmp $unsafePreservedPath "" preserve_${name}_copy
-  SetErrorLevel 2
-  MessageBox MB_ICONSTOP "${name} 中发现目录链接或无法读取属性的路径，安装已停止，尚未卸载旧程序。请检查后重试：$unsafePreservedPath" /SD IDOK
-  Abort
-preserve_${name}_copy:
-  StrCpy $directoryCopyExit "create-directory-error"
-  ClearErrors
-  CreateDirectory "$preservedDataDir\${name}"
-  IfErrors preserve_${name}_failed
-  !insertmacro copyDirectoryLongPath "${source}" "$preservedDataDir\${name}" "$preservedDataDir\backup-${name}.log"
-  StrCmp $directoryCopyExit "error" preserve_${name}_failed
-  StrCmp $directoryCopyExit "timeout" preserve_${name}_failed
-  ; Robocopy 的 0～7 都是成功状态，8 及以上表示复制失败。
-  IntCmpU $directoryCopyExit 8 preserve_${name}_failed preserve_${name}_done preserve_${name}_failed
-preserve_${name}_failed:
-  SetErrorLevel 2
-  MessageBox MB_ICONSTOP "无法完整备份 ${name}，安装已停止。现有程序及备份保留在：$preservedDataDir$\r$\n复制返回：$directoryCopyExit。具体原因见：$preservedDataDir\backup-${name}.log" /SD IDOK
-  Abort
-preserve_${name}_done:
-!macroend
-
-!macro restoreDirectory name
-  IfFileExists "$preservedDataDir\${name}\." 0 restore_${name}_done
-  StrCpy $directoryCopyExit "create-directory-error"
-  ClearErrors
-  CreateDirectory "$INSTDIR\${name}"
-  IfErrors restore_${name}_failed
-  !insertmacro copyDirectoryLongPath "$preservedDataDir\${name}" "$INSTDIR\${name}" "$preservedDataDir\restore-${name}.log"
-  StrCmp $directoryCopyExit "error" restore_${name}_failed
-  StrCmp $directoryCopyExit "timeout" restore_${name}_failed
-  IntCmpU $directoryCopyExit 8 restore_${name}_failed restore_${name}_done restore_${name}_failed
-restore_${name}_failed:
-  SetErrorLevel 2
-  MessageBox MB_ICONSTOP "无法完整恢复 ${name}，安装已停止。所有备份仍保留在：$preservedDataDir$\r$\n复制返回：$directoryCopyExit。具体原因见：$preservedDataDir\restore-${name}.log" /SD IDOK
-  Abort
-restore_${name}_done:
-!macroend
-
 !macro customHeader
 !ifndef BUILD_UNINSTALLER
-; 隐藏节在用户确认最终目录后、旧版卸载前执行；打开或取消安装不产生备份。
-Section "-preserveData"
+; 最终目录确认后才开始事务，打开和取消安装不会生成备份。
+Section "-prepareUpdateTransaction"
+  ; stock 的静默提权发生在后面的主节，不能先暂存再由另一个进程接管事务。
+  ${If} $installMode == "all"
+    ${IfNot} ${UAC_IsAdmin}
+      SetErrorLevel 2
+      MessageBox MB_ICONSTOP "这份旧程序属于全用户安装，请以管理员身份运行安装器后重试。尚未移动旧程序或用户数据。" /SD IDOK
+      Abort
+    ${EndIf}
+  ${EndIf}
   !insertmacro CHECK_APP_RUNNING
-  StrCpy $preservedDataDir "$INSTDIR.sanrenjz-update-backup"
-  StrCpy $previousDataDir ""
-  IfFileExists "$preservedDataDir" 0 preserve_start
-  ; 上次可能只备份了一部分，不能直接覆盖当前插件，也不能删除恢复材料。
-  System::Call 'kernel32::GetTickCount() i .r0'
-  StrCpy $backupSuffix $0
-preserve_previous_name:
-  StrCpy $previousDataDir "$preservedDataDir.previous-$backupSuffix"
-  IfFileExists "$previousDataDir" 0 preserve_previous_move
-  IntOp $backupSuffix $backupSuffix + 1
-  Goto preserve_previous_name
-preserve_previous_move:
-  ClearErrors
-  Rename "$preservedDataDir" "$previousDataDir"
-  IfErrors 0 preserve_previous_done
+  ; common.nsh 在自定义 include 之后加载，编译期标识必须延后到本节展开。
+  StrCpy $updateUninstallerName "${UNINSTALL_FILENAME}"
+  StrCpy $updateProductVersion "${VERSION}"
+  StrCpy $updateProductAppId "${APP_ID}"
+  StrCpy $updateRegistryKey "${INSTALL_REGISTRY_KEY}"
+  StrCpy $updateUninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}"
+  StrCpy $updateRegistryHive "CurrentUser"
+  ${If} $installMode == "all"
+    StrCpy $updateRegistryHive "LocalMachine"
+  ${EndIf}
+  StrCpy $updateTransactionDir "$INSTDIR.sanrenjz-update-backup"
+  ReadRegStr $updateRegisteredDir SHELL_CONTEXT "${INSTALL_REGISTRY_KEY}" InstallLocation
+  ; 同时存在两种安装范围时，不允许 stock 卸载器操作另一个未保护的目录。
+  ${If} $installMode == "all"
+    ReadRegStr $updateSecondaryRegisteredDir HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+    ${If} $updateSecondaryRegisteredDir != ""
+      SetErrorLevel 2
+      MessageBox MB_ICONSTOP "检测到当前用户另有安装记录。为保护另一份安装及数据，本次安装已停止。" /SD IDOK
+      Abort
+    ${EndIf}
+  ${EndIf}
+  InitPluginsDir
+  ; .onInit 曾把工作目录设为 INSTDIR，必须先释放，才能原子暂存整个旧目录。
+  SetOutPath "$PLUGINSDIR"
+  File /oname=windows-update-transaction.ps1 "${SANRENJZ_UPDATE_HELPER}"
+update_prepare_retry:
+  StrCpy $updateHelperPhase prepare
+  Call SanrenjzRunUpdateHelper
+  StrCmp $updateHelperExit "0" update_prepare_ready
   SetErrorLevel 2
-  MessageBox MB_ICONSTOP "无法安全保留上次升级备份，安装已停止。请关闭占用文件的程序后重试：$preservedDataDir" /SD IDOK
+  MessageBox MB_RETRYCANCEL|MB_ICONSTOP "无法安全准备安装更新，旧程序和恢复材料已保留。请检查日志后重试：$updateTransactionDir\transaction.log$\r$\n返回：$updateHelperExit" /SD IDCANCEL IDRETRY update_prepare_retry
   Abort
-preserve_previous_done:
-  DetailPrint "上次升级备份已保留：$previousDataDir"
-preserve_start:
-  !insertmacro preserveDirectory "$INSTDIR\plugins" plugins
-  !insertmacro preserveDirectory "$INSTDIR\python-plugins" python-plugins
-  !insertmacro preserveDirectory "$INSTDIR\plugin-configs" plugin-configs
-  !insertmacro preserveDirectory "$INSTDIR\runtime" runtime
+update_prepare_ready:
+  Call SanrenjzUseChildTemp
+  StrCmp $updateTempReady "1" update_prepare_done
+  SetErrorLevel 2
+  MessageBox MB_ICONSTOP "无法准备旧版卸载器的同盘临时目录，安装已停止。恢复材料保留在：$updateTransactionDir" /SD IDOK
+  Abort
+update_prepare_done:
 SectionEnd
 !endif
 !macroend
 
+!macro SanrenjzCheckOldUninstallResult suffix
+  ; stock 函数大量复用寄存器，先保存真实退出结果，再恢复进程环境。
+  StrCpy $updateUninstallExit $R0
+  StrCpy $updateUninstallFailed "0"
+  IfErrors 0 +2
+  StrCpy $updateUninstallFailed "1"
+  Call SanrenjzRestoreChildTemp
+  StrCmp $updateUninstallFailed "0" 0 update_uninstall_failed_${suffix}
+  StrCmp $updateUninstallExit "0" update_uninstall_done_${suffix}
+update_uninstall_failed_${suffix}:
+  SetErrorLevel 2
+  MessageBox MB_ICONSTOP "旧版卸载未完成，安装已停止，原安装事务保留供重试。返回：$updateUninstallExit。详情见：$updateTransactionDir\transaction.log" /SD IDOK
+  Call SanrenjzRollbackUpdate
+  Quit
+update_uninstall_done_${suffix}:
+!macroend
+
+!macro customUnInstallCheck
+  !insertmacro SanrenjzCheckOldUninstallResult shell
+!macroend
+
+!macro customUnInstallCheckCurrentUser
+  !insertmacro SanrenjzCheckOldUninstallResult user
+!macroend
+
 !macro customInstall
-  ; 全部恢复成功后才清理备份，任何一步失败均保留完整备份。
-  !insertmacro restoreDirectory plugins
-  !insertmacro restoreDirectory python-plugins
-  !insertmacro restoreDirectory plugin-configs
-  !insertmacro restoreDirectory runtime
-  ; 清理也必须使用扩展路径，否则复制成功后仍会残留超长路径文件。
-  Push $preservedDataDir
-  Call SanrenjzExtendedPath
-  Pop $0
-  RMDir /r "$0"
-  StrCmp $previousDataDir "" preserve_install_done
-  MessageBox MB_ICONINFORMATION "安装已完成，上次升级的恢复材料仍保留在以下位置。如需找回旧文件，可从这里检查：$previousDataDir" /SD IDOK
-preserve_install_done:
+  Call SanrenjzRestoreChildTemp
+update_restore_retry:
+  StrCpy $updateHelperPhase restore
+  Call SanrenjzRunUpdateHelper
+  StrCmp $updateHelperExit "0" update_restore_done
+  SetErrorLevel 2
+  MessageBox MB_RETRYCANCEL|MB_ICONSTOP "新版程序已解包，用户目录尚未完整恢复。恢复材料继续保留，重试将使用同一事务：$updateTransactionDir$\r$\n详情见 transaction.log；返回：$updateHelperExit" /SD IDCANCEL IDRETRY update_restore_retry
+  Abort
+update_restore_done:
+  ; 用户在同一安装窗口重试成功后，不遗留先前失败的进程退出码。
+  SetErrorLevel 0
 !macroend
