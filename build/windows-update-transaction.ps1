@@ -12,21 +12,40 @@
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2
-$frameworkSystem = Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'System.dll'
 [Environment]::CurrentDirectory = [Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
-# NSIS 插件目录也有原生 System.dll，不能让 CodeDom 按当前目录解析 .NET 引用。
-Add-Type -ReferencedAssemblies $frameworkSystem -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-public static class SanrenjzUpdateNative {
-    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
-    public static extern bool MoveFileEx(string source, string target, uint flags);
-    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
-    public static extern bool DeleteFile(string name);
-    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
-    public static extern bool RemoveDirectory(string name);
+# 直接在内存声明 Win32 API，避免 CodeDOM 在中文 TEMP 或 NSIS 插件目录编译失败。
+if (-not ('SanrenjzUpdateNative' -as [type])) {
+    $assemblyName = New-Object Reflection.AssemblyName('SanrenjzUpdateNative')
+    $assembly = [AppDomain]::CurrentDomain.DefineDynamicAssembly($assemblyName, [Reflection.Emit.AssemblyBuilderAccess]::Run)
+    $module = $assembly.DefineDynamicModule($assemblyName.Name)
+    $nativeType = $module.DefineType('SanrenjzUpdateNative', [Reflection.TypeAttributes]'Public, Abstract, Sealed')
+    $importType = [Runtime.InteropServices.DllImportAttribute]
+    $importConstructor = $importType.GetConstructor([type[]]@([string]))
+    $importFields = [Reflection.FieldInfo[]]@(
+        $importType.GetField('EntryPoint'), $importType.GetField('CharSet'),
+        $importType.GetField('CallingConvention'), $importType.GetField('ExactSpelling'),
+        $importType.GetField('SetLastError')
+    )
+    $nativeMethods = @(
+        @{ Name='MoveFileEx'; Parameters=[type[]]@([string],[string],[uint32]) },
+        @{ Name='DeleteFile'; Parameters=[type[]]@([string]) },
+        @{ Name='RemoveDirectory'; Parameters=[type[]]@([string]) }
+    )
+    foreach ($nativeMethod in $nativeMethods) {
+        $entryPoint = $nativeMethod.Name + 'W'
+        $method = $nativeType.DefineMethod(
+            $nativeMethod.Name, [Reflection.MethodAttributes]'Public, Static, PinvokeImpl',
+            [Reflection.CallingConventions]::Standard, [bool], $nativeMethod.Parameters
+        )
+        # SetLastError 必须写入 DllImport 元数据，失败后才能取得本次原生调用的错误码。
+        $importValues = [object[]]@($entryPoint, [Runtime.InteropServices.CharSet]::Unicode,
+            [Runtime.InteropServices.CallingConvention]::Winapi, $true, $true)
+        $import = New-Object Reflection.Emit.CustomAttributeBuilder($importConstructor, [object[]]@('kernel32.dll'), $importFields, $importValues)
+        $method.SetCustomAttribute($import)
+        $method.SetImplementationFlags([Reflection.MethodImplAttributes]::PreserveSig)
+    }
+    [void]$nativeType.CreateType()
 }
-'@
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 $install = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
 $parent = [IO.Path]::GetDirectoryName($install)
