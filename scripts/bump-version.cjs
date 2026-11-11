@@ -34,7 +34,10 @@ function main(argv = process.argv.slice(2), root = path.resolve(__dirname, '..')
         lock.version = next;
         lock.packages[''].version = next;
         try {
-            [pkg, lock].forEach((value, index) => fs.writeFileSync(files[index], `${JSON.stringify(value, null, 2)}\n`, 'utf8'));
+            [pkg, lock].forEach((value, index) => {
+                const newline = original[index].includes('\r\n') ? '\r\n' : '\n';
+                fs.writeFileSync(files[index], `${JSON.stringify(value, null, 2)}\n`.replace(/\n/g, newline), 'utf8');
+            });
         } catch (error) {
             files.forEach((file, index) => fs.writeFileSync(file, original[index], 'utf8'));
             throw error;

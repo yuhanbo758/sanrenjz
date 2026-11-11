@@ -68,6 +68,10 @@ Section "install"
   RMDir /r "$INSTDIR\\python-plugins"
   RMDir /r "$INSTDIR\\plugin-configs"
   RMDir /r "$INSTDIR\\runtime"
+  CreateDirectory "$INSTDIR\\plugins"
+  FileOpen $0 "$INSTDIR\\plugins\\only-new.txt" w
+  FileWrite $0 "new payload"
+  FileClose $0
   ReadEnvStr $0 SANRENJZ_FIXTURE_FAIL_RESTORE
   StrCmp $0 "1" 0 restore_ready
   CreateDirectory "$INSTDIR\\plugins"
@@ -98,6 +102,13 @@ SectionEnd
 
         const target = path.join(sandbox, 'upgrade', '应用 程序');
         const canaries = ['plugins/插件/.runtime/会话.bin', 'plugins/.hidden', 'python-plugins/程序/main.py', 'plugin-configs/keep.json', 'runtime/python/deep/keep.bin'];
+        const longPrefix = path.join('plugins', '长路径插件', '.runtime', 'CacheStorage', 'a'.repeat(48));
+        const padding = 250 - path.join(target, longPrefix, 'the-real-index').length - 1;
+        assert(padding > 0 && padding < 200);
+        const longCanary = path.join(longPrefix, 'b'.repeat(padding), 'the-real-index');
+        assert.equal(path.join(target, longCanary).length, 250);
+        assert(path.join(target + suffix, longCanary).length > 260, '备份后才越过 Shell 复制的长路径限制');
+        canaries.push(longCanary);
         for (const name of canaries) write(path.join(target, name), Buffer.from([0, 1, 255, 2, 128]));
         fs.mkdirSync(path.join(target, 'plugins/空目录'), { recursive: true });
         write(path.join(target, 'plugins/hidden-windows.bin'), 'hidden attribute');
@@ -110,6 +121,7 @@ SectionEnd
         assert(fs.existsSync(path.join(target, 'plugins/空目录')), '保留空目录');
         assert.equal(fs.readFileSync(path.join(target, 'plugins/hidden-windows.bin'), 'utf8'), 'hidden attribute');
         assert(!fs.existsSync(path.join(target, 'plugins/stale.txt')), '旧恢复材料不得覆盖当前插件');
+        assert.equal(fs.readFileSync(path.join(target, 'plugins/only-new.txt'), 'utf8'), 'new payload', '恢复不删除新载荷文件');
         const previous = fs.readdirSync(path.dirname(target)).filter(name => name.startsWith(path.basename(target) + suffix + '.previous-'));
         assert.equal(previous.length, 1);
         assert.equal(fs.readFileSync(path.join(path.dirname(target), previous[0], 'plugins/stale.txt'), 'utf8'), 'old recovery');
@@ -132,6 +144,16 @@ SectionEnd
         }
         assert.equal(run('fresh').status, 0, '全新安装');
         assert.equal(run('fresh').status, 0, '没有保留目录也可再次安装');
+        fs.mkdirSync(path.join(sandbox, 'empty', '应用 程序', 'plugins'), { recursive: true });
+        assert.equal(run('empty').status, 0, 'Robocopy 的 0 返回值也是成功');
+        const linkedTarget = path.join(sandbox, 'linked', '应用 程序');
+        const external = path.join(sandbox, 'junction-target');
+        write(path.join(external, 'keep.txt'), 'external target');
+        fs.mkdirSync(path.join(linkedTarget, 'plugins'), { recursive: true });
+        fs.symlinkSync(external, path.join(linkedTarget, 'plugins/external-link'), 'junction');
+        assert.notEqual(run('linked').status, 0, '目录联接必须在旧卸载器执行前被拒绝');
+        assert(!fs.existsSync(path.join(linkedTarget, 'install-started.txt')));
+        assert.equal(fs.readFileSync(path.join(external, 'keep.txt'), 'utf8'), 'external target');
     } finally {
         assert(path.dirname(sandbox) === os.tmpdir() && path.basename(sandbox).startsWith('sanrenjz-nsis-'));
         fs.rmSync(sandbox, { recursive: true, force: true });

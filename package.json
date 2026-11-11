@@ -1,6 +1,6 @@
 {
   "name": "sanrenjz",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "三人聚智：效率工具与 Python 程序管理",
   "main": "main.js",
   "scripts": {
@@ -31,6 +31,7 @@
     "audit:public": "node scripts/audit-public-scope.js",
     "audit:privacy": "python scripts/check-privacy.py --git",
     "version:next": "node scripts/bump-version.cjs",
+    "version:bump": "node scripts/bump-version.cjs --apply",
     "test:merge": "node --test tests/merged-*.test.js tests/python-manager*.test.js tests/python-environment*.test.js tests/migration*.test.js tests/package-scope*.test.js",
     "test:hotkeys": "node --test tests/hotkey-controller.test.js tests/hotkey-restart.test.js",
     "test:console": "node --test tests/console-encoding.test.js"

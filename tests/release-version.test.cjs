@@ -37,3 +37,19 @@ test('默认预览、显式应用和 CI 校验同步三个版本字段，不改�
         assert.throws(() => main(['--apply', '--check'], root), /仅支持/);
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('版本递增保留 Windows 文件原有 CRLF，不改依赖版本', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-version-eol-'));
+    const pkg = { name: 'sanrenjz', version: '0.2.0' };
+    const lock = { version: '0.2.0', packages: { '': { version: '0.2.0' }, dependency: { version: '0.2.0' } } };
+    const serialize = value => `${JSON.stringify(value, null, 2)}\n`.replace(/\n/g, '\r\n');
+    fs.writeFileSync(path.join(root, 'package.json'), serialize(pkg));
+    fs.writeFileSync(path.join(root, 'package-lock.json'), serialize(lock));
+    try {
+        main(['--apply'], root);
+        pkg.version = '0.2.1';
+        lock.version = '0.2.1'; lock.packages[''].version = '0.2.1';
+        assert.equal(fs.readFileSync(path.join(root, 'package.json'), 'utf8'), serialize(pkg));
+        assert.equal(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'), serialize(lock));
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});

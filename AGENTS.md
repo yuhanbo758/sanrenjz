@@ -45,7 +45,8 @@
 - 头像在 Electron 内选择本机图片或恢复默认，仅保存到独立 userData/account-avatar 目录，不上传商店、不改应用设置和登录信息；登录状态变化不得覆盖本地头像。默认及失效回退均使用程序 logo。内联页面以自身 file URL 定位宿主资源，不能依赖 renderer 的 __dirname；读取 build 图标须兼容开发目录和安装态 resources/build，不能假定 extraResources 图标也在 ASAR 内。
 - DMG卸载重试仅限本次构建登记的镜像及其设备，且同时满足退出码16和Resource busy；有限重试后仍失败必须中止，不能修改系统索引、操作其他磁盘或忽略失败。
 - Windows NSIS 升级备份须在最终安装目录确定并开始安装后、旧版卸载前执行，打开或取消安装不生成备份；残留备份先独立归档，不覆盖当前插件或删除恢复材料。Windows 安装事务使用原生 NSIS 隔离验收，不以 macOS 的签名、DMG 或应用替换验收代替。
-- 自 0.2.0 起，后续正常发布的末位版本号限 0～9，按 0.2.0 → 0.2.1、0.2.9 → 0.3.0 递增；每十个末位版本向中间位进一位。当前发布任务授权后才更新版本，使用 `npm run version:next` 预览、加 `-- --apply` 显式应用，并同步 package.json 与 package-lock.json；Actions 只校验、不擅自递增。Windows NSIS 与 macOS DMG/ZIP 更新流程分别构建和验收。
+- Windows 升级的备份、恢复和清理均须支持长路径，不能以 Shell CopyFiles 处理插件目录；备份目录名增长导致源路径未超限、目标路径超限的场景必须纳入原生回归。复制失败保留明确返回码和本地日志，不跳过 .runtime；旧卸载器执行前须拒绝目录联接和符号链接，避免递归删除外部目标。
+- 自 0.2.0 起，后续正常发布的末位版本号限 0～9，按 0.2.0 → 0.2.1、0.2.9 → 0.3.0 递增；每十个末位版本向中间位进一位。当前发布任务授权后才更新版本，使用 `npm run version:next` 预览、`npm run version:bump` 显式应用，并同步 package.json 与 package-lock.json；Actions 只校验、不擅自递增。Windows NSIS 与 macOS DMG/ZIP 更新流程分别构建和验收。
 
 ## 双平台 Git 同步
 

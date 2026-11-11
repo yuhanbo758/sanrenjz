@@ -40,7 +40,7 @@ npm run build-win
 
 GitHub Actions 配置为推送 `main` 或手动运行时构建 Windows x64、macOS Intel x64、macOS Apple Silicon arm64 和 Linux x64。四个目标的构建、隐私审计及原生隔离运行检查全部通过后，独立发布任务才会按版本通道创建 Release，稳定版本正常发布并设为 Latest，上传 7 个安装包、SHA256 清单和来源清单。版本由维护者手动更新，不自动递增，不覆盖已有公开标签或资产，也不启用旧产品更新通道；详情见 [GitHub 自动打包](docs/GitHub自动打包.md)。
 
-自 `0.2.0` 起，版本按 `0.2.0 → 0.2.1`、`0.2.9 → 0.3.0` 递增，末位只使用 0～9。`npm run version:next` 只预览下一版本，发布获授权后使用 `npm run version:next -- --apply` 同步两个版本文件；Actions 校验版本一致性，不自动修改版本。
+自 `0.2.0` 起，版本按 `0.2.0 → 0.2.1`、`0.2.9 → 0.3.0` 递增，末位只使用 0～9。`npm run version:next` 只预览下一版本，发布获授权后使用 `npm run version:bump` 同步两个版本文件；Actions 校验版本一致性，不自动修改版本。
 
 Windows 提供 NSIS EXE；两种 macOS 架构分别提供 DMG 和 ZIP；Linux 提供 AppImage 和 tar.gz。当前包没有 Windows 正式代码签名，macOS 仅采用 ad-hoc 签名、未经 Developer ID 签名及 Apple 公证。构建结果以对应 Actions 运行和 Release 来源提交为准，不代表安装升级、Gatekeeper 或真实设备权限已完成验收。
 
@@ -87,6 +87,8 @@ macOS/Linux 保留手动解释器支持，不提供一键安装 Python。四目�
 0.1.12 增加 macOS“安装并重启”，保留失败恢复材料并确认新版宿主启动，详见 [Mac 一键更新](docs/macos-one-click-update-20261110.md)。
 
 0.2.0 修复 Windows 安装中断后被旧备份阻挡的问题，确认安装后才备份并独立归档旧恢复材料；Windows NSIS 与 Mac DMG/ZIP 分别验收，详见 [0.2.0 发布说明](docs/发布说明-0.2.0.md)。
+
+0.2.1 修复插件 .runtime 深层文件在备份后超过 Windows Shell 路径限制而复制失败的问题，备份、恢复和清理均支持长路径，详见 [0.2.1 发布说明](docs/发布说明-0.2.1.md)。
 
 <!-- sanrenjz-promotion:start -->
 ## 👨‍💻 作者信息
