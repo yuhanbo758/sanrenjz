@@ -1,5 +1,5 @@
 ﻿param(
-    [Parameter(Mandatory=$true)][ValidateSet('prepare','restore','rollback','consolidate')][string]$Phase,
+    [Parameter(Mandatory=$true)][ValidateSet('prepare','restore','rollback','consolidate','close-app')][string]$Phase,
     [Parameter(Mandatory=$true)][string]$InstallDir,
     [Parameter(Mandatory=$true)][string]$UninstallerName,
     [Parameter(Mandatory=$true)][string]$Version,
@@ -8,7 +8,8 @@
     [string]$RegistryKey = '',
     [string]$UninstallRegistryKey = '',
     [ValidateSet('CurrentUser','LocalMachine')][string]$RegistryHive = 'CurrentUser',
-    [ValidateSet('Registry64','Registry32')][string]$RegistryView = 'Registry64'
+    [ValidateSet('Registry64','Registry32')][string]$RegistryView = 'Registry64',
+    [switch]$RefuseOtherInstallations
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2
@@ -27,15 +28,20 @@ if (-not ('SanrenjzUpdateNative' -as [type])) {
         $importType.GetField('SetLastError')
     )
     $nativeMethods = @(
-        @{ Name='MoveFileEx'; Parameters=[type[]]@([string],[string],[uint32]) },
-        @{ Name='DeleteFile'; Parameters=[type[]]@([string]) },
-        @{ Name='RemoveDirectory'; Parameters=[type[]]@([string]) }
+        @{ Name='MoveFileEx'; EntryPoint='MoveFileExW'; ReturnType=[bool]; Parameters=[type[]]@([string],[string],[uint32]) },
+        @{ Name='DeleteFile'; EntryPoint='DeleteFileW'; ReturnType=[bool]; Parameters=[type[]]@([string]) },
+        @{ Name='RemoveDirectory'; EntryPoint='RemoveDirectoryW'; ReturnType=[bool]; Parameters=[type[]]@([string]) },
+        @{ Name='OpenProcess'; EntryPoint='OpenProcess'; ReturnType=[IntPtr]; Parameters=[type[]]@([uint32],[bool],[uint32]) },
+        @{ Name='QueryFullProcessImageName'; EntryPoint='QueryFullProcessImageNameW'; ReturnType=[bool]; Parameters=[type[]]@([IntPtr],[uint32],[Text.StringBuilder],[uint32].MakeByRefType()) },
+        @{ Name='WaitForSingleObject'; EntryPoint='WaitForSingleObject'; ReturnType=[uint32]; Parameters=[type[]]@([IntPtr],[uint32]) },
+        @{ Name='TerminateProcess'; EntryPoint='TerminateProcess'; ReturnType=[bool]; Parameters=[type[]]@([IntPtr],[uint32]) },
+        @{ Name='CloseHandle'; EntryPoint='CloseHandle'; ReturnType=[bool]; Parameters=[type[]]@([IntPtr]) }
     )
     foreach ($nativeMethod in $nativeMethods) {
-        $entryPoint = $nativeMethod.Name + 'W'
+        $entryPoint = $nativeMethod.EntryPoint
         $method = $nativeType.DefineMethod(
             $nativeMethod.Name, [Reflection.MethodAttributes]'Public, Static, PinvokeImpl',
-            [Reflection.CallingConventions]::Standard, [bool], $nativeMethod.Parameters
+            [Reflection.CallingConventions]::Standard, $nativeMethod.ReturnType, $nativeMethod.Parameters
         )
         # SetLastError 必须写入 DllImport 元数据，失败后才能取得本次原生调用的错误码。
         $importValues = [object[]]@($entryPoint, [Runtime.InteropServices.CharSet]::Unicode,
@@ -60,6 +66,86 @@ $logFile = Join-Path $backup 'transaction.log'
 $persistent = @('plugins','python-plugins','plugin-configs','runtime','plugin_runtime')
 $script:state = $null
 
+function ProcessWait([IntPtr]$handle, [uint32]$milliseconds) {
+    $result = [SanrenjzUpdateNative]::WaitForSingleObject($handle, $milliseconds)
+    if ($result -eq [uint32]::MaxValue) {
+        $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw "Cannot wait for application process (Win32 $code)"
+    }
+    if ($result -ne 0 -and $result -ne 258) { throw "Unexpected application process wait result: $result" }
+    return $result
+}
+function ProcessImagePath([IntPtr]$handle) {
+    $buffer = New-Object Text.StringBuilder(32768)
+    [uint32]$capacity = $buffer.Capacity
+    if (![SanrenjzUpdateNative]::QueryFullProcessImageName($handle, 0, $buffer, [ref]$capacity)) {
+        $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw "Cannot identify application process path (Win32 $code)"
+    }
+    $path = $buffer.ToString()
+    if ($path.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) { $path = '\\' + $path.Substring(8) }
+    elseif ($path.StartsWith('\\?\')) { $path = $path.Substring(4) }
+    return [IO.Path]::GetFullPath($path)
+}
+function CloseApp {
+    if (!$UninstallerName.StartsWith('Uninstall ', [StringComparison]::OrdinalIgnoreCase)) { throw 'Cannot determine application name from uninstaller name' }
+    $appName = $UninstallerName.Substring(10)
+    if (!$appName -or [IO.Path]::GetFileName($appName) -ne $appName -or !$appName.EndsWith('.exe', [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid application executable name' }
+    $expectedPath = [IO.Path]::GetFullPath((Join-Path $install $appName))
+    $processName = [IO.Path]::GetFileNameWithoutExtension($appName)
+    $processes = @([Diagnostics.Process]::GetProcessesByName($processName))
+    $candidates = New-Object 'Collections.Generic.List[object]'
+    try {
+        # 先核对所有同名进程，再操作目标；旧卸载器按名称结束进程，须提前拒绝其它安装目录。
+        foreach ($process in $processes) {
+            $handle = [SanrenjzUpdateNative]::OpenProcess(0x00101000, $false, [uint32]$process.Id)
+            if ($handle -eq [IntPtr]::Zero) {
+                $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                if ($code -eq 87) { continue }
+                throw "Cannot inspect application process $($process.Id) (Win32 $code)"
+            }
+            $candidate = [pscustomobject]@{ Process=$process; Handle=$handle; Path=''; IsTarget=$false }
+            $candidates.Add($candidate)
+            if ((ProcessWait $handle 0) -eq 0) { continue }
+            try { $candidate.Path = ProcessImagePath $handle }
+            catch { if ((ProcessWait $handle 0) -eq 0) { continue }; throw }
+            $candidate.IsTarget = [string]::Equals($candidate.Path, $expectedPath, [StringComparison]::OrdinalIgnoreCase)
+        }
+        if ($RefuseOtherInstallations) {
+            foreach ($candidate in $candidates) {
+                if (!$candidate.IsTarget -and $candidate.Path -and (ProcessWait $candidate.Handle 0) -ne 0) {
+                    throw "Another installation is running; close it before continuing: $($candidate.Path)"
+                }
+            }
+        }
+        foreach ($candidate in $candidates) {
+            if (!$candidate.IsTarget -or (ProcessWait $candidate.Handle 0) -eq 0) { continue }
+            try { [void]$candidate.Process.CloseMainWindow() } catch { }
+            if ((ProcessWait $candidate.Handle 1500) -eq 0) { continue }
+            # 持有原句柄直至退出，防止 PID 复用；强制结束使用另取且再次核对路径的同一进程句柄。
+            $terminateHandle = [SanrenjzUpdateNative]::OpenProcess(0x00101001, $false, [uint32]$candidate.Process.Id)
+            if ($terminateHandle -eq [IntPtr]::Zero) {
+                $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                if ((ProcessWait $candidate.Handle 0) -eq 0) { continue }
+                throw "Cannot close application process $($candidate.Process.Id) (Win32 $code)"
+            }
+            try {
+                if ((ProcessWait $terminateHandle 0) -eq 0) { continue }
+                try { $actualPath = ProcessImagePath $terminateHandle }
+                catch { if ((ProcessWait $terminateHandle 0) -eq 0) { continue }; throw }
+                if (![string]::Equals($actualPath, $expectedPath, [StringComparison]::OrdinalIgnoreCase)) { throw 'Application process identity changed; refusing to terminate it' }
+                if (![SanrenjzUpdateNative]::TerminateProcess($terminateHandle, 0)) {
+                    $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                    if ((ProcessWait $terminateHandle 0) -ne 0) { throw "Cannot terminate application process $($candidate.Process.Id) (Win32 $code)" }
+                }
+                if ((ProcessWait $terminateHandle 5000) -ne 0) { throw "Application process $($candidate.Process.Id) did not exit" }
+            } finally { [void][SanrenjzUpdateNative]::CloseHandle($terminateHandle) }
+        }
+    } finally {
+        foreach ($candidate in $candidates) { [void][SanrenjzUpdateNative]::CloseHandle($candidate.Handle) }
+        foreach ($process in $processes) { $process.Dispose() }
+    }
+}
 function Extended([string]$path) {
     if ($path.StartsWith('\\?\')) { return $path }
     if ($path.StartsWith('\\')) { return '\\?\UNC\' + $path.Substring(2) }
@@ -357,6 +443,8 @@ function Rollback {
 }
 
 try {
+    # 进程预检不得创建事务目录、日志或注册表项，重试与取消保持用户文件原样。
+    if ($Phase -eq 'close-app') { CloseApp; exit 0 }
     AssertPlain $backup; EnsureDir $backup; AssertPlain $active
     if ([IO.File]::Exists((Extended $stateFile))) {
         AssertPlain $stateFile
@@ -372,6 +460,7 @@ try {
     }
     exit 0
 } catch {
+    if ($Phase -eq 'close-app') { [Console]::Error.WriteLine('Cannot close application: ' + $_.Exception.Message); exit 1 }
     try { Log ($Phase + ': ' + $_.Exception.Message) } catch { }
     [Console]::Error.WriteLine('Update transaction failed. Recovery materials and details: ' + $logFile)
     exit 1

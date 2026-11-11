@@ -118,6 +118,9 @@ function createFixture({ perMachine = false } = {}) {
             include = path.join(project, 'build', 'installer.nsh');
             let source = fs.readFileSync(include, 'utf8');
             source = source.replace('  Pop $updateHelperOutput', `  Pop $updateHelperOutput\n  Push $9\n  FileOpen $9 "${quote(path.join(sandbox, 'helper-results.log'))}" a\n  FileSeek $9 0 END\n  FileWrite $9 "$updateHelperPhase exit=$updateHelperExit output=$updateHelperOutput$\\r$\\n"\n  FileClose $9\n  Pop $9`);
+            const uninstallerOutput = /  Pop \$0\r?\n  Pop \$1\r?\n(?=  StrCmp \$0 "0" un_update_close_app_done)/;
+            assert(uninstallerOutput.test(source), '保留真实卸载器关闭宿主的结果诊断');
+            source = source.replace(uninstallerOutput, `  Pop $0\n  Pop $1\n  Push $9\n  FileOpen $9 "${quote(path.join(sandbox, 'uninstaller-helper-results.log'))}" a\n  FileSeek $9 0 END\n  FileWrite $9 "close-app exit=$0 output=$1$\\r$\\n"\n  FileClose $9\n  Pop $9\n`);
             if (scenario.abortAfterPrepare) {
                 assert(source.includes('!macro customHeader'));
                 source = source.replace('!macro customHeader', '!macro FixtureProductionHeader');
@@ -154,7 +157,7 @@ function createFixture({ perMachine = false } = {}) {
         return executable;
     }
 
-    async function execute(executable, args = [], environment = {}, timeout = 30000) {
+    async function execute(executable, args = [], environment = {}, timeout = 30000, verbatimArguments = false) {
         for (const argument of args) {
             if (argument.startsWith('/D=')) {
                 const installed = path.resolve(argument.slice(3));
@@ -163,7 +166,7 @@ function createFixture({ perMachine = false } = {}) {
             }
         }
         return new Promise((resolve, reject) => {
-            const child = spawn(executable, args, { windowsHide: true, stdio: 'ignore', env: { ...process.env, ...environment } });
+            const child = spawn(executable, args, { windowsHide: true, windowsVerbatimArguments: verbatimArguments, stdio: 'ignore', env: { ...process.env, ...environment } });
             owned.add(child);
             const timer = setTimeout(() => {
                 spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
@@ -197,7 +200,7 @@ function createFixture({ perMachine = false } = {}) {
         else {
             console.error('NSIS integration failure materials: ' + sandbox);
             // 失败时只打印本次 synthetic fixture 的安装事务日志，不读取状态快照或用户文件。
-            const logs = [path.join(sandbox, 'helper-results.log'), path.join(sandbox, 'legacy-uninstall-result.txt'),
+            const logs = [path.join(sandbox, 'helper-results.log'), path.join(sandbox, 'uninstaller-helper-results.log'), path.join(sandbox, 'legacy-uninstall-result.txt'),
                 ...[...installationRoots].flatMap(installed => ['transaction.log', 'legacy-recovery.log']
                     .map(filename => path.join(installed + backupSuffix, filename)))];
             for (const file of logs) {
@@ -215,7 +218,7 @@ function createFixture({ perMachine = false } = {}) {
         }
     }
 
-    return { sandbox, productName, guid, appId, baseline, registries, binaries, build, execute, startApplication, cleanup, unregister,
+    return { sandbox, application, productName, guid, appId, baseline, registries, binaries, build, execute, startApplication, cleanup, unregister,
         pass() { succeeded = true; } };
 }
 
@@ -287,6 +290,49 @@ test('真实 NSIS 长路径覆盖升级：旧卸载器、中文宿主关闭及�
     assert(fs.readFileSync(path.join(fixture.sandbox, 'prepared-temp.txt'), 'utf8').endsWith('\\active\\temp'), '旧卸载器的 TEMP 使用同盘固定事务目录');
     t.diagnostic('prepare 后失败已回滚；同一固定备份目录重试成功');
 
+    fixture.pass();
+});
+
+test('Unicode 关闭宿主：只结束精确安装路径，不生成备份或修改目录', { skip: process.platform !== 'win32', timeout: 60000 }, async t => {
+    const fixture = createFixture(); t.after(() => fixture.cleanup());
+    const installed = path.join(fixture.sandbox, '目标 安装');
+    const otherInstalled = path.join(fixture.sandbox, '独立 安装');
+    const temp = path.join(fixture.sandbox, '中文 临时目录');
+    for (const directory of [installed, otherInstalled, temp]) fs.mkdirSync(directory);
+    for (const directory of [installed, otherInstalled]) {
+        fs.copyFileSync(fixture.application, path.join(directory, `${fixture.productName}.exe`));
+        write(path.join(directory, 'keep.bin'), Buffer.from([0, 3, 255, 128, 10, 13, 17]));
+    }
+    const inventories = [fixture.sandbox, installed, otherInstalled, temp].map(directory => [directory, fs.readdirSync(directory).sort()]);
+    const snapshots = [installed, otherInstalled].flatMap(directory => ['keep.bin', `${fixture.productName}.exe`]
+        .map(filename => { const file = path.join(directory, filename); return [file, fs.readFileSync(file)]; }));
+    const target = await fixture.startApplication(installed);
+    const unrelated = await fixture.startApplication(otherInstalled);
+    const helper = path.join(repository, 'build', 'windows-update-transaction.ps1');
+    const helperArgs = ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helper,
+        '-Phase', 'close-app', '-InstallDir', installed, '-UninstallerName', `Uninstall ${fixture.productName}.exe`,
+        '-Version', '2.0.0', '-AppId', fixture.appId];
+    const environment = { ...process.env, TEMP: temp, TMP: temp };
+    const refused = spawnSync('powershell.exe', [...helperArgs, '-RefuseOtherInstallations'], { env: environment, windowsHide: true, encoding: 'utf8', timeout: 30000 });
+    assert.ifError(refused.error);
+    assert.notEqual(refused.status, 0, '调用旧卸载器前发现另一安装活跃，必须停止');
+    assert.equal(target.exitCode, null, '预检查拒绝时目标宿主也保持运行');
+    assert.equal(unrelated.exitCode, null, '预检查拒绝时同名独立宿主保持运行');
+    for (const directory of [installed, otherInstalled]) assert(!fs.existsSync(directory + backupSuffix), '预检查拒绝不创建备份');
+    command('powershell.exe', helperArgs, { env: environment });
+    const deadline = Date.now() + 5000;
+    while (target.exitCode === null && Date.now() < deadline) await delay(20);
+    assert.notEqual(target.exitCode, null, '目标路径的真实中文宿主已退出');
+    assert.equal(unrelated.exitCode, null, '相同中文文件名的另一安装仍运行');
+    command('powershell.exe', helperArgs, { env: environment });
+    assert.equal(unrelated.exitCode, null, '目标已经退出时重复检查也不影响另一安装');
+    for (const directory of [installed, otherInstalled]) assert(!fs.existsSync(directory + backupSuffix), '单独关闭宿主不创建备份');
+    for (const [directory, inventory] of inventories) assert.deepEqual(fs.readdirSync(directory).sort(), inventory, '关闭宿主不增删目录文件');
+    for (const [file, content] of snapshots) assert.deepEqual(fs.readFileSync(file), content, '关闭宿主不改写安装或独立目录文件');
+    for (const hive of ['HKCU', 'HKLM']) for (const key of registryPaths(fixture.guid, fixture.appId, hive)) {
+        for (const view of ['32', '64']) assert.notEqual(spawnSync('reg.exe', ['query', key, '/reg:' + view], { windowsHide: true, stdio: 'ignore' }).status, 0, '关闭宿主不创建安装注册表记录');
+    }
+    t.diagnostic('真实 Unicode 宿主仅关闭目标路径；同名独立进程、文件、目录和注册表均保持原样');
     fixture.pass();
 });
 
@@ -375,5 +421,53 @@ test('真实 all-users 升级及回滚：独立 HKLM GUID、长路径资料和�
     assert(command('reg.exe', ['query', fixture.registries[1], '/v', 'DisplayVersion', '/reg:64']).includes('2.0.0'));
     for (const file of files) assert.deepEqual(fs.readFileSync(path.join(installed, file)), Buffer.from([0, 3, 255, 128, 10, 13, 17]));
     t.diagnostic('真实 HKLM all-users 旧安装、解包后回滚及重试升级均通过，所有资料字节一致');
+    fixture.pass();
+});
+
+test('真实新卸载器关闭中文宿主：升级拒绝异目录冲突，独立卸载仅处理目标路径', { skip: process.platform !== 'win32', timeout: 180000 }, async t => {
+    const fixture = createFixture(); t.after(() => fixture.cleanup());
+    const current = fixture.build('current', productionInclude);
+    const installed = path.join(fixture.sandbox, '目标 安装');
+    const otherInstalled = path.join(fixture.sandbox, '另一 独立安装');
+    const temp = path.join(fixture.sandbox, '中文 临时目录');
+    fs.mkdirSync(otherInstalled); fs.mkdirSync(temp);
+    const environment = { TEMP: temp, TMP: temp };
+    fs.copyFileSync(fixture.application, path.join(otherInstalled, `${fixture.productName}.exe`));
+    const untouched = path.join(otherInstalled, 'keep.bin');
+    write(untouched, Buffer.from([0, 3, 255, 128, 10, 13, 17]));
+    const guardHost = await fixture.startApplication(otherInstalled);
+    assert.notEqual((await fixture.execute(current, ['/S', `/D=${installed}`], environment, 120000)).code, 0, '全新安装也拒绝异目录同名活跃宿主');
+    assert.equal(guardHost.exitCode, null, '全新安装预检查不关闭独立宿主');
+    assert(!fs.existsSync(installed + backupSuffix), '未进入 prepare 的全新安装预检查不创建任何备份目录');
+    if (fs.existsSync(installed)) assert.deepEqual(fs.readdirSync(installed), [], 'stock 初始化最多只创建空安装目录');
+    assert.deepEqual(fs.readFileSync(untouched), Buffer.from([0, 3, 255, 128, 10, 13, 17]));
+    const stopped = new Promise(resolve => guardHost.once('close', resolve));
+    assert(guardHost.kill(), '只结束本fixture启动的独立宿主以继续全新安装');
+    await stopped;
+    assert.equal((await fixture.execute(current, ['/S', `/D=${installed}`], environment, 120000)).code, 0);
+    // 原生卸载器从安装目录之外执行，_?= 指定实际目录并让父进程等待完整卸载结果。
+    const uninstaller = path.join(fixture.sandbox, 'native-uninstaller.exe');
+    fs.copyFileSync(path.join(installed, `Uninstall ${fixture.productName}.exe`), uninstaller);
+    const transactionLog = path.join(installed + backupSuffix, 'transaction.log');
+    const previousLog = fs.readFileSync(transactionLog);
+    const host = await fixture.startApplication(installed);
+    const otherHost = await fixture.startApplication(otherInstalled);
+    assert.notEqual((await fixture.execute(current, ['/S', `/D=${installed}`], environment, 120000)).code, 0, '新安装器拒绝可能被旧卸载器误关的异目录同名进程');
+    assert.equal(host.exitCode, null, '升级预检查拒绝时不关闭目标宿主');
+    assert.equal(otherHost.exitCode, null, '升级预检查拒绝时不关闭另一安装');
+    assert.deepEqual(fs.readFileSync(transactionLog), previousLog, '升级预检查拒绝不启动或记录安装事务');
+    assert(!fs.existsSync(path.join(installed + backupSuffix, 'active')), '升级预检查拒绝不暂存旧程序');
+    assert.equal(fs.readFileSync(path.join(installed, 'payload-version.txt'), 'utf8'), '2.0.0');
+
+    // NSIS 的 _?= 读取命令行剩余原文，必须置于最后且不加 Windows 的整参引号。
+    assert.equal((await fixture.execute(uninstaller, ['/S', '/currentuser', `_?=${installed}`], environment, 120000, true)).code, 0, '完整原生卸载器成功返回');
+    const deadline = Date.now() + 5000;
+    while (host.exitCode === null && Date.now() < deadline) await delay(20);
+    assert.notEqual(host.exitCode, null, '新卸载器已关闭目标路径中文宿主');
+    assert.equal(otherHost.exitCode, null, '新卸载器不关闭同名独立宿主');
+    assert(!fs.existsSync(installed), '原生完整卸载已删除目标安装目录');
+    assert.deepEqual(fs.readFileSync(untouched), Buffer.from([0, 3, 255, 128, 10, 13, 17]), '另一安装目录文件保持原样');
+    assert.notEqual(spawnSync('reg.exe', ['query', fixture.registries[1], '/reg:64'], { windowsHide: true, stdio: 'ignore' }).status, 0, '原生卸载已删除本fixture注册表');
+    t.diagnostic('新安装器冲突预检查保持两份宿主；新原生卸载器仅关闭并卸载精确目标目录');
     fixture.pass();
 });
