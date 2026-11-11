@@ -2,7 +2,7 @@
 
 推送到 `main`，或在 Actions 手动运行“多平台自动打包发布”，会检查当前公开源码并构建四个目标。只有四个目标的构建、隐私审计和原生运行验收全部通过，发布任务才会向 [GitHub Releases](https://github.com/yuhanbo758/sanrenjz/releases) 上传安装包及校验文件。
 
-当前配置版本为 `0.1.9`。本说明描述发布流程，具体平台是否成功以对应 Actions 运行和 Release 的来源提交为准，不提前代表各平台构建、安装或业务功能已经完成验收。
+本次配置版本为 `0.2.0`。本说明描述发布流程，具体平台是否成功以对应 Actions 运行和 Release 的来源提交为准，不提前代表各平台构建、安装或业务功能已经完成验收。
 
 ## 构建目标与下载文件
 
@@ -13,7 +13,7 @@
 | macOS Apple Silicon arm64 | `macos-15` | `.dmg`、`.zip` |
 | Linux x64 | `ubuntu-22.04` | `.AppImage`、`.tar.gz` |
 
-每个版本合计 7 个安装包。Release 还包含 `SHA256SUMS.txt` 和 `release-manifest.json`，共 9 个下载资产。文件名包含版本、平台和架构，macOS 的 Intel 与 Apple Silicon 文件不会互相覆盖。当前 `0.1.7` 使用正常 Release，`prerelease=false` 并设为 **Latest**；只有维护者显式使用先行版本号时才发布 **Pre-release**。
+每个版本合计 7 个安装包。Release 还包含 `SHA256SUMS.txt` 和 `release-manifest.json`，共 9 个下载资产。文件名包含版本、平台和架构，macOS 的 Intel 与 Apple Silicon 文件不会互相覆盖。正式版本使用正常 Release，`prerelease=false` 并设为 **Latest**；只有维护者显式使用先行版本号时才发布 **Pre-release**。
 
 ## 检查与构建顺序
 
@@ -32,13 +32,16 @@ macOS 构建对本次创建的 DMG 设备卸载“资源忙”错误执行有限
 
 ## 版本与发布保护
 
-版本由维护者手动更新，`package.json` 和 `package-lock.json` 必须一致。例如，从当前版本准备下一个修订版时，可运行：
+版本在发布授权后显式更新，`package.json` 和 `package-lock.json` 必须一致。自 `0.2.0` 起，末位只使用 0～9：`0.2.0 → 0.2.1`，`0.2.9 → 0.3.0`。预览下一版本和实际应用分别使用：
 
 ```powershell
-npm version patch --no-git-tag-version
+npm run version:next
+npm run version:next -- --apply
 ```
 
 审阅代码、运行检查后再提交推送。工作流不自动修改版本或提交代码，也不沿用旧产品的更新通道。应用内仅在用户主动操作时检查本仓库的正式 Release，不自动下载或安装。
+
+Windows 安装备份使用原生 NSIS 隔离回归，覆盖取消、最终安装目录、残留归档、备份/恢复失败和重试；macOS 分别验证 DMG、签名、应用替换和启动确认。两类安装事务不能互相代替，Mac 钩子不参与 Windows 目标构建。
 
 公开标签和资产不可被新提交覆盖。已有同名标签或资产与本次提交、内容不一致时，发布应停止；维护者须确认差异并升级版本，不能删除已公开版本后强行替换。手动在其他分支运行可以验证构建，只有 `main` 允许发布。
 
@@ -51,7 +54,7 @@ npm version patch --no-git-tag-version
 Windows PowerShell 示例：
 
 ```powershell
-Get-FileHash -LiteralPath .\sanrenjz-0.1.9-win-x64.exe -Algorithm SHA256
+Get-FileHash -LiteralPath .\sanrenjz-0.2.0-win-x64.exe -Algorithm SHA256
 ```
 
 macOS 可使用 `shasum -a 256 <下载文件>`，Linux 可使用 `sha256sum <下载文件>`。只下载一个平台文件时，比较清单中该文件对应的行即可。

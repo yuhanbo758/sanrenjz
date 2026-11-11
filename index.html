@@ -2098,6 +2098,7 @@
 
         // 加载插件管理列表
         let pluginManagementLoadVersion = 0;
+        const pluginUninstallsPending = new Set();
         window.openPluginManagement = async (engine = 'all') => {
             const wasOpen = settingsModal.classList.contains('show');
             settingsModal.classList.add('show');
@@ -2181,17 +2182,17 @@
                                 <label><input type="checkbox" class="plugin-setting-toggle" data-plugin-name="${escapeMarkup(plugin.name)}" data-setting="autoStartWithMain" ${autoStartWithMain ? 'checked' : ''}> 随主程序启动</label>
                                 <label><input type="checkbox" class="plugin-setting-toggle" data-plugin-name="${escapeMarkup(plugin.name)}" data-setting="showInMainUI" ${showInMainUI ? 'checked' : ''}> 在主界面显示</label>
                             </div>
+                            <button type="button" class="pm-btn danger" data-action="uninstall" ${pluginUninstallsPending.has(plugin.id) ? 'disabled' : ''}>${pluginUninstallsPending.has(plugin.id) ? '卸载中…' : '卸载'}</button>
                             <i class="fas fa-chevron-down" style="color: #ccc; transition: transform 0.3s;"></i>
                         </div>
                         
                         <div class="pm-details">
                             ${isPython ? `
                             <p class="pm-python-path">入口：${escapeMarkup(plugin.path)}</p>
-                            <p class="setting-description">${plugin.isRunning ? '运行中，请先停止程序再移除。' : '未运行'}；用户配置由插件自行管理，移除程序时保留。</p>
+                            <p class="setting-description">${plugin.isRunning ? '运行中，请先停止程序再卸载。' : '未运行'}；卸载删除插件程序文件夹，保留独立保存的用户配置。</p>
                             <div class="pm-actions">
                                 <button type="button" class="pm-btn" data-action="python-details">程序详情</button>
                                 <button type="button" class="pm-btn" data-action="python-logs">运行日志</button>
-                                <button type="button" class="pm-btn danger" data-action="uninstall" ${plugin.isRunning ? 'disabled' : ''}>移除插件</button>
                             </div>` : `
                             <div class="pm-keyword-section">
                                 <div class="pm-toggle-label">自定义搜索关键词</div>
@@ -2239,7 +2240,6 @@
 
                             <div class="pm-actions">
                                 <button class="pm-btn" data-action="super-panel">增加到超级面板</button>
-                                <button class="pm-btn danger" data-action="uninstall">卸载删除插件</button>
                             </div>`}
                         </div>
                     `;
@@ -2308,16 +2308,32 @@
                     item.querySelector('[data-action="python-details"]')?.addEventListener('click', () => window.showPythonDetails(plugin));
                     item.querySelector('[data-action="python-logs"]')?.addEventListener('click', () => window.showPythonLogs(plugin.id));
                     item.querySelector('[data-action="uninstall"]').addEventListener('click', async (event) => {
-                        if (!isPython) return uninstallPlugin(plugin.name);
-                        if (!confirm(`移除“${plugin.name}”？程序文件会移除，已有用户配置保留。`)) return;
+                        if (pluginUninstallsPending.has(plugin.id)) return;
+                        const target = isPython ? (plugin.standalone ? plugin.path : plugin.folderPath) : plugin.path;
+                        if (!confirm(`确定卸载“${plugin.name}”吗？\n\n将永久删除${plugin.standalone ? '程序文件' : '插件文件夹及其中所有文件（包括 .runtime）'}：\n${target}\n\n独立保存的用户配置和数据会保留。此操作无法撤销。`)) return;
                         const button = event.currentTarget;
+                        pluginUninstallsPending.add(plugin.id);
                         button.disabled = true;
+                        button.textContent = '卸载中…';
                         try {
                             const result = await ipcRenderer.invoke('unified:remove', plugin.id);
-                            if (!result?.success) throw new Error(result?.error || '移除失败');
+                            if (!result?.success) throw new Error(result?.error || '卸载失败');
+                            if (!isPython) {
+                                pluginKeywordDrafts.delete(plugin.name);
+                                pluginKeywordSavedValues.delete(plugin.name);
+                                window.syncSettingsFooter();
+                            }
                             await updatePluginViews();
-                        } catch (error) { showNotification('移除失败', error.message, 'error'); }
-                        finally { button.disabled = false; }
+                            showNotification('卸载成功', `插件“${plugin.name}”已卸载`, 'success');
+                        } catch (error) { showNotification('卸载失败', error.message, 'error'); }
+                        finally {
+                            pluginUninstallsPending.delete(plugin.id);
+                            for (const row of container.querySelectorAll('.plugin-management-item')) {
+                                if (row.dataset.pluginId !== plugin.id) continue;
+                                const control = row.querySelector('[data-action="uninstall"]');
+                                control.disabled = false; control.textContent = '卸载';
+                            }
+                        }
                     });
                     container.appendChild(item);
                 }

@@ -185,6 +185,10 @@ function copyMissingPlugins(sourceDir, targetDir, { updateExisting = false } = {
     const result = { copied: [], updated: [], skipped: [] };
 
     for (const plugin of listPluginEntries(sourceDir)) {
+        if (!targetPlugins.has(plugin.identity) && require('./plugin-uninstall').isUninstalled(targetDir, `tools:${plugin.identity}`)) {
+            result.skipped.push(plugin.pluginName);
+            continue;
+        }
         // 以 pluginName 判重，避免同一插件因文件夹名称不同被远端版本重复补入。
         const existingPlugin = targetPlugins.get(plugin.identity);
         if (existingPlugin) {

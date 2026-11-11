@@ -27,14 +27,7 @@ git push origin main
 
 ## Gitea
 
-```powershell
-# 默认预览文件数量、大小和插件清单，不上传
-python -X utf8 scripts/gitea-private-sync.py
-# 当前任务已授权同步时执行
-python -X utf8 scripts/gitea-private-sync.py --push
-```
-
-脚本创建或核对同名私有仓库并关闭 Actions。优先使用密码管理 `gitea/backup-token`，兼容 gitea-git-backup skill 已有的会话认证环境。凭据不写入源码、Git URL 或 Git 配置。其他设备需自行配置认证。
+调用项目外部的 `gitea-git-backup` skill，选择本项目的私有同步流程；默认先预览，当前任务明确授权后才提交推送。外部工具负责创建或核对同名私有仓库并关闭 Actions，本项目不维护本机认证适配、凭据配置和相关专用测试。
 
 私有 Git 数据库在 `.git/gitea-private.git`，使用独立索引从当前工作区构建全量源码快照，公开工作区、分支和索引不切换。可重复执行，没有变化不产生新提交；不强推，发现其他设备提交则停止并要求先合并源码。
 

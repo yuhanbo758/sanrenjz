@@ -15,7 +15,7 @@ module.exports = async function signPackage(context) {
             if (entry.isSymbolicLink()) continue;
             const file = path.join(directory, entry.name);
             if (entry.isDirectory()) findNative(file);
-            else if (/\.(node|dylib)$/.test(entry.name)) nativeFiles.push(file);
+            else if (/\.(node|dylib)$/.test(entry.name) || entry.name === 'mac-dock-helper') nativeFiles.push(file);
         }
     }
     findNative(app);

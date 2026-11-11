@@ -16,7 +16,8 @@ const tools = path.join(temporary, 'tools'); fs.mkdirSync(tools);
 const python = path.join(temporary, 'python'); fs.mkdirSync(python);
 const settingsPath = path.join(profile, 'settings.json');
 const startupFailure = process.argv.includes('--startup-failure');
-fs.writeFileSync(settingsPath, JSON.stringify({ globalHotkey: 'Ctrl+Alt+F6', pinHotkey: 'Ctrl+Alt+F7', superPanelHotkey: '', autoStart: startupFailure, enableRightClickPanel: false, migrationPrompted: true, pythonMode: 'none', customMarker: '必须保留' }));
+const developmentLogin = process.argv.includes('--development-login');
+fs.writeFileSync(settingsPath, JSON.stringify({ globalHotkey: 'Ctrl+Alt+F6', pinHotkey: 'Ctrl+Alt+F7', superPanelHotkey: '', autoStart: startupFailure || developmentLogin, enableRightClickPanel: false, migrationPrompted: true, pythonMode: 'none', customMarker: '必须保留' }));
 class FixtureManager extends Manager { constructor(win, options) { super(win, options); this.pluginDir = tools; this.catalog = new PluginCatalog(tools); } }
 class FixturePython extends pythonModule.PythonManager { constructor(options) { super({ ...options, pluginDir: python }); } }
 require.cache[require.resolve('../app/software_manager')].exports = FixtureManager;
@@ -28,12 +29,22 @@ app.disableHardwareAcceleration();
 const bindings = new Map();
 let registrations = 0, loginState = false, failDisable = false;
 const loginCalls = [];
+const loginQueries = [];
+if (!developmentLogin) {
+    // 只模拟安装版的系统启动项边界，主程序仍用开发模式加载临时插件和设置。
+    const loginStartup = require('../app/login-startup');
+    require.cache[require.resolve('../app/login-startup')].exports = {
+        getLoginItemOptions: () => loginStartup.getLoginItemOptions({ isPackaged: true })
+    };
+}
 globalShortcut.register = (key, callback) => { registrations++; if (bindings.has(key)) return false; bindings.set(key, callback); return true; };
 globalShortcut.unregister = key => bindings.delete(key);
 globalShortcut.unregisterAll = () => bindings.clear();
 globalShortcut.isRegistered = key => bindings.has(key);
-app.getLoginItemSettings = () => ({ openAtLogin: loginState });
+app.getLoginItemSettings = options => { loginQueries.push(options); return { openAtLogin: loginState }; };
 app.setLoginItemSettings = value => {
+    assert.equal(value.path, process.execPath);
+    assert.deepEqual(value.args, []);
     if (startupFailure && value.openAtLogin) throw new Error('模拟启动时系统设置失败');
     loginCalls.push(value.openAtLogin); loginState = value.openAtLogin;
     if (failDisable && !value.openAtLogin) throw new Error('模拟系统自启动失败');
@@ -56,6 +67,17 @@ require('../main');
     const evaluate = expression => win.webContents.executeJavaScript(expression);
     const save = patch => evaluate(`require('electron').ipcRenderer.invoke('save-settings',${JSON.stringify(patch)}).then(value=>({ok:true,value}),error=>({ok:false,error:error.message}))`);
     try {
+        if (developmentLogin) {
+            check(read().autoStart && loginCalls.length === 0 && loginQueries.length === 0, '开发版读取已有自启设置时不访问系统启动项');
+            check((await save({ rightClickDelay: 321 })).ok && read().autoStart, '开发版仍可保存普通设置并保留安装版自启偏好');
+            const before = fs.readFileSync(settingsPath, 'utf8');
+            const result = await save({ autoStart: false, globalHotkey: 'Ctrl+Alt+F8' });
+            check(!result.ok && /请在安装版三人聚智中设置/.test(result.error), '开发版修改自启明确提示安装版入口');
+            check(fs.readFileSync(settingsPath, 'utf8') === before && bindings.has('Ctrl+Alt+F6') && !bindings.has('Ctrl+Alt+F8'), '开发版拒绝自启变更时保留设置和快捷键');
+            check(loginCalls.length === 0 && loginQueries.length === 0, '开发版启动和保存始终不触碰真实系统启动项');
+            report.success = true;
+            return;
+        }
         if (startupFailure) {
             check(!win.isDestroyed() && BrowserWindow.getAllWindows().includes(win), '启动时系统设置失败不会退出主程序');
             check(bindings.has('Ctrl+Alt+F6') && bindings.has('Ctrl+Alt+F7'), '系统设置失败不阻断已配置快捷键');
@@ -72,6 +94,7 @@ require('../main');
         bindings.delete('Ctrl+Alt+F6');
         check((await save({ globalHotkey: 'Ctrl+Alt+F6' })).ok && bindings.has('Ctrl+Alt+F6'), '失效快捷键可按已保存原值重试注册');
         check((await save({ autoStart: true })).ok && loginState && read().autoStart, '显式自启动变更与文件一起成功');
+        check(loginQueries.every(options => options.path === process.execPath && Array.isArray(options.args) && options.args.length === 0), '系统启动项读写使用相同路径与参数');
         const originalWrite = fs.writeFileSync;
         fs.writeFileSync = (file, ...args) => { if (String(file) === `${settingsPath}.tmp`) throw new Error('模拟设置落盘失败'); return originalWrite(file, ...args); };
         try {
@@ -99,7 +122,7 @@ require('../main');
         report.success = true;
     } catch (error) { report.success = false; report.errors.push(error.stack || String(error)); }
     finally {
-        const output = path.join(__dirname, '..', 'dist', startupFailure ? 'merged-startup-login-failure-report.json' : 'merged-save-settings-effects-report.json');
+        const output = path.join(__dirname, '..', 'dist', developmentLogin ? 'merged-development-login-report.json' : startupFailure ? 'merged-startup-login-failure-report.json' : 'merged-save-settings-effects-report.json');
         fs.writeFileSync(output, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report));
         app.isQuiting = true; app.quit();
     }

@@ -17,7 +17,7 @@ function existingFile(filePath) {
     }
 }
 
-function resolvePluginVisual({ folderPath, settings = {}, defaultLogoPath = '', defaultIconPath = '' }) {
+function resolvePluginVisual({ folderPath, settings = {}, defaultLogoPath = '', defaultIconPath = '', platform = process.platform }) {
     const candidates = [];
     if (settings.logo) {
         const candidate = path.resolve(folderPath, String(settings.logo));
@@ -27,11 +27,14 @@ function resolvePluginVisual({ folderPath, settings = {}, defaultLogoPath = '', 
         }
     }
     candidates.push(...['logo.png', 'icon.png', 'logo.ico', 'icon.ico'].map((name) => path.join(folderPath, name)));
+    // 同时提供 ICO/PNG 的旧 Windows 插件在 Mac/Linux 上优先使用 PNG。
+    const imageCandidates = platform === 'win32' ? candidates : candidates.filter(file => !/\.ico$/i.test(file));
     const iconCandidates = [path.join(folderPath, 'logo.ico'), path.join(folderPath, 'icon.ico')];
     if (candidates[0] && path.extname(candidates[0]).toLowerCase() === '.ico') iconCandidates.unshift(candidates[0]);
     // 主程序只解析现有资源；不生成图片、转换 ICO、计算入口源码指纹或写入插件目录。
     return {
-        logoPath: candidates.find(existingFile) || existingFile(defaultLogoPath) || existingFile(defaultIconPath),
+        logoPath: imageCandidates.find(existingFile) || existingFile(defaultLogoPath) || (platform === 'win32' ? existingFile(defaultIconPath) : ''),
+        macIconPath: imageCandidates.find(existingFile) || candidates.find(existingFile) || existingFile(defaultLogoPath),
         taskbarIconPath: iconCandidates.find(existingFile) || existingFile(defaultIconPath),
         visualDependencies: [...new Set([...candidates, ...iconCandidates, defaultLogoPath, defaultIconPath].filter(Boolean))]
     };

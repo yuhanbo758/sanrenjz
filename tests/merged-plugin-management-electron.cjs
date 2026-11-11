@@ -8,7 +8,8 @@ const RealManager = require('../app/software_manager');
 const pythonModule = require('../app/python-manager');
 const environmentModule = require('../app/python-environment');
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-插件设置 空格-'));
+const root = process.env.SANRENJZ_PLUGIN_MANAGEMENT_TEST_ROOT;
+if (!root || path.dirname(root) !== os.tmpdir() || !path.basename(root).startsWith('sanrenjz-插件设置 空格-')) throw new Error('需要父进程提供隔离目录');
 const profile = path.join(root, 'profile');
 const toolsDir = path.join(root, '效率插件');
 const pythonDir = path.join(root, 'Python 插件');
@@ -153,6 +154,7 @@ require('../main');
         for (const [width, height] of [[800, 600], [1000, 680]]) {
             win.setSize(width, height); await delay(80);
             check(await evaluate("(() => { const p=document.querySelector('.settings-main').getBoundingClientRect(); return [...document.querySelectorAll('.plugin-management-item')].filter(row=>row.style.display!=='none').every(row=>[...row.querySelectorAll('.pm-lifecycle input')].every(input=>{const r=input.getBoundingClientRect(); return r.left>=p.left && r.right<=p.right;})); })()"), `${width}x${height} Python 开关未溢出设置页`);
+            check(await evaluate("(() => { const p=document.querySelector('.settings-main').getBoundingClientRect(); return [...document.querySelectorAll('.plugin-management-item')].filter(row=>row.style.display!=='none').every(row=>{const r=row.querySelector('[data-action=uninstall]').getBoundingClientRect(); const title=row.querySelector('.pm-name').getBoundingClientRect(); return r.left>=title.right && r.right<=p.right && r.top<=title.bottom;}); })()"), `${width}x${height} 卸载按钮保持在名称右侧且未溢出`);
             fs.writeFileSync(path.join(output, `python-settings-${width}x${height}.png`), (await win.webContents.capturePage()).toPNG());
         }
         const loaded = new Promise(resolve => win.webContents.once('did-finish-load', resolve)); win.webContents.reload(); await loaded;
@@ -179,6 +181,44 @@ require('../main');
         check(await evaluate("document.getElementById('global-hotkey-input').value==='Ctrl+Alt+F12'"), '内部跳转插件管理继续保留未保存快捷键');
         assert.deepEqual(readSettings().pluginSearchSettings[sharedName], { enabled: false, keywords: ['保留关键词'] });
         check(true, '整合保持效率插件已有搜索设置');
+
+        createTool('same-name-2', sharedName);
+        await invoke('refresh-plugins');
+        await until(() => evaluate("document.querySelectorAll('.plugin-management-item').length===4"), '新增同名插件未刷新');
+        await evaluate("document.getElementById('plugin-manager-engine').value='all'; document.getElementById('plugin-manager-engine').dispatchEvent(new Event('change')); true;");
+        check(await evaluate("[...document.querySelectorAll('.plugin-management-item')].every(row=>{const b=row.querySelector('.pm-header [data-action=uninstall]');return b && b.textContent==='卸载';})"), '两类插件折叠时均直接显示卸载按钮');
+        const toolId = 'tools:same-name';
+        const uninstall = `${row(toolId)}.querySelector('[data-action=uninstall]')`;
+        const target = path.join(toolsDir, 'same-name');
+        const sibling = path.join(toolsDir, 'same-name-2');
+        const storage = manager.getPluginStoragePath(sharedName);
+        fs.writeFileSync(storage, '{"用户配置":"保留"}', 'utf8');
+        fs.mkdirSync(path.join(target, '.runtime')); fs.writeFileSync(path.join(target, '.runtime', 'cache'), 'cache');
+        await evaluate(`window.confirm=message=>{window.lastUninstallConfirm=message;return false;}; ${uninstall}.click(); true;`);
+        check(fs.existsSync(target), '取消卸载保留完整插件目录');
+        check(await evaluate(`window.lastUninstallConfirm.includes(${JSON.stringify(target)}) && window.lastUninstallConfirm.includes('.runtime')`), '确认提示显示实际删除目录和运行资料范围');
+        manager.pluginWindows.set(sharedName, { isDestroyed: () => false });
+        try { check((await invoke('unified:remove', toolId)).success === false && fs.existsSync(target), '运行中的效率插件拒绝删除'); }
+        finally { manager.pluginWindows.delete(sharedName); }
+
+        const originalRemove = fs.promises.rm;
+        fs.promises.rm = async (file, ...args) => {
+            if (file === target) throw new Error('模拟卸载文件占用');
+            return originalRemove(file, ...args);
+        };
+        try {
+            await evaluate(`window.confirm=()=>true; ${uninstall}.click(); true;`);
+            await until(() => evaluate(`!${uninstall}.disabled && ${uninstall}.textContent==='卸载'`), '失败后未恢复卸载按钮');
+            check(fs.existsSync(target), '删除失败保留目录并允许重试');
+        } finally { fs.promises.rm = originalRemove; }
+
+        await evaluate(`${uninstall}.click(); ${uninstall}.click(); true;`);
+        await until(() => !fs.existsSync(target), '效率插件没有删除实际目录');
+        await until(() => evaluate(`!${row(toolId)}`), '效率插件卸载未刷新管理列表');
+        check(fs.existsSync(sibling) && fs.existsSync(path.join(pythonDir, '中文 插件')), '按稳定 ID 卸载，不删除同名效率插件或 Python 插件');
+        check(fs.readFileSync(storage, 'utf8') === '{"用户配置":"保留"}', '效率插件卸载保留独立存储');
+        check((await invoke('search-catalog-get')).plugins.every(item => item.id !== toolId), '卸载同步移除快捷搜索入口');
+        check((await invoke('get-main-plugin-list')).every(item => item.id !== toolId), '卸载同步移除主页面入口');
         check(launches === 0 && inspections === 0, '完整管理流程没有扫描安装 Python 或启动程序');
         check(report.errors.length === 0, '没有未处理的界面异常');
         report.success = true;
@@ -190,4 +230,3 @@ require('../main');
     }
 })().catch(error => { console.error(error); app.exit(1); });
 setTimeout(() => { console.error('统一插件管理验收超时'); app.exit(2); }, 50000).unref();
-app.once('quit', () => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });

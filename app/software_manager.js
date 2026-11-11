@@ -3,9 +3,12 @@ const { spawn, fork } = require('child_process');
 const fs = require('fs');
 const crypto = require('crypto');
 const { PluginCatalog } = require('./plugin-catalog');
+const { removePluginPath, assertPluginAvailable } = require('./plugin-uninstall');
+const { normalizePluginIdentity } = require('./plugin_store');
 const { waitForPluginWindowReady } = require('./plugin_runtime/plugin-window-ready');
 const { decodeUtf8Stream } = require('./console-encoding');
 const { getInstalledAppRoot } = require('./install-root');
+const { MacPluginDock } = require('./plugin_runtime/mac-dock');
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const HOST_DEBUG_MESSAGES = new Set(['自定义标题栏创建完成', '点击最小化按钮', '点击最大化按钮', '点击关闭按钮', '注册插件进入事件', '注册插件准备就绪事件', '当前平台不支持键盘模拟', '序列化测试通过']);
 const HOST_DEBUG_PREFIXES = ['点击钉住按钮，当前状态:', '钉住状态更新为:', '插件初始钉住状态:', '收到钉住状态更新事件:', '模拟键盘按键:', '键盘模拟完成，退出码:',
@@ -44,6 +47,11 @@ class PluginManager {
             this.pluginMeta = new Map();
             this.pluginCleanupTimers = new Map();
             this.pluginBackgroundKeepAlive = new Map();
+            this.macDock = new MacPluginDock({
+                runtimeRoot: path.join(app.getPath('userData'), 'runtime', 'mac-plugin-dock'),
+                helperPath: path.join(__dirname, 'native', 'mac-dock-helper'),
+                onError: error => this.sendError(`Mac Dock 图标失败：${error.message}\n`)
+            });
 
             console.log('PluginManager 初始化成功');
             console.log('插件目录:', this.pluginDir);
@@ -400,46 +408,23 @@ class PluginManager {
     }
 
     // 卸载插件
-    async uninstallPlugin(pluginName) {
+    async uninstallPlugin(pluginName, pluginPath) {
         try {
-            console.log(`开始卸载插件: ${pluginName}`);
-            
-            // 先停止插件
-            this.stopPlugin(pluginName);
-            
-            // 获取插件路径
-            // 注意：这里需要遍历目录找到匹配的插件，因为 getPluginList 是动态扫描的
             const plugins = await this.getPluginList({ force: true });
-            const plugin = plugins.find(p => p.name === pluginName);
-            
+            const matches = plugins.filter(p => pluginPath ? p.path === pluginPath : p.name === pluginName);
+            if (matches.length > 1) throw new Error('存在同名插件，请从插件管理中选择具体插件卸载');
+            const plugin = matches[0];
             if (!plugin) {
                 throw new Error(`找不到插件: ${pluginName}`);
             }
-            
-            const pluginPath = plugin.path;
-            
-            // 确认路径在插件目录下，防止误删系统文件
-            if (!pluginPath.startsWith(this.pluginDir)) {
-                throw new Error(`非法插件路径: ${pluginPath}`);
+            const win = this.pluginWindows.get(plugin.name);
+            const child = this.pluginProcesses.get(plugin.name);
+            if ((win && !win.isDestroyed()) || (child && child.exitCode == null)) {
+                throw new Error('请先关闭正在运行的插件再卸载');
             }
-            
-            // 删除插件目录
-            // 使用 rimraf 或 fs.rm (Node.js 14.14+)
-            if (fs.existsSync(pluginPath)) {
-                fs.rmSync(pluginPath, { recursive: true, force: true });
-                console.log(`插件目录已删除: ${pluginPath}`);
-            }
-            
-            // 清理持久化数据
-            // 这一步可选，根据需求决定是否保留数据
-            // const storagePath = this.getPluginStoragePath(pluginName);
-            // if (fs.existsSync(storagePath)) {
-            //     fs.unlinkSync(storagePath);
-            // }
-            
-            // 清除动态注册的功能
-            this.dynamicFeatures.delete(pluginName);
-            
+            await removePluginPath(this.pluginDir, plugin.path, `tools:${normalizePluginIdentity(plugin.name)}`);
+            this.dynamicFeatures.delete(plugin.name);
+            await this.getPluginList({ force: true });
             return { success: true, message: `插件 ${pluginName} 已卸载` };
         } catch (error) {
             console.error(`卸载插件 ${pluginName} 失败:`, error);
@@ -451,6 +436,7 @@ class PluginManager {
     async runPlugin(pluginPath, features = []) {
         let logContext = this._pluginLogContext(pluginPath);
         try {
+            assertPluginAvailable(pluginPath);
             console.log('开始执行插件:', pluginPath);
             
             const pluginJsonPath = path.join(pluginPath, 'plugin.json');
@@ -690,6 +676,7 @@ class PluginManager {
 
         // 窗口关闭时清理状态
         pluginWindow.on('closed', () => {
+            this.macDock.unpin(pluginName);
             this._emitLog(logContext, 'system', '插件窗口已关闭');
             console.log(`插件窗口关闭，清理状态: ${pluginName}`);
             this.closePluginIndicatorWindow(pluginName);
@@ -1303,6 +1290,10 @@ class PluginManager {
         this.pluginMeta.set(pluginName, { pluginPath, pluginConfig });
         this.pluginBackgroundKeepAlive.set(pluginName, false);
         this.pluginWindows.set(pluginName, pluginWindow);
+        if (autoSeparate) {
+            try { this.syncPluginDock(pluginName, true); }
+            catch (error) { this.stopPlugin(pluginName); throw error; }
+        }
         
         return pluginWindow;
     }
@@ -1517,6 +1508,7 @@ class PluginManager {
         const meta = this.pluginMeta.get(pluginName);
         const logContext = meta ? this._pluginLogContext(meta.pluginPath, pluginName) : null;
         try {
+            this.macDock.unpin(pluginName);
             this.closePluginIndicatorWindow(pluginName);
 
             // 关闭插件窗口
@@ -1560,6 +1552,7 @@ class PluginManager {
 
     // 停止所有插件
     stopAllPlugins() {
+        this.macDock.dispose();
         for (const [key, win] of this.pluginAuxWindows) {
             if (win && !win.isDestroyed()) {
                 try { win.close(); } catch (_) {}
@@ -1622,6 +1615,11 @@ class PluginManager {
             const currentStatus = this.pluginPinnedMap.get(pluginName) || false;
             const newStatus = !currentStatus;
             this.pluginPinnedMap.set(pluginName, newStatus);
+            try { this.syncPluginDock(pluginName, newStatus); }
+            catch (error) {
+                this.pluginPinnedMap.set(pluginName, currentStatus);
+                throw error;
+            }
             
             console.log(`插件 ${pluginName} 钉住状态: ${currentStatus} -> ${newStatus}`);
             
@@ -1676,6 +1674,25 @@ class PluginManager {
             console.error(`切换插件 ${pluginName} 钉住状态时出错:`, error);
             return false;
         }
+    }
+
+    // Mac 的每个钉住插件使用独立 Dock 身份；窗口与业务仍由宿主管理。
+    syncPluginDock(pluginName, pinned) {
+        if (process.platform !== 'darwin') return;
+        if (!pinned) { this.macDock.unpin(pluginName); return; }
+        const meta = this.pluginMeta.get(pluginName);
+        const win = this.pluginWindows.get(pluginName);
+        if (!meta || !win || win.isDestroyed()) return;
+        this.macDock.pin({
+            id: pluginName, stableId: `tools:${path.relative(this.pluginDir, meta.pluginPath).split(path.sep).join('/')}`,
+            name: pluginName, icon: this.getPluginIconPath(meta.pluginPath),
+            focus: () => {
+                if (win.isDestroyed()) return;
+                if (win.isMinimized()) win.restore();
+                win.show(); win.focus();
+            },
+            close: () => this.stopPlugin(pluginName)
+        });
     }
 
     // 获取插件窗口钉住状态
@@ -1774,13 +1791,14 @@ class PluginManager {
         return null;
     }
 
-    // 获取插件图标路径 - 优先使用 logo.ico，否则使用 logo.png
+    // macOS/Linux 优先 PNG，Windows 保持 ICO 优先。
     getPluginIconPath(pluginPath) {
         try {
             const logoIcoPath = path.join(pluginPath, 'logo.ico');
             const logoPngPath = path.join(pluginPath, 'logo.png');
             
-            // 优先检查 logo.ico
+            if (process.platform !== 'win32' && fs.existsSync(logoPngPath)) return logoPngPath;
+            // Windows 优先检查 logo.ico；原生 Mac Dock 辅助进程也能只读加载旧 ICO。
             if (fs.existsSync(logoIcoPath)) {
                 console.log(`插件图标找到 logo.ico: ${logoIcoPath}`);
                 return logoIcoPath;
@@ -1919,6 +1937,7 @@ class PluginManager {
     async runPluginAction(pluginPath, feature, selectedText) {
         let logContext = this._pluginLogContext(pluginPath);
         try {
+            assertPluginAvailable(pluginPath);
             console.log('🎯 执行插件功能:', feature.code, '选中文本:', selectedText);
             
             const pluginJsonPath = path.join(pluginPath, 'plugin.json');

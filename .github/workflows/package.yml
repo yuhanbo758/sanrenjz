@@ -11,7 +11,6 @@ on:
       - '**/*.md'
       - '.githooks/**'
       - 'scripts/*git*.py'
-      - 'scripts/credential_provider.py'
   workflow_dispatch:
 
 permissions:
@@ -47,7 +46,10 @@ jobs:
           node scripts/audit-public-scope.js
       - name: 确认发布版本
         id: version
-        run: node scripts/preview-version.cjs
+        run: |
+          node --test tests/release-version.test.cjs
+          node scripts/bump-version.cjs --check
+          node scripts/preview-version.cjs
       - name: 检查发布版本与来源提交
         id: release
         env:
@@ -165,6 +167,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 构建公开安装包
         run: node scripts/package-local.js --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - name: Windows 升级备份原生回归
+        if: runner.os == 'Windows'
+        run: node --test tests/windows-installer.test.cjs
       - name: 检查本次公开暂存内容
         run: |
           $taskStages = @(Get-ChildItem -LiteralPath dist -Directory | Where-Object { $_.Name -match '^public-stage-\d+-\d+$' })

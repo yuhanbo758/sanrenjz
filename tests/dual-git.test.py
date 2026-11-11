@@ -1,4 +1,4 @@
-"""验证公开推送不能夹带已删除的敏感历史，私有范围保留非开源插件。"""
+"""验证公开推送不能夹带已删除的敏感历史。"""
 import contextlib
 import importlib.util
 import io
@@ -23,23 +23,9 @@ def module(name, filename):
 
 
 guard = module('guard', 'github-git-guard.py')
-backup = module('backup', 'gitea-private-sync.py')
 
 
 class DualGitTests(unittest.TestCase):
-    def test_private_candidates_include_unclassified_plugins(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            keep = ['app/software/private-plugin/main.js', 'app/python-software/new-private/main.enc',
-                    'tests/private-feature.test.js', 'scripts/private-python/tool.py', '.github/workflows/package.yml']
-            skip = ['app/software/private-plugin/.runtime/session.json', 'node_modules/pkg/index.js',
-                    '.git/gitea-private.git/objects/file', 'dist/output.zip', '.env', 'plugin-data/user.db']
-            for name in keep + skip:
-                file = root / name
-                file.parent.mkdir(parents=True, exist_ok=True)
-                file.write_text('fixture', encoding='utf8')
-            self.assertEqual(set(backup.candidates(root)), set(keep))
-
     def test_public_history_is_scanned_even_when_head_is_clean(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

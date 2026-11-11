@@ -7,6 +7,7 @@ const { MigrationManager } = require('./migration-manager');
 const { extractZip, findRoots, importTools, inside } = require('./plugin-import');
 const { RunLogStore, validateLogFilter } = require('./run-log-store');
 const { getInstalledAppRoot } = require('./install-root');
+const { isUninstalled } = require('./plugin-uninstall');
 
 function publicRuntime(runtime) {
     if (!runtime || runtime.canceled) return runtime;
@@ -23,7 +24,7 @@ function createMergedHost({ app, ipcMain, dialog, shell, getWindow, getManager, 
         const bundled = path.join(process.resourcesPath, 'app', 'python-software');
         if (fs.existsSync(bundled)) for (const item of fs.readdirSync(bundled)) {
             const destination = path.join(pythonDir, item);
-            if (!item.startsWith('.') && !fs.existsSync(destination)) fs.cpSync(path.join(bundled, item), destination, { recursive: true, filter: () => true });
+            if (!item.startsWith('.') && !isUninstalled(pythonDir, `python:${item}`) && !fs.existsSync(destination)) fs.cpSync(path.join(bundled, item), destination, { recursive: true, filter: () => true });
         }
     }
     const changed = async ({ pythonImported = [] } = {}) => {
@@ -147,7 +148,9 @@ function createMergedHost({ app, ipcMain, dialog, shell, getWindow, getManager, 
             if (String(id).startsWith('python:')) return python.remove(id);
             const item = (await list(true)).find(p => p.id === id);
             if (!item) throw new Error('插件未安装');
-            const result = await getManager().uninstallPlugin(item.name); await changed(); return result;
+            const result = await getManager().uninstallPlugin(item.name, item.path);
+            if (result.success) await changed();
+            return result;
         },
         'unified:import': async (_e, kind) => {
             const config = { 'python-file': { properties: ['openFile', 'multiSelections'], filters: [{ name: 'Python 文件', extensions: ['py'] }] }, 'python-folder': { properties: ['openDirectory', 'multiSelections'] }, 'tools-folder': { properties: ['openDirectory', 'multiSelections'] }, 'tools-zip': { properties: ['openFile', 'multiSelections'], filters: [{ name: '插件 ZIP', extensions: ['zip'] }] } }[kind];

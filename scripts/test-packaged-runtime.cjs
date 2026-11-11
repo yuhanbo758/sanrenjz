@@ -95,6 +95,20 @@ function locatePackage(root, options, pkg) {
     return { ...layout, binary };
 }
 
+function validateMacDockResources(resources, platform, arch, run = spawnSync) {
+    if (platform !== 'mac') return;
+    for (const relative of ['app/plugin_runtime/mac-dock.js', 'app/native/mac-dock-helper']) {
+        const file = path.join(resources, relative);
+        if (!fs.existsSync(file)) throw failure('MAC_DOCK_RESOURCE_MISSING');
+        const stat = fs.lstatSync(file);
+        if (!stat.isFile() || stat.isSymbolicLink() || !stat.size) throw failure('MAC_DOCK_RESOURCE_INVALID');
+    }
+    const helper = path.join(resources, 'app/native/mac-dock-helper');
+    if (!(fs.statSync(helper).mode & 0o111)) throw failure('MAC_DOCK_HELPER_NOT_EXECUTABLE');
+    const inspected = run('/usr/bin/lipo', ['-archs', helper], { encoding: 'utf8' });
+    if (inspected.status !== 0 || inspected.stdout.trim() !== (arch === 'x64' ? 'x86_64' : arch)) throw failure('MAC_DOCK_HELPER_ARCHITECTURE');
+}
+
 function isolatedEnvironment(base, { platform, profile, pluginRoot }) {
     const env = { ...base, SANRENJZ_ACCEPTANCE: '1', SANRENJZ_USER_DATA: profile, SANRENJZ_TEST_HIDDEN: '1', SANRENJZ_PYTHON_LIVE: '0' };
     delete env.ELECTRON_RUN_AS_NODE;
@@ -200,6 +214,7 @@ async function runSmoke({ root = path.resolve(__dirname, '..'), platform, arch, 
         report.version = pkg.version;
         const catalog = JSON.parse(fs.readFileSync(path.join(root, 'config/public-plugins.json'), 'utf8'));
         const layout = locatePackage(root, { platform, arch }, pkg);
+        validateMacDockResources(layout.resources, platform, arch);
         sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-native-smoke-'));
         const profile = path.join(sandbox, 'profile');
         const pluginRoot = platform === 'win' ? path.join(sandbox, 'portable') : profile;
@@ -281,6 +296,31 @@ async function runSmoke({ root = path.resolve(__dirname, '..'), platform, arch, 
             record(settings.rightClickDelay === 421 && diskSettings.rightClickDelay === 421 && settings.pythonMode === 'none' && settings.autoStart === false, 'isolated-settings-save-and-readback');
             const logs = await evaluate("require('electron').ipcRenderer.invoke('runtime:logs')");
             record(logs.records.length === 0, 'no-business-runtime-logs');
+            if (platform === 'mac') {
+                stage = 'mac-plugin-dock';
+                const fixture = path.join(pluginRoot, 'plugins', 'dock-acceptance-safe');
+                fs.mkdirSync(fixture);
+                fs.writeFileSync(path.join(fixture, 'plugin.json'), JSON.stringify({ pluginName: 'Dock 隔离验收', main: 'index.html' }));
+                fs.writeFileSync(path.join(fixture, 'index.html'), '<!doctype html><body>无业务测试插件</body>');
+                fs.copyFileSync(path.join(layout.resources, 'build/icon.png'), path.join(fixture, 'logo.png'));
+                await evaluate("require('electron').ipcRenderer.invoke('refresh-plugins')");
+                const launched = await evaluate("require('electron').ipcRenderer.invoke('unified:run','tools:dock-acceptance-safe')");
+                record(launched.success === true, 'packaged-dock-plugin-launch');
+                record(await evaluate("require('electron').ipcRenderer.invoke('toggle-plugin-pin-window','Dock 隔离验收')") === true, 'packaged-dock-pin');
+                let dockPid;
+                await waitFor(() => {
+                    const processes = spawnSync('/bin/ps', ['-axo', 'pid,ppid,comm'], { encoding: 'utf8' });
+                    if (processes.status !== 0) return false;
+                    const owned = processes.stdout.split('\n').map(line => line.match(/^\s*(\d+)\s+(\d+)\s+(.+)$/)).find(row => row && Number(row[2]) === child.pid && row[3].endsWith('/mac-dock-helper'));
+                    if (owned) dockPid = Number(owned[1]);
+                    return Boolean(owned);
+                });
+                record(Number.isInteger(dockPid), 'packaged-dock-native-child');
+                record(await evaluate("require('electron').ipcRenderer.invoke('toggle-plugin-pin-window','Dock 隔离验收')") === false, 'packaged-dock-unpin');
+                await waitFor(() => { try { process.kill(dockPid, 0); return false; } catch { return true; } });
+                record(true, 'packaged-dock-native-cleanup');
+                await evaluate("require('electron').ipcRenderer.invoke('unified:stop','tools:dock-acceptance-safe')");
+            }
             stage = 'shutdown';
             await evaluate("setTimeout(()=>require('@electron/remote').app.quit(),20);true").catch(() => {});
             await settleWithin(closed, 12000);
@@ -313,4 +353,4 @@ if (require.main === module) {
     try { options = parseOptions(); } catch (error) { console.error(error.code || 'INVALID_ARGUMENTS'); process.exitCode = 1; }
     if (options) runSmoke(options).then(report => { console.log(JSON.stringify(report)); process.exitCode = report.success ? 0 : 1; }).catch(() => { console.error('SMOKE_REPORT_FAILED'); process.exitCode = 1; });
 }
-module.exports = { parseOptions, locatePackage, isolatedEnvironment, inside, stopOwnedProcess, runSmoke, runtimeArguments, sanitizeSystemLine, createSystemDiagnostics, connectCdp };
+module.exports = { parseOptions, locatePackage, validateMacDockResources, isolatedEnvironment, inside, stopOwnedProcess, runSmoke, runtimeArguments, sanitizeSystemLine, createSystemDiagnostics, connectCdp };

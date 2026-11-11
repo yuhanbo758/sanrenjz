@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const WebSocket = require('ws');
-const { parseOptions, locatePackage, isolatedEnvironment, inside, stopOwnedProcess, runSmoke, runtimeArguments, sanitizeSystemLine, createSystemDiagnostics, connectCdp } = require('../scripts/test-packaged-runtime.cjs');
+const { parseOptions, locatePackage, validateMacDockResources, isolatedEnvironment, inside, stopOwnedProcess, runSmoke, runtimeArguments, sanitizeSystemLine, createSystemDiagnostics, connectCdp } = require('../scripts/test-packaged-runtime.cjs');
 
 function fixture(t) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sanrenjz-smoke-test-'));
@@ -14,6 +14,29 @@ function fixture(t) {
     t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
     return root;
 }
+
+test('Mac 安装包缺少 Dock 模块、辅助程序或架构不符时验收失败', t => {
+    const root = fixture(t);
+    assert.doesNotThrow(() => validateMacDockResources(root, 'win', 'x64'));
+    assert.throws(() => validateMacDockResources(root, 'mac', 'arm64'), { code: 'MAC_DOCK_RESOURCE_MISSING' });
+    fs.mkdirSync(path.join(root, 'app/plugin_runtime'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'app/native'));
+    fs.writeFileSync(path.join(root, 'app/plugin_runtime/mac-dock.js'), 'fixture');
+    assert.throws(() => validateMacDockResources(root, 'mac', 'arm64'), { code: 'MAC_DOCK_RESOURCE_MISSING' });
+    const helper = path.join(root, 'app/native/mac-dock-helper'); fs.writeFileSync(helper, 'fixture'); fs.chmodSync(helper, 0o755);
+    // 执行位策略用明确的夹具覆盖，避免 Windows chmod 无法表达 Unix 执行位。
+    const statSync = fs.statSync;
+    let executable = false;
+    t.mock.method(fs, 'statSync', (file, ...args) => {
+        const stat = statSync(file, ...args);
+        if (file === helper) stat.mode = executable ? stat.mode | 0o111 : stat.mode & ~0o111;
+        return stat;
+    });
+    assert.throws(() => validateMacDockResources(root, 'mac', 'arm64'), { code: 'MAC_DOCK_HELPER_NOT_EXECUTABLE' });
+    executable = true;
+    assert.throws(() => validateMacDockResources(root, 'mac', 'arm64', () => ({ status: 0, stdout: 'x86_64' })), { code: 'MAC_DOCK_HELPER_ARCHITECTURE' });
+    assert.doesNotThrow(() => validateMacDockResources(root, 'mac', 'arm64', () => ({ status: 0, stdout: 'arm64\n' })));
+});
 
 test('仅接受四个平台架构组合，拒绝重复、缺失和未知参数', () => {
     for (const [platform, arch] of [['win', 'x64'], ['mac', 'x64'], ['mac', 'arm64'], ['linux', 'x64']]) {

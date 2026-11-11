@@ -182,13 +182,14 @@ require('../main');
         check(!catalog.plugins.some(item => item.name === hiddenName) && await evaluate('!plugins.some(item=>item.name==="隐藏效率工具")'), '移除插件并刷新后主进程与搜索页面都清除旧条目');
 
         await key('d', { ctrlKey: true });
-        await until(() => evaluate('isPinned===true'), '钉住状态未同步');
+        // 钉住状态先由 IPC 返回，显示文本需等后续状态查询；同时等待业务值和界面。
+        await until(() => evaluate('isPinned===true && pinStatus.textContent.includes("已钉住")'), '钉住状态未同步');
         check(await evaluate('pinStatus.textContent.includes("已钉住")'), 'Ctrl+D 与真实宿主钉住状态同步');
         beforeHide = hideRequests; await key('Escape'); await delay(80);
         check(hideRequests === beforeHide + 1, '已钉住时显式 Escape 仍可关闭搜索');
         beforeHide = hideRequests; await evaluate("window.dispatchEvent(new Event('blur'));true;"); await delay(260);
         check(hideRequests === beforeHide, '钉住时失去焦点继续保留搜索');
-        await key('D', { ctrlKey: true }); await until(() => evaluate('isPinned===false'), '取消钉住未同步');
+        await key('D', { ctrlKey: true }); await until(() => evaluate('isPinned===false && !pinStatus.textContent.includes("已钉住")'), '取消钉住未同步');
         check(await evaluate('!pinStatus.textContent.includes("已钉住")'), '再次 Ctrl+D 正常解除钉住');
         check(report.errors.length === 0, '真实搜索动作没有未处理页面异常');
         report.success = true;

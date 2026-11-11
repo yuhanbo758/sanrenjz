@@ -58,7 +58,10 @@ const { hookOutputSource } = require(app.isPackaged
 const { getInstalledAppRoot } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'install-root.js')
     : './app/install-root');
-
+const { getLoginItemOptions } = require(app.isPackaged
+    ? path.join(process.resourcesPath, 'app', 'login-startup.js')
+    : './app/login-startup');
+const loginItemOptions = getLoginItemOptions(app);
 const { MacTextInsertion } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'mac-text-insertion.js')
     : './app/mac-text-insertion');
@@ -73,7 +76,6 @@ const { ReleaseUpdates, GITHUB_RELEASES_URL } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'release-updates.js')
     : './app/release-updates');
 let releaseUpdates;
-
 const { MacUpdateInstaller } = require(app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'mac-update-installer.js')
     : './app/mac-update-installer');
@@ -2976,14 +2978,17 @@ ipcMain.handle('save-settings', (event, settings) => {
                 || Boolean(!requested[key] && binding);
         });
         const autoStartChanged = Object.prototype.hasOwnProperty.call(settings, 'autoStart') && requested.autoStart !== currentSettings.autoStart;
+        if (autoStartChanged && !mergedAcceptance && !loginItemOptions) {
+            throw new Error('开发版不能修改系统开机自启动，请在安装版三人聚智中设置；原设置保持不变。');
+        }
         const persist = () => {
             let previousLogin;
             let loginAttempted = false;
             try {
                 if (autoStartChanged && !mergedAcceptance) {
-                    previousLogin = { openAtLogin: app.getLoginItemSettings({ path: process.execPath }).openAtLogin, path: process.execPath };
+                    previousLogin = { ...loginItemOptions, openAtLogin: app.getLoginItemSettings(loginItemOptions).openAtLogin };
                     loginAttempted = true;
-                    app.setLoginItemSettings({ openAtLogin: requested.autoStart, path: process.execPath });
+                    app.setLoginItemSettings({ ...loginItemOptions, openAtLogin: requested.autoStart });
                 }
                 return saveSettings(requested);
             } catch (error) {
@@ -4788,9 +4793,9 @@ app.whenReady().then(async () => {
         }
 
         // 设置开机自启动
-        if (settings.autoStart) {
+        if (settings.autoStart && loginItemOptions) {
             try {
-                app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
+                app.setLoginItemSettings({ ...loginItemOptions, openAtLogin: true });
             } catch (error) {
                 console.warn('系统自启动未能启用:', error.message);
                 const notify = () => sendRendererEvent('notify', { title: '开机自启动未生效', message: error.message, type: 'warning' });

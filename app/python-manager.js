@@ -4,6 +4,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { decodeUtf8Stream } = require('./console-encoding');
+const { removePluginPath, assertPluginAvailable } = require('./plugin-uninstall');
 const { importLocalSoftware } = require('./python-support/software_store');
 const { preparePluginConfig, safePluginId } = require('./python-support/plugin_config');
 const { createPluginAppId, resolvePluginVisual } = require('./python-support/plugin_visual');
@@ -161,7 +162,9 @@ class PythonManager {
         const id = `python:${relative}`;
         const preferences = (this.loadSettings() || {}).pluginPreferences || {};
         const preference = preferences[id] || {};
-        const visual = resolvePluginVisual({ folderPath: folder, settings: metadata });
+        const visual = resolvePluginVisual({ folderPath: folder, settings: metadata,
+            defaultLogoPath: path.join(path.dirname(__dirname), 'build', 'icon.png'),
+            defaultIconPath: path.join(path.dirname(__dirname), 'build', 'icon.ico') });
         const configId = standalone ? safePluginId(path.parse(entry).name) : safePluginId(folder);
         const config = preparePluginConfig({ folderPath: folder, settings: standalone ? { config_file: `${path.basename(entry)}.config.json` } : metadata, configRoot: this._configRoot(), pluginId: configId, initialize: false });
         const details = ['README.md', 'FEATURES.md', '使用说明.md', '说明.md'].map((name) => path.join(folder, name)).find((file) => fs.existsSync(file));
@@ -169,7 +172,8 @@ class PythonManager {
         return {
             id, engine: 'python', name: metadata.name || path.parse(entry).name,
             description: metadata.description || 'Python 程序', path: entry, folderPath: folder,
-            iconPath: visual.logoPath, logoPath: visual.logoPath, taskbarIconPath: visual.taskbarIconPath,
+            iconPath: visual.macIconPath || visual.logoPath, logoPath: visual.logoPath,
+            taskbarIconPath: visual.taskbarIconPath, macIconPath: visual.macIconPath,
             pluginAppId: createPluginAppId(standalone ? path.parse(entry).name : folder),
             category: metadata.category || '', version: metadata.version || '', author: metadata.author || '',
             mainFile: path.basename(entry), requirementsPath: requirements && fs.existsSync(requirements) ? requirements : '',
@@ -237,11 +241,13 @@ class PythonManager {
                 }
                 if (/\.py$/i.test(candidate.entry)) this._installStandardHelpers(prepared);
             }
-            result = importLocalSoftware(prepared, this.pluginDir, activePaths, this._configRoot());
+            result = importLocalSoftware(prepared, this.pluginDir, activePaths.map(file => fs.realpathSync(file)), this._configRoot());
         } finally {
             if (workspace) fs.rmSync(workspace, { recursive: true, force: true });
         }
-        const item = this.list().find((candidate) => candidate.path === result.path || candidate.folderPath === result.path);
+        // macOS 的 /var 与 /private/var 等别名指向同一目录，导入器返回物理路径。
+        const importedPath = fs.realpathSync(result.path);
+        const item = this.list().find((candidate) => fs.realpathSync(candidate.path) === importedPath || fs.realpathSync(candidate.folderPath) === importedPath);
         this._notifyChanged(item?.id);
         return { ...item, action: result.action };
     }
@@ -433,6 +439,7 @@ class PythonManager {
         let temporary = '';
         try {
             const item = this._find(id);
+            assertPluginAvailable(item.path);
             const runtime = await this.environment.resolve();
             if (!this.pending.has(id) || this.closing) throw failure('启动已取消', 'PYTHON_CANCELLED');
             const plan = await this.dependencyPlan(id, runtime);
@@ -453,7 +460,8 @@ class PythonManager {
                 } catch (_) { throw failure('加密插件无法解密，请检查授权或环境配置', 'PYTHON_DECRYPT_FAILED'); }
             }
             const args = [path.join(SUPPORT_DIR, 'plugin_bootstrap.py'), '--script', entry,
-                '--plugin-dir', item.folderPath, '--logo', item.iconPath || '', '--icon', item.taskbarIconPath || '',
+                '--plugin-dir', item.folderPath, '--logo', item.logoPath || '', '--icon', item.taskbarIconPath || '',
+                '--mac-icon', item.macIconPath || '',
                 '--config', config.configPath, '--config-dir', config.configRoot, '--app-id', item.pluginAppId];
             return await new Promise((resolve, reject) => {
                 const child = spawn(runtime.executable, args, { cwd: item.folderPath, env: this._env(runtime, item, config), windowsHide: true });
@@ -499,11 +507,14 @@ class PythonManager {
     }
 
     async remove(id) {
-        if (this.running.has(id) || this.pending.has(id)) throw failure('请先停止 Python 程序再移除', 'PLUGIN_RUNNING');
         const item = this._find(id);
         const target = item.standalone ? item.path : item.folderPath;
-        if (!inside(this.pluginDir, target)) throw failure('不能移除插件目录外的文件', 'PLUGIN_INVALID');
-        fs.rmSync(target, { recursive: !item.standalone, force: true });
+        // 同一目录可能包含多个入口，任一入口运行或启动中均不能删除整目录。
+        const affected = this.list().filter(candidate => candidate.path === target || (!item.standalone && candidate.folderPath === target));
+        if (affected.some(candidate => this.running.has(candidate.id) || this.pending.has(candidate.id))) {
+            throw failure('请先停止 Python 程序再卸载', 'PLUGIN_RUNNING');
+        }
+        await removePluginPath(this.pluginDir, target, `python:${path.basename(target)}`, { recursive: !item.standalone });
         this._notifyChanged(id);
         return { success: true, id, configPreserved: true };
     }

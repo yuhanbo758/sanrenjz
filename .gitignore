@@ -109,6 +109,7 @@ security-review.md
 /python-plugin-configs/
 /migration-backups/
 **/__pycache__/
+/app/native/
 *.pyc
 *.db
 *.sqlite*
