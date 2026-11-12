@@ -171,6 +171,8 @@ test('取消、超时、DNS 与限流返回中文安全错误并可重试', asyn
     f.routes.set(API_URL, { stall: true });
     await assert.rejects(f.manager.check(), /超时|最长/);
     assert.equal(f.manager.busy, false);
+    // 30ms 仅用于超时分支，正常重试与文件校验不沿用易受 CI 调度影响的短期限。
+    f.manager.timeoutMs = 1000;
     f.routes.set(API_URL, { error: Object.assign(new Error('sensitive request details'), { code: 'ENOTFOUND' }) });
     await assert.rejects(f.manager.check(), /解析 GitHub/);
     f.routes.set(API_URL, { status: 403 });

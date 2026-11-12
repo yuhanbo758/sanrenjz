@@ -387,3 +387,79 @@ test('Windows helper：最终空备份目录被占用时不重建日志，释放
     } finally { await unlock(); }
     f.run('cleanup'); f.noBackup(); f.assertData();
 });
+
+function committedConfigConflict(f) {
+    const previous = Buffer.from('{"owner":"old","value":"unique personal data"}');
+    const current = Buffer.from('{"owner":"current","value":"new configuration"}');
+    write(path.join(f.install, 'config.json'), previous);
+    f.run('prepare'); f.payload();
+    write(path.join(f.install, 'config.json'), current);
+    f.register('0.2.2', false); f.run('restore'); f.run('cleanup', 10);
+    assert.deepEqual(fs.readFileSync(path.join(f.old, 'config.json')), previous);
+    assert.deepEqual(fs.readFileSync(path.join(f.install, 'config.json')), current);
+    return { previous, current };
+}
+
+test('Windows helper：清理保留的旧配置在下一次升级及失败回滚后仍完整保留', options, t => {
+    const f = fixture(t);
+    const { previous, current } = committedConfigConflict(f);
+    const originalRegistry = f.registry();
+    f.run('prepare', 0, '0.2.3');
+    const recovery = path.join(f.backup, 'recovery');
+    const archived = fs.readdirSync(recovery);
+    assert.equal(archived.length, 1, '旧整目录只归入同一恢复区一次');
+    assert(archived[0].startsWith('interrupted-'));
+    const previousConfig = path.join(recovery, archived[0], 'config.json');
+    assert.deepEqual(fs.readFileSync(previousConfig), previous, '下一次 prepare 不能盲删上一事务保留的旧配置');
+    assert.deepEqual(fs.readFileSync(path.join(f.old, 'config.json')), current, '新事务暂存的是当前配置');
+    f.payload('failed-next');
+    write(path.join(f.install, 'config.json'), 'failed next configuration');
+    f.register('0.2.3', false); f.run('rollback', 0, '0.2.3');
+    assert.deepEqual(fs.readFileSync(previousConfig), previous, '后续失败回滚也不能删除此前保留的不同副本');
+    assert.deepEqual(fs.readFileSync(path.join(f.install, 'config.json')), current);
+    assert.deepEqual(f.registry(), originalRegistry);
+    assert.equal(readJSON(f.stateFile).Stage, 'rolledBack');
+    f.assertData(); f.noScatteredBackup();
+});
+
+test('Windows helper：已提交目录归档中断按日志续行，歧义状态拒绝且不覆盖资料', options, t => {
+    for (const interruption of ['before-move', 'after-move', 'both-missing']) {
+        const f = fixture(t);
+        const { previous, current } = committedConfigConflict(f);
+        const recovery = path.join(f.backup, 'recovery');
+        const target = path.join(recovery, 'interrupted-' + crypto.randomUUID().replaceAll('-', ''));
+        const state = readJSON(f.stateFile);
+        state.CommittedArchiveTarget = target; f.saveState(state);
+        if (interruption === 'before-move') {
+            write(path.join(target, 'config.json'), 'separate existing recovery data');
+            f.run('prepare', 1, '0.2.3');
+            f.run('rollback', 1, '0.2.3');
+            assert.deepEqual(fs.readFileSync(path.join(f.old, 'config.json')), previous);
+            assert.equal(fs.readFileSync(path.join(target, 'config.json'), 'utf8'), 'separate existing recovery data');
+            assert.deepEqual(fs.readFileSync(path.join(f.install, 'config.json')), current);
+            assert.equal(readJSON(f.stateFile).CommittedArchiveTarget, target);
+            assert.equal(path.dirname(target), recovery);
+            fs.rmSync(target, { recursive: true });
+        } else if (interruption === 'after-move') {
+            fs.mkdirSync(recovery, { recursive: true }); fs.renameSync(f.old, target);
+            f.run('rollback', 0, '0.2.3');
+            assert.deepEqual(fs.readFileSync(path.join(f.install, 'config.json')), current, '已提交事务的 rollback 只能保留材料，不能回退新程序');
+        } else {
+            // 模拟持久日志仍在，但源和归档都丢失；不能把它当成已完成并继续破坏当前安装。
+            assert.equal(path.dirname(f.old), f.active);
+            fs.rmSync(f.old, { recursive: true });
+            f.run('prepare', 1, '0.2.3');
+            assert.deepEqual(fs.readFileSync(path.join(f.install, 'config.json')), current);
+            assert.equal(readJSON(f.stateFile).CommittedArchiveTarget, target);
+            assert(!fs.existsSync(target));
+            continue;
+        }
+        f.run('prepare', 0, '0.2.3');
+        f.run('prepare', 0, '0.2.3');
+        assert.deepEqual(fs.readdirSync(recovery), [path.basename(target)], interruption + ' 重试不得重复归档');
+        assert.deepEqual(fs.readFileSync(path.join(target, 'config.json')), previous);
+        assert.deepEqual(fs.readFileSync(path.join(f.old, 'config.json')), current);
+        assert.equal(readJSON(f.stateFile).Stage, 'staged');
+        f.run('rollback', 0, '0.2.3'); f.assertData();
+    }
+});

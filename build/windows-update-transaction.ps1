@@ -194,8 +194,48 @@ function RemoveSafe([string]$path) {
         if (![SanrenjzUpdateNative]::DeleteFile((Extended $path))) { throw "Cannot remove file: $path" }
     }
 }
-function CleanupCommitted {
+function PreserveUnverifiedCommittedApp {
+    $property = $script:state.PSObject.Properties['CommittedArchiveTarget']
+    $archiveTarget = if ($null -ne $property) { [string]$property.Value } else { '' }
+    $recovery = [IO.Path]::Combine($backup,'recovery')
+    if (!$archiveTarget) {
+        if (!(Exists $oldApp)) { return }
+        try {
+            AssertTreePlain $oldApp
+            AssertHistoricalApplication $oldApp $false $true
+            return
+        } catch { }
+        # 已提交安装不能再回滚；未核实旧资料只整体移动，既不覆盖当前文件也不删除。
+        AssertPlain $backup
+        AssertPlain $oldApp
+        AssertPlain $recovery
+        EnsureDir $recovery
+        $archiveTarget = [IO.Path]::Combine($recovery,('interrupted-' + [Guid]::NewGuid().ToString('N')))
+        if ($null -eq $property) { $script:state | Add-Member -MemberType NoteProperty -Name CommittedArchiveTarget -Value $archiveTarget }
+        else { $script:state.CommittedArchiveTarget = $archiveTarget }
+        SaveState
+    }
+    $archiveTarget = [IO.Path]::GetFullPath($archiveTarget).TrimEnd('\')
+    $expectedParent = [IO.Path]::GetFullPath($recovery).TrimEnd('\')
+    $archiveName = [IO.Path]::GetFileName($archiveTarget)
+    if (![string]::Equals([IO.Path]::GetDirectoryName($archiveTarget),$expectedParent,[StringComparison]::OrdinalIgnoreCase) -or !$archiveName.StartsWith('interrupted-',[StringComparison]::OrdinalIgnoreCase) -or $archiveName.Length -le 'interrupted-'.Length) {
+        throw 'Committed archive target is outside this installation recovery directory'
+    }
+    AssertPlain $backup
+    AssertPlain $recovery
+    AssertPlain $oldApp
+    AssertPlain $archiveTarget
+    $sourceExists = Exists $oldApp
+    $targetExists = Exists $archiveTarget
+    if (($sourceExists -and ![IO.Directory]::Exists((Extended $oldApp))) -or ($targetExists -and ![IO.Directory]::Exists((Extended $archiveTarget)))) { throw 'Committed application archive entry is not a directory; materials retained' }
+    # 目标先记入日志再同盘移动；任一崩溃边界都复用同一个目标，不生成重复归档。
+    if ($sourceExists -and !$targetExists) { MoveSafe $oldApp $archiveTarget }
+    elseif (!$sourceExists -and $targetExists) { }
+    else { throw 'Ambiguous committed application archive state; materials retained' }
+}
+function CleanupCommitted([switch]$PreserveUnverifiedApp) {
     if (!(Exists $active)) { return }
+    if ($PreserveUnverifiedApp) { PreserveUnverifiedCommittedApp }
     # 提交标记最后删除；清理中断后仍能识别为已提交，不会重新暂存当前应用。
     foreach ($entry in @([IO.Directory]::EnumerateFileSystemEntries((Extended $active)))) {
         $name=[IO.Path]::GetFileName($entry)
@@ -450,7 +490,7 @@ function Prepare {
     }
     # 导入计划只在本次事务持久化后撤销，收纳中断时继续同一批次。
     RemoveSafe (Join-Path $backup 'legacy\import.json')
-    if ($script:state.Stage -eq 'committed') { CleanupCommitted; $script:state=$null; Prepare; return }
+    if ($script:state.Stage -eq 'committed') { CleanupCommitted -PreserveUnverifiedApp; $script:state=$null; Prepare; return }
     if ($script:state.Stage -in @('restoring','rollingBack','originalRestoring')) { Rollback }
     if ($script:state.Stage -eq 'rolledBack') { $script:state.Stage='created'; $script:state.Moves=@(); $script:state.RecoveryTarget=''; $script:state.Version=$Version; $script:state.Registry=@(SnapshotRegistry); SaveState }
     if ($script:state.Stage -eq 'created') {
@@ -522,7 +562,7 @@ function Restore {
 }
 function Rollback {
     if ($null -eq $script:state) { return }
-    if ($script:state.Stage -eq 'committed') { CleanupCommitted; return }
+    if ($script:state.Stage -eq 'committed') { CleanupCommitted -PreserveUnverifiedApp; return }
     if ($script:state.Stage -eq 'created' -and !(Exists $oldApp)) { $script:state.Stage='rolledBack'; SaveState; return }
     if ($script:state.Stage -eq 'rolledBack') { return }
     if ($script:state.Stage -eq 'originalRestoring') {
