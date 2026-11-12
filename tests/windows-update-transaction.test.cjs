@@ -146,7 +146,10 @@ test('Windows helper：prepare → rollback 恢复文件与原注册表类型', 
 });
 
 test('Windows helper：部分恢复移动后崩溃，按同一日志继续恢复', options, t => {
-    const f = fixture(t); f.run('prepare'); f.payload();
+    const f = fixture(t);
+    write(path.join(f.install, 'uninstallerIcon.ico'), 'old NSIS program icon');
+    f.run('prepare'); f.payload();
+    write(path.join(f.install, 'uninstallerIcon.ico'), 'updated NSIS program icon');
     const state = readJSON(f.stateFile);
     state.Stage = 'restoring'; state.Moves = ['plugins', 'python-plugins', 'personal.txt'];
     fs.renameSync(path.join(f.old, 'plugins'), path.join(f.install, 'plugins'));
@@ -156,6 +159,7 @@ test('Windows helper：部分恢复移动后崩溃，按同一日志继续恢复
     assert.equal(readJSON(f.stateFile).Stage, 'committed', '先提交成功，再单独清理历史');
     f.run('cleanup');
     f.noBackup();
+    assert.equal(fs.readFileSync(path.join(f.install, 'uninstallerIcon.ico'), 'utf8'), 'updated NSIS program icon', '更新卸载器图标不应被误判成用户资料冲突');
 });
 
 test('Windows helper：原目录已恢复但标记未更新，可继续回滚并恢复注册表', options, t => {

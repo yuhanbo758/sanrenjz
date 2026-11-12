@@ -234,7 +234,7 @@ function AssertMatchingData([string]$source, [string]$target) {
 }
 function IsPayloadEntry([string]$name) {
     $mainName = $UninstallerName -replace '^Uninstall ',''
-    return $name -in @($mainName,$UninstallerName,'resources','locales','chrome_100_percent.pak','chrome_200_percent.pak',
+    return $name -in @($mainName,$UninstallerName,'uninstallerIcon.ico','resources','locales','chrome_100_percent.pak','chrome_200_percent.pak',
         'd3dcompiler_47.dll','dxcompiler.dll','dxil.dll','ffmpeg.dll','icudtl.dat','libEGL.dll','libGLESv2.dll',
         'LICENSE.electron.txt','LICENSES.chromium.html','resources.pak','snapshot_blob.bin','v8_context_snapshot.bin',
         'vk_swiftshader.dll','vk_swiftshader_icd.json','vulkan-1.dll')
